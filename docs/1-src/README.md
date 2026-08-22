@@ -1,7 +1,8 @@
 # 1-src — Source architecture
 
-**Scope:** Source-code architecture: backends, tray, diagnostics, GUI, power
-management, and support tools.
+**Scope:** Source-code architecture for the `keyrgb/` package: backends, tray,
+diagnostics, GUI, power management, and support tools. The lane id is `1-src`
+and stays put; it is not the Python import root.
 
 ## Documents
 

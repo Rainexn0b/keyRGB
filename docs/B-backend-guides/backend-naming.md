@@ -15,7 +15,7 @@ ITE<chip>_<capability>[_<capability>...][_<oem>]
 
 **Canonical rules (including the hard max-four post-chip appendages limit and
 coarse chassis tokens) live in**
-[`keyrgb/core/backends/README.md`](../../src/core/backends/README.md).
+[`keyrgb/core/backends/README.md`](../../keyrgb/core/backends/README.md).
 Do not invent longer surface-inventory names; put logo/neon/vent detail on
 secondary routes and in support docs.
 

@@ -16,7 +16,7 @@ This file is the authoritative list of documentation lanes.
 | `0-governance` | Documentation governance and this registry | active |
 | `1-buildpython` | Build system (`buildpython`) design and operation | active |
 | `1-repo` | Repository layout and conventions | active |
-| `1-src` | Source-code architecture | active |
+| `1-src` | Source-code architecture for the `keyrgb/` package | active |
 | `2-usage` | User-facing usage, setup, troubleshooting | active |
 | `3-contributing` | Contributor workflow: build runner, commit/release procedures | active |
 | `9-Legal` | Code of conduct and legal/project-policy docs | active |

@@ -5,7 +5,7 @@ config locations.
 
 ## Application code
 
-- `src/` - application source (core, tray app, and GUIs)
+- `keyrgb/` - application source (core, tray app, and GUIs)
 - `tests/` - pytest suite
 - `buildpython/` - local build, quality, and release runner
 
@@ -18,12 +18,13 @@ config locations.
 ## Documentation
 
 - `README.md` - end-user install, usage, and troubleshooting guide
-- `docs/architecture/src/` - source and runtime architecture notes
-- `docs/architecture/buildpython/` - buildpython architecture notes
-- `docs/architecture/repo/` - repository-structure notes
-- `docs/developement/` - contributor workflow, backend, layout, and maintenance notes
-- `docs/bug-reports/` - deeper issue investigations and follow-up notes
-- `docs/usage/` - user-facing workflow docs that extend the README
+- `docs/1-src/` - source-code architecture for the `keyrgb/` package
+- `docs/1-buildpython/` - buildpython design and operation
+- `docs/1-repo/` - repository-structure notes
+- `docs/2-usage/` - user-facing workflow docs that extend the README
+- `docs/3-contributing/` - contributor workflow
+- `docs/B-backend-guides/` / `docs/B-backend-audits/` - backend notes
+- `docs/0-governance/lane-registry.md` - full documentation lane list
 
 ## Local or generated artifacts
 

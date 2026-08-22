@@ -5,45 +5,23 @@ from __future__ import annotations
 import logging
 import os
 import tkinter as tk
-from pathlib import Path
 from tkinter import ttk
 
-from keyrgb.core.runtime.imports import ensure_repo_root_on_sys_path
-
-try:
-    from keyrgb.core.config import Config
-    from keyrgb.core.power.system import (
-        DEFAULT_EXTREME_SAVER_CAP_KHZ,
-        MAX_EXTREME_SAVER_CAP_KHZ,
-        MIN_EXTREME_SAVER_CAP_KHZ,
-        PowerMode,
-        get_current_freq_stats_khz,
-        get_status,
-        normalize_extreme_saver_cap_khz,
-        set_mode,
-    )
-    from keyrgb.gui.theme import apply_clam_theme
-    from keyrgb.gui.utils.window_geometry import compute_centered_window_geometry
-    from keyrgb.gui.utils.window_icon import apply_keyrgb_window_icon
-except ImportError:
-    ensure_repo_root_on_sys_path(Path(__file__))
-    from keyrgb.core.config import Config
-    from keyrgb.core.power.system import (
-        DEFAULT_EXTREME_SAVER_CAP_KHZ,
-        MAX_EXTREME_SAVER_CAP_KHZ,
-        MIN_EXTREME_SAVER_CAP_KHZ,
-        PowerMode,
-        get_current_freq_stats_khz,
-        get_status,
-        normalize_extreme_saver_cap_khz,
-        set_mode,
-    )
-    from keyrgb.gui.theme import apply_clam_theme
-    from keyrgb.gui.utils.window_geometry import compute_centered_window_geometry
-    from keyrgb.gui.utils.window_icon import apply_keyrgb_window_icon
-
-
+from keyrgb.core.config import Config
+from keyrgb.core.power.system import (
+    DEFAULT_EXTREME_SAVER_CAP_KHZ,
+    MAX_EXTREME_SAVER_CAP_KHZ,
+    MIN_EXTREME_SAVER_CAP_KHZ,
+    PowerMode,
+    get_current_freq_stats_khz,
+    get_status,
+    normalize_extreme_saver_cap_khz,
+    set_mode,
+)
+from keyrgb.gui.theme import apply_clam_theme
 from keyrgb.gui.utils.tk_async import TkAsyncCoordinator, submit_gui_work
+from keyrgb.gui.utils.window_geometry import compute_centered_window_geometry
+from keyrgb.gui.utils.window_icon import apply_keyrgb_window_icon
 
 logger = logging.getLogger(__name__)
 

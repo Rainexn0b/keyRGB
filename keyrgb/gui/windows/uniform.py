@@ -6,17 +6,24 @@ import logging
 import os
 import time
 import tkinter as tk
-from pathlib import Path
 from tkinter import ttk
 from typing import TYPE_CHECKING, TypeAlias
 
+from keyrgb.core.config import Config
 from keyrgb.core.runtime.hardware_ownership import acquire_hardware_control_lock, release_hardware_control_lock
-from keyrgb.core.runtime.imports import ensure_repo_root_on_sys_path
 from keyrgb.core.utils.exceptions import is_device_busy
 from keyrgb.gui.theme import apply_clam_theme
 from keyrgb.gui.utils.tk_async import TkAsyncCoordinator, submit_gui_work
 from keyrgb.gui.utils.window_geometry import compute_centered_window_geometry
 from keyrgb.gui.utils.window_icon import apply_keyrgb_window_icon
+from keyrgb.gui.widgets.color_wheel import ColorWheel
+from keyrgb.gui.windows import (
+    _uniform_color_bootstrap as uniform_color_bootstrap,
+    _uniform_color_interactions as uniform_color_interactions,
+    _uniform_color_state as uniform_color_state,
+    _uniform_color_ui as uniform_color_ui,
+    _uniform_init_adapter as uniform_init_adapter,
+)
 
 if TYPE_CHECKING:
     from keyrgb.gui.windows._uniform_color_state import _UniformStatusLabel
@@ -28,29 +35,6 @@ _TK_WIDGET_STATE_ERRORS = (AttributeError, RuntimeError, tk.TclError)
 _GEOMETRY_APPLY_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
 _WRAP_SYNC_ERRORS = (RuntimeError, tk.TclError, TypeError, ValueError)
 _DEVICE_CLOSE_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
-
-try:
-    from keyrgb.core.config import Config
-    from keyrgb.gui.widgets.color_wheel import ColorWheel
-    from keyrgb.gui.windows import (
-        _uniform_color_bootstrap as uniform_color_bootstrap,
-        _uniform_color_interactions as uniform_color_interactions,
-        _uniform_color_state as uniform_color_state,
-        _uniform_color_ui as uniform_color_ui,
-        _uniform_init_adapter as uniform_init_adapter,
-    )
-except ImportError:
-    # Fallback for direct execution (e.g. `python keyrgb/gui/windows/uniform.py`).
-    ensure_repo_root_on_sys_path(Path(__file__))
-    from keyrgb.core.config import Config
-    from keyrgb.gui.widgets.color_wheel import ColorWheel
-    from keyrgb.gui.windows import (
-        _uniform_color_bootstrap as uniform_color_bootstrap,
-        _uniform_color_interactions as uniform_color_interactions,
-        _uniform_color_state as uniform_color_state,
-        _uniform_color_ui as uniform_color_ui,
-        _uniform_init_adapter as uniform_init_adapter,
-    )
 
 
 SecondaryDeviceRoute: TypeAlias = uniform_color_bootstrap.SecondaryDeviceRoute

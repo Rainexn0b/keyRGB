@@ -4,6 +4,8 @@
 
 - Packaging: Stop shipping the `buildpython` checkout helper in the installable `keyrgb` wheel/sdist. `python -m buildpython` still works from a repo checkout; end-user installs own only `keyrgb/`.
 - Tests: Use pytest `pythonpath = ["."]` as the only import bootstrap. Drop the extra `tests/_paths` sys.path insert from conftest and individual suites.
+- Runtime: Drop direct-execution `ImportError` + `sys.path` fallbacks from the uniform, reactive-color, and power-mode GUIs and from tray dependency loading. Launch via console scripts or `python -m keyrgb…`.
+- Docs: Point living repo/build/contributing notes at `keyrgb/` instead of the old `src/` import root. The `docs/1-src/` lane id stays (permanent); its README now says it documents the `keyrgb/` package.
 
 ## 0.33.0 (2026-08-22)
 

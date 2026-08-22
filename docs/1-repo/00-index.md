@@ -1,7 +1,7 @@
 # Repository Architecture (Index)
 
 This subsection covers repository-level structure rather than runtime behavior
-inside `src/` or build-runner internals inside `buildpython/`.
+inside `keyrgb/` or build-runner internals inside `buildpython/`.
 
 ## Documents
 

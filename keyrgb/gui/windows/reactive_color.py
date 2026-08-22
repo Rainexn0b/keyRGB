@@ -7,11 +7,16 @@ import os
 import signal
 import time
 import tkinter as tk
-from pathlib import Path
 from tkinter import ttk
 from typing import TYPE_CHECKING, cast
 
-from keyrgb.core.runtime.imports import ensure_repo_root_on_sys_path
+from keyrgb.gui.windows import (
+    _reactive_color_geometry as _geometry,
+    _reactive_color_init_adapter as _init_adapter,
+    _reactive_color_runtime as _runtime,
+    _reactive_color_settings_adapter as _settings_adapter,
+    _reactive_color_wiring as _wiring,
+)
 
 if TYPE_CHECKING:
     from keyrgb.core.config import Config as ConfigType
@@ -21,26 +26,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 _GEOMETRY_APPLY_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
 _WRAP_SYNC_ERRORS = (RuntimeError, tk.TclError, TypeError, ValueError)
-
-
-try:
-    from keyrgb.gui.windows import (
-        _reactive_color_geometry as _geometry,
-        _reactive_color_init_adapter as _init_adapter,
-        _reactive_color_runtime as _runtime,
-        _reactive_color_settings_adapter as _settings_adapter,
-        _reactive_color_wiring as _wiring,
-    )
-except ImportError:
-    # Fallback for direct execution (e.g. `python keyrgb/gui/windows/reactive_color.py`).
-    ensure_repo_root_on_sys_path(Path(__file__))
-    from keyrgb.gui.windows import (
-        _reactive_color_geometry as _geometry,
-        _reactive_color_init_adapter as _init_adapter,
-        _reactive_color_runtime as _runtime,
-        _reactive_color_settings_adapter as _settings_adapter,
-        _reactive_color_wiring as _wiring,
-    )
 
 
 Config = _runtime.Config
