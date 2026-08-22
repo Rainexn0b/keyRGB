@@ -2,10 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tests._paths import ensure_repo_root_on_sys_path
-
-ensure_repo_root_on_sys_path()
-
 from keyrgb.core.diagnostics import hidraw
 
 

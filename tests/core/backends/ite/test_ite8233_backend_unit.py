@@ -4,10 +4,6 @@ import os
 
 import pytest
 
-from tests._paths import ensure_repo_root_on_sys_path
-
-ensure_repo_root_on_sys_path()
-
 from keyrgb.core.backends.base import BackendStability, ExperimentalEvidence
 from keyrgb.core.backends.exceptions import BackendIOError
 from keyrgb.core.backends.ite8233_none_chassis_lightbar_clevo import (

@@ -5,9 +5,7 @@ import os
 import sys
 import time
 
-from tests._paths import REPO_ROOT, ensure_repo_root_on_sys_path
-
-ensure_repo_root_on_sys_path()
+from tests._paths import REPO_ROOT
 
 sys.path.insert(0, os.path.join(REPO_ROOT, "tuxedo-src"))
 

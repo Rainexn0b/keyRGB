@@ -7,10 +7,6 @@ from pathlib import Path
 
 import pytest
 
-from tests._paths import ensure_repo_root_on_sys_path
-
-ensure_repo_root_on_sys_path()
-
 import keyrgb.core.backends.sysfs.common as sysfs_common
 import keyrgb.core.diagnostics.collectors as diagnostics_collectors
 import keyrgb.core.diagnostics.collectors.backends as collectors_backends

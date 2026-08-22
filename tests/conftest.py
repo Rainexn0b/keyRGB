@@ -10,16 +10,12 @@ from pathlib import Path
 
 import pytest
 
-from tests._paths import ensure_repo_root_on_sys_path
 from tests._validation_env import (
     access_tripwire_enabled,
     hardware_opted_in,
     led_snapshot_tripwire_enabled,
     usb_import_tripwire_enabled,
 )
-
-_TESTS_REPO_ROOT = ensure_repo_root_on_sys_path()
-
 
 _SKIP_AGENT_TESTS_ENV = "KEYRGB_SKIP_AGENT_TESTS"
 

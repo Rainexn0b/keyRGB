@@ -5,10 +5,6 @@ from pathlib import Path
 
 import pytest
 
-from tests._paths import ensure_repo_root_on_sys_path
-
-ensure_repo_root_on_sys_path()
-
 from keyrgb.core.backends.sysfs import SysfsLedsBackend
 from keyrgb.core.backends.sysfs.common import _is_real_sysfs_path, _leds_root, _safe_write_text, _write_int
 from keyrgb.core.backends.sysfs.device import SysfsLedKeyboardDevice

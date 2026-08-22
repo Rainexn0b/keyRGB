@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import os
 
-from tests._paths import REPO_ROOT, ensure_repo_root_on_sys_path
-
-ensure_repo_root_on_sys_path()
+from tests._paths import REPO_ROOT
 
 
 def test_config_has_reactive_color_defaults(monkeypatch) -> None:

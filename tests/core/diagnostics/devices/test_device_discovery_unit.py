@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-from tests._paths import ensure_repo_root_on_sys_path
-
-ensure_repo_root_on_sys_path()
-
 from keyrgb.core.diagnostics.device_discovery import collect_device_discovery, format_device_discovery_text
 
 

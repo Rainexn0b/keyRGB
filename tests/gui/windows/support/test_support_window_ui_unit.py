@@ -2,10 +2,6 @@ from __future__ import annotations
 
 import pytest
 
-from tests._paths import ensure_repo_root_on_sys_path
-
-ensure_repo_root_on_sys_path()
-
 import keyrgb.gui.windows.support as support_window
 from tests.gui.windows.support._support_window_test_fakes import (
     FakeRoot as _FakeRoot,

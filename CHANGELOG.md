@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Packaging: Stop shipping the `buildpython` checkout helper in the installable `keyrgb` wheel/sdist. `python -m buildpython` still works from a repo checkout; end-user installs own only `keyrgb/`.
+- Tests: Use pytest `pythonpath = ["."]` as the only import bootstrap. Drop the extra `tests/_paths` sys.path insert from conftest and individual suites.
 
 ## 0.33.0 (2026-08-22)
 

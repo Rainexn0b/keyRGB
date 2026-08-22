@@ -4,9 +4,9 @@ from pathlib import Path
 
 from buildpython.core.profiles import PROFILES
 from buildpython.steps.step_defs import steps
-from tests._paths import ensure_repo_root_on_sys_path
+from tests._paths import REPO_ROOT
 
-_REPO_ROOT = Path(ensure_repo_root_on_sys_path())
+_REPO_ROOT = Path(REPO_ROOT)
 _BUILD_SYSTEM = _REPO_ROOT / "docs" / "1-buildpython" / "01-Build-system.md"
 _BUILD_STEPS = _REPO_ROOT / "docs" / "1-buildpython" / "01.1-Build-steps.md"
 _CI_DOC = _REPO_ROOT / "docs" / "1-buildpython" / "03-CI.md"

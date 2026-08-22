@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-from tests._paths import ensure_repo_root_on_sys_path
-
-ensure_repo_root_on_sys_path()
-
 from keyrgb.core.diagnostics.support import (
     ITE8291R3_SPEED_PROBE_KEY,
     ITE8910_SPEED_PROBE_KEY,

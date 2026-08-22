@@ -4,10 +4,6 @@ from types import SimpleNamespace
 
 import pytest
 
-from tests._paths import ensure_repo_root_on_sys_path
-
-ensure_repo_root_on_sys_path()
-
 import keyrgb.core.backends.sysfs.privileged as sysfs_privileged
 
 
