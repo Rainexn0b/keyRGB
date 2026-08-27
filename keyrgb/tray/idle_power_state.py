@@ -54,6 +54,16 @@ class TrayIdlePowerState:
     # new input, a power restore, or a manual turn-on arrives.
     controller_sleep_off: bool = False
     controller_sleep_off_at: float = 0.0
+    # Event-driven guard that prevents a freshly-armed relight intent (manual
+    # turn-on or a successful power restore) from being undone by a native
+    # controller-sleep zero read. After suspend/resume (or a manual turn-on)
+    # the ITE firmware may stay in its native input-timeout sleep and keep
+    # reporting brightness=0 even though KeyRGB just relit the deck; without
+    # this guard a poll past the post-resume suppression window would re-latch
+    # ``controller_sleep_off`` and stop the effect, leaving the board dark until
+    # another manual toggle. Armed only on relight-intent actions; cleared once
+    # a poll proves the hardware is awake (brightness>0, current_off=False).
+    controller_sleep_resume_guard: bool = False
     hardware_toggle_restore_effect: str = "none"
     hardware_toggle_restore_per_key_colors: dict[object, object] | None = None
     hardware_toggle_restore_software_target: str = "keyboard"

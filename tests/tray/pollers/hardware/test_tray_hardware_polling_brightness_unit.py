@@ -639,3 +639,113 @@ def test_nonzero_brightness_register_stays_asleep_when_hardware_is_off() -> None
     assert result == (8, True)
     assert owner.controller_sleep_off is True
     assert tray.is_off is True
+
+
+def test_controller_sleep_off_not_latched_while_resume_guard_armed_after_suppression(monkeypatch) -> None:
+    """Regression: after the 10s post-resume timestamp suppression window, a
+    stable zero read must not re-latch ``controller_sleep_off`` while a relight-
+    intent guard is armed (manual turn-on / successful power restore). The ITE
+    firmware may still be in its native input-timeout sleep and report 0 even
+    though KeyRGB just relit the deck; latching there would stop the effect and
+    leave the board dark until another manual toggle.
+    """
+
+    import time
+
+    from keyrgb.tray.idle_power_state import set_idle_power_state_field
+    from keyrgb.tray.pollers.hardware._recovery import set_controller_sleep_resume_guard
+
+    tray = _DummyTray(brightness=25, is_off=False)
+    tray.config.controller_sleep_respect = True
+    # Simulate a resume that happened >10s ago so the timestamp suppression no
+    # longer protects the deck on its own.
+    set_idle_power_state_field(
+        tray,
+        attr_name="_last_resume_at",
+        state_name="last_resume_at",
+        value=time.monotonic() - 20.0,
+    )
+    # A relight intent (turn-on / power restore) armed the guard.
+    set_controller_sleep_resume_guard(tray, True)
+    recovery_calls: list[int] = []
+
+    def _fake_recover(_tray, *, current_brightness: int) -> bool:
+        recovery_calls.append(int(current_brightness))
+        return True
+
+    monkeypatch.setattr(
+        "keyrgb.tray.pollers.hardware_polling._recover_stable_zero_brightness_best_effort",
+        _fake_recover,
+    )
+
+    result = _apply_polled_hardware_state(
+        tray,
+        current_brightness=0,
+        current_off=False,
+        last_brightness=0,
+        last_off_state=False,
+    )
+
+    owner = tray.tray_idle_power_state
+    assert owner.controller_sleep_off is False
+    assert tray.is_off is False
+    # Guard stays armed until hardware proves awake (brightness>0, off=False).
+    assert owner.controller_sleep_resume_guard is True
+    # Continue recovery attempts: a static effect has no render loop that can
+    # otherwise reassert brightness while the firmware remains asleep.
+    assert recovery_calls == [0]
+    assert result == (0, False)
+
+
+def test_nonzero_awake_read_clears_resume_guard_then_later_zero_latches(monkeypatch) -> None:
+    """A non-zero awake read clears the relight-intent guard, and a later
+    genuine stable zero (guard now disarmed) re-latches ``controller_sleep_off``,
+    preserving real idle-sleep behavior after a proven-awake observation.
+    """
+
+    import time
+
+    from keyrgb.tray.idle_power_state import set_idle_power_state_field
+    from keyrgb.tray.pollers.hardware._recovery import set_controller_sleep_resume_guard
+
+    tray = _DummyTray(brightness=25, is_off=False)
+    tray.config.controller_sleep_respect = True
+    set_controller_sleep_resume_guard(tray, True)
+    stop_calls: list[str] = []
+    tray.engine = SimpleNamespace(
+        running=False,
+        stop=lambda: stop_calls.append("stop"),
+        _device_mode_off=False,
+    )
+
+    # First poll: hardware proves awake (brightness>0, not off) -> guard cleared.
+    _apply_polled_hardware_state(
+        tray,
+        current_brightness=25,
+        current_off=False,
+        last_brightness=25,
+        last_off_state=False,
+    )
+    assert tray.tray_idle_power_state.controller_sleep_resume_guard is False
+
+    # Much later the controller genuinely natively sleeps (stable zero, no
+    # recent resume). Guard is now disarmed, so the deck may honor the sleep.
+    set_idle_power_state_field(
+        tray,
+        attr_name="_last_resume_at",
+        state_name="last_resume_at",
+        value=time.monotonic() - 20.0,
+    )
+    result = _apply_polled_hardware_state(
+        tray,
+        current_brightness=0,
+        current_off=False,
+        last_brightness=0,
+        last_off_state=False,
+    )
+    owner = tray.tray_idle_power_state
+    assert owner.controller_sleep_off is True
+    assert owner.controller_sleep_off_at > 0
+    assert tray.is_off is True
+    assert stop_calls == ["stop"]
+    assert result == (0, True)

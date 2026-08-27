@@ -53,6 +53,7 @@ def attach_idle_power_owner(tray: object, owner: TrayIdlePowerState | None = Non
         ("_dim_temp_target_brightness", "dim_temp_target_brightness"),
         ("_last_brightness", "last_brightness"),
         ("_last_resume_at", "last_resume_at"),
+        ("_controller_sleep_resume_guard", "controller_sleep_resume_guard"),
     ):
         try:
             setattr(tray, attr, getattr(st, field))

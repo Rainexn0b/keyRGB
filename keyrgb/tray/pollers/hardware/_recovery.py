@@ -199,6 +199,28 @@ def set_controller_sleep_off(tray: IdlePowerTrayProtocol, value: bool, *, now: f
     )
 
 
+def controller_sleep_resume_guard_active(tray: IdlePowerTrayProtocol) -> bool:
+    """Whether a relight-intent guard is armed, suppressing controller-sleep latching."""
+
+    return read_idle_power_state_bool_field(
+        tray,
+        attr_name="_controller_sleep_resume_guard",
+        state_name="controller_sleep_resume_guard",
+        default=False,
+    )
+
+
+def set_controller_sleep_resume_guard(tray: IdlePowerTrayProtocol, value: bool) -> None:
+    """Arm/clear the relight-intent guard that suppresses controller-sleep latching."""
+
+    set_idle_power_state_field(
+        tray,
+        attr_name="_controller_sleep_resume_guard",
+        state_name="controller_sleep_resume_guard",
+        value=bool(value),
+    )
+
+
 def _configured_brightness_intent(tray: IdlePowerTrayProtocol) -> int:
     try:
         return int(getattr(getattr(tray, "config", None), "brightness", 0))

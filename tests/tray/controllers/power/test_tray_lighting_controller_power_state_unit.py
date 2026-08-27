@@ -370,6 +370,83 @@ class TestPowerTurnOffRestore:
             fade_in_duration_s=DEFAULT_IDLE_FADE_DURATION_S,
         )
 
+    def test_turn_on_arms_resume_guard(self):
+        from keyrgb.tray.controllers.lighting_controller import turn_on
+        from tests.tray.fakes import make_owner_backed_mock_tray
+
+        mock_tray = make_owner_backed_mock_tray(
+            is_off=True,
+            user_forced_off=False,
+            idle_forced_off=False,
+            power_forced_off=False,
+            last_brightness=75,
+        )
+        mock_tray.config.brightness = 0
+        mock_tray.config.effect = "breathe"
+        mock_tray.tray_idle_power_state.controller_sleep_resume_guard = False
+
+        with patch("keyrgb.tray.controllers.lighting_controller.start_current_effect") as mock_start:
+            turn_on(mock_tray)
+
+        mock_start.assert_called_once()
+        assert mock_tray.tray_idle_power_state.controller_sleep_resume_guard is True
+        # Manual turn-on also clears any prior controller-sleep-off latch.
+        assert mock_tray.tray_idle_power_state.controller_sleep_off is False
+
+    def test_power_restore_success_arms_resume_guard(self):
+        from keyrgb.tray.controllers.lighting_controller import power_restore
+        from tests.tray.fakes import make_owner_backed_mock_tray
+
+        mock_tray = make_owner_backed_mock_tray(
+            is_off=True,
+            user_forced_off=False,
+            idle_forced_off=False,
+            power_forced_off=True,
+            last_brightness=50,
+        )
+        mock_tray.config.brightness = 0
+        mock_tray.config.effect = "breathe"
+        mock_tray.tray_idle_power_state.controller_sleep_resume_guard = False
+
+        guard_seen_during_start: list[bool] = []
+
+        def record_guard(*_args, **_kwargs):
+            guard_seen_during_start.append(mock_tray.tray_idle_power_state.controller_sleep_resume_guard)
+
+        with patch(
+            "keyrgb.tray.controllers.lighting_controller.start_current_effect",
+            side_effect=record_guard,
+        ) as mock_start:
+            power_restore(mock_tray)
+
+        mock_start.assert_called_once()
+        assert guard_seen_during_start == [True]
+        assert mock_tray.tray_idle_power_state.controller_sleep_resume_guard is True
+
+    def test_power_restore_user_forced_off_does_not_arm_resume_guard(self):
+        from keyrgb.tray.controllers.lighting_controller import power_restore
+        from tests.tray.fakes import make_owner_backed_mock_tray
+
+        mock_tray = make_owner_backed_mock_tray(
+            is_off=True,
+            user_forced_off=True,
+            idle_forced_off=False,
+            power_forced_off=False,
+            last_brightness=25,
+        )
+        mock_tray.config.brightness = 25
+        # Pre-arm to prove the non-restore path clears rather than arms.
+        mock_tray.tray_idle_power_state.controller_sleep_resume_guard = True
+
+        with patch("keyrgb.tray.controllers.lighting_controller.start_current_effect") as mock_start:
+            power_restore(mock_tray)
+
+        mock_start.assert_not_called()
+        # User-forced-off is an explicit dark intent: the guard must not stay
+        # armed (would otherwise block a later genuine native sleep latch).
+        assert mock_tray.tray_idle_power_state.controller_sleep_resume_guard is False
+
+
 
 class TestIdleFadeDuration:
     def test_defaults_when_config_lacks_setting(self):

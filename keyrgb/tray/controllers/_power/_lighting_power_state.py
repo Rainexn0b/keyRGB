@@ -44,6 +44,16 @@ def _set_controller_sleep_off(tray: LightingTrayProtocol, value: bool) -> None:
     )
 
 
+def _set_controller_sleep_resume_guard(tray: LightingTrayProtocol, value: bool) -> None:
+    """Arm/clear the relight-intent guard that suppresses controller-sleep latching."""
+    set_idle_power_state_field(
+        tray,
+        attr_name="_controller_sleep_resume_guard",
+        state_name="controller_sleep_resume_guard",
+        value=bool(value),
+    )
+
+
 def _set_last_resume_at(tray: LightingTrayProtocol, value: float) -> None:
     """Set last_resume_at timestamp via idle power state bridge."""
     set_idle_power_state_field(tray, attr_name="_last_resume_at", state_name="last_resume_at", value=value)
@@ -60,6 +70,7 @@ def turn_off_impl(
     try_log_event(tray, "menu", "turn_off")
     _set_user_forced_off(tray, True)
     _set_idle_forced_off(tray, False)
+    _set_controller_sleep_resume_guard(tray, False)
     tray.engine.turn_off()
     if software_effect_target_routes_aux_devices(tray):
         turn_off_secondary_software_targets(tray)
@@ -82,6 +93,10 @@ def turn_on_impl(
     _set_last_resume_at(tray, time.monotonic())
     _set_user_forced_off(tray, False)
     _set_idle_forced_off(tray, False)
+    # A manual turn-on is an explicit relight intent: keep the deck from being
+    # re-latched into native sleep by a firmware zero read until hardware proves
+    # it is actually awake.
+    _set_controller_sleep_resume_guard(tray, True)
     _set_controller_sleep_off(tray, False)
     tray.is_off = False
 
@@ -109,6 +124,7 @@ def power_turn_off_impl(
     try_log_event(tray, "power", "turn_off")
     _set_power_forced_off(tray, True)
     _set_idle_forced_off(tray, False)
+    _set_controller_sleep_resume_guard(tray, False)
     tray.is_off = True
     tray.engine.turn_off(fade=True, fade_duration_s=idle_fade_duration_s(tray.config))
     if software_effect_target_routes_aux_devices(tray):
@@ -139,20 +155,31 @@ def power_restore_impl(
         is_reactive_effect_fn=is_reactive_effect_fn,
     )
     if policy_state.guard_state.user_forced_off:
+        # An explicit user-off wants the deck dark; clear any stale guard so a
+        # later genuine controller sleep can latch again.
+        _set_controller_sleep_resume_guard(tray, False)
         return
 
     if policy_state.guard_state.idle_forced_off is True:
+        _set_controller_sleep_resume_guard(tray, False)
         return
 
     if policy_state.should_log_power_restore:
         try_log_event(tray, "power", "restore")
 
-    _set_controller_sleep_off(tray, False)
-
     if not policy_state.should_restore:
+        # The policy decided not to relight (e.g. board stays dark). No relight
+        # intent, so clear any stale guard.
+        _set_controller_sleep_off(tray, False)
+        _set_controller_sleep_resume_guard(tray, False)
         tray.is_off = True
         return
 
+    # Arm before clearing the prior native-sleep latch and before crossing the
+    # effect/backend boundary. A concurrent hardware poll must not re-latch the
+    # same zero observation in either gap.
+    _set_controller_sleep_resume_guard(tray, True)
+    _set_controller_sleep_off(tray, False)
     tray.engine.current_color = (0, 0, 0)
     tray.is_off = False
 

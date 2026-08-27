@@ -41,6 +41,8 @@ _set_pending_zero_confirm_at = _recovery.set_pending_zero_confirm_at
 _controller_sleep_off_active = _recovery.controller_sleep_off_active
 _controller_sleep_respect_enabled = _recovery.controller_sleep_respect_enabled
 _set_controller_sleep_off = _recovery.set_controller_sleep_off
+_controller_sleep_resume_guard_active = _recovery.controller_sleep_resume_guard_active
+_set_controller_sleep_resume_guard = _recovery.set_controller_sleep_resume_guard
 _stop_engine_for_controller_sleep_best_effort = _controller_sleep.stop_engine_for_controller_sleep_best_effort
 _clear_post_stop_controller_sleep_write_best_effort = _controller_sleep.clear_post_stop_write_best_effort
 _restart_effect_after_controller_firmware_wake_best_effort = (
@@ -100,6 +102,10 @@ def _apply_polled_hardware_state(
             # that loop will not run a second off->soft-on restore.
             _set_controller_sleep_off(tray, False)
             tray.is_off = False
+            # A proven-awake read also clears any relight-intent guard so a later
+            # genuine native sleep can latch again.
+            if _controller_sleep_resume_guard_active(tray):
+                _set_controller_sleep_resume_guard(tray, False)
             restored = _restart_effect_after_controller_firmware_wake_best_effort(
                 tray,
                 now=time.monotonic(),
@@ -119,6 +125,11 @@ def _apply_polled_hardware_state(
     if current_brightness > 0:
         _reset_stable_zero_recovery_attempt_count(tray)
         _set_pending_zero_confirm_at(tray, 0.0)
+        # A non-zero read with the device reported as not-off proves the
+        # firmware actually woke and the deck is lit. Clear the relight-intent
+        # guard so a later genuine controller sleep can latch again.
+        if not current_off and _controller_sleep_resume_guard_active(tray):
+            _set_controller_sleep_resume_guard(tray, False)
 
     # Temp-dim is a "screen dimmed" brightness policy, not an off-state. Some
     # backends can briefly report 0 / off while dim-sync brightness is being
@@ -235,6 +246,7 @@ def _apply_polled_hardware_state(
             and not (user_forced_off or power_forced_off or idle_forced_off)
             and _configured_brightness_intent(tray) > 0
             and not recently_restored
+            and not _controller_sleep_resume_guard_active(tray)
         ):
             # Opt-in: honor the controller's native keyboard-input sleep as a
             # valid off state instead of force re-lighting it. This contract
@@ -249,6 +261,10 @@ def _apply_polled_hardware_state(
             # Skip this stick-dark path for a short window after idle/power
             # restore: a post-restore firmware transient zero must not undo the
             # restore and leave the deck stuck until a manual tray toggle.
+            # The relight-intent guard extends that protection past the fixed
+            # timestamp window: the firmware may remain in native sleep (and
+            # keep reporting zero) long after resume, so we must not re-latch
+            # until a poll proves the deck is actually awake.
             _set_controller_sleep_off(tray, True, now=now)
             tray.is_off = True
             # Stop any residual effect thread and mark mode-off for the next
@@ -258,6 +274,10 @@ def _apply_polled_hardware_state(
             _log_polled_hardware_event(tray, "controller_sleep_off")
             _refresh_ui_without_icon_animation(tray)
             return current_brightness, True
+        # When the relight guard prevented controller-sleep latching above,
+        # retain the normal stable-zero recovery attempt.  Static effects do
+        # not have a render loop continuously reasserting brightness, so merely
+        # keeping the logical state on would not necessarily wake the deck.
         if _recover_stable_zero_brightness_best_effort(tray, current_brightness=current_brightness):
             return current_brightness, False
 
