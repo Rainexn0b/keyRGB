@@ -1,18 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, cast
-
 from ..fades import fade_in_per_key, fade_uniform_color, prime_per_key_frame
-from ..reactive.effects import run_reactive_fade, run_reactive_ripple
-from ..software.effects import (
-    run_chase,
-    run_color_cycle,
-    run_rainbow_swirl,
-    run_rainbow_wave,
-    run_spectrum_cycle,
-    run_strobe,
-    run_twinkle,
-)
 from ..timing import clamped_interval, get_interval
 
 
@@ -81,39 +69,3 @@ def prime_per_key_frame_method(self) -> bool:
         num_rows=int(geometry.rows),
         num_cols=int(geometry.cols),
     )
-
-
-def effect_rainbow_wave_method(self) -> None:
-    run_rainbow_wave(cast(Any, self))
-
-
-def effect_rainbow_swirl_method(self) -> None:
-    run_rainbow_swirl(cast(Any, self))
-
-
-def effect_spectrum_cycle_method(self) -> None:
-    run_spectrum_cycle(cast(Any, self))
-
-
-def effect_color_cycle_method(self) -> None:
-    run_color_cycle(cast(Any, self))
-
-
-def effect_chase_method(self) -> None:
-    run_chase(cast(Any, self))
-
-
-def effect_twinkle_method(self) -> None:
-    run_twinkle(cast(Any, self))
-
-
-def effect_strobe_method(self) -> None:
-    run_strobe(cast(Any, self))
-
-
-def effect_reactive_fade_method(self) -> None:
-    run_reactive_fade(cast(Any, self))
-
-
-def effect_reactive_ripple_method(self) -> None:
-    run_reactive_ripple(cast(Any, self))

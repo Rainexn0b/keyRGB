@@ -1,7 +1,9 @@
 """Canonical effect catalog.
 
-This module is intentionally dependency-free so it can be imported by both the
-core effects engine and the tray UI without circular imports.
+Software and reactive names, titles, and menu order come from
+``EFFECT_REGISTRATION`` markers discovered by ``keyrgb.core.effects.registry``.
+Hardware firmware names stay a static fallback; live hardware effects are
+backend-owned.
 
 It provides:
 - canonical effect name lists (ordering matters for UI presentation)
@@ -14,6 +16,8 @@ from __future__ import annotations
 from typing import Final
 
 from keyrgb.core.backends.base import normalize_backend_capabilities
+from keyrgb.core.effects.effect_contract import EffectKind
+from keyrgb.core.effects.registry import effect_names, get_effect_registration
 
 # Hardware effects (built into the keyboard/controller firmware)
 HW_EFFECTS: Final[list[str]] = [
@@ -29,22 +33,11 @@ HW_EFFECTS: Final[list[str]] = [
 
 
 # Software effects (implemented in Python)
-SOFTWARE_EFFECTS: Final[list[str]] = [
-    "rainbow_wave",
-    "rainbow_swirl",
-    "spectrum_cycle",
-    "color_cycle",
-    "chase",
-    "twinkle",
-    "strobe",
-]
+SOFTWARE_EFFECTS: Final[list[str]] = effect_names(kind=EffectKind.SOFTWARE)
 
 
 # Reactive typing effects (implemented in Python)
-REACTIVE_EFFECTS: Final[list[str]] = [
-    "reactive_fade",
-    "reactive_ripple",
-]
+REACTIVE_EFFECTS: Final[list[str]] = effect_names(kind=EffectKind.REACTIVE)
 
 
 SW_EFFECTS: Final[list[str]] = [*SOFTWARE_EFFECTS, *REACTIVE_EFFECTS]
@@ -70,16 +63,6 @@ _CATALOG_EFFECT_EXTRACTION_ERRORS: Final[tuple[type[BaseException], ...]] = (
 _EFFECT_ALIASES: Final[dict[str, str]] = {}
 
 
-_EFFECT_TITLES: Final[dict[str, str]] = {
-    "reactive_fade": "Reactive Typing (Fade)",
-    "reactive_ripple": "Reactive Typing (Ripple)",
-    "rainbow_wave": "Rainbow Wave",
-    "rainbow_swirl": "Rainbow Swirl",
-    "spectrum_cycle": "Spectrum Cycle",
-    "color_cycle": "Color Cycle",
-}
-
-
 def title_for_effect(effect_name: str) -> str:
     """Return a human-friendly label for an effect name."""
 
@@ -87,8 +70,9 @@ def title_for_effect(effect_name: str) -> str:
     if not n:
         return ""
 
-    if n in _EFFECT_TITLES:
-        return _EFFECT_TITLES[n]
+    registration = get_effect_registration(n)
+    if registration is not None and registration.title:
+        return registration.title
 
     return n.replace("_", " ").strip().title()
 

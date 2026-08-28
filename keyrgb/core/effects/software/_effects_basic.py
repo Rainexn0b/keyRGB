@@ -6,6 +6,7 @@ import time
 from typing import TYPE_CHECKING
 
 from keyrgb.core.effects.colors import hsv_to_rgb
+from keyrgb.core.effects.effect_contract import EffectKind, EffectRegistration
 from keyrgb.core.effects.matrix_layout import geometry_for_engine
 
 from ._buffers import fill_uniform_color_map, get_engine_color_map_buffer, scale_color_map_into
@@ -245,3 +246,39 @@ def run_color_cycle(engine: EffectsEngine, *, render_fn=base_render) -> None:
         # visible phase variation at high speeds (matches v0.18.1 behaviour).
         phase += nominal_dt * (1.8 * p)
         engine.stop_event.wait(nominal_dt)
+
+
+EFFECT_REGISTRATIONS = (
+    EffectRegistration(
+        name="rainbow_wave",
+        kind=EffectKind.SOFTWARE,
+        runner=run_rainbow_wave,
+        start_color=(255, 0, 0),
+        title="Rainbow Wave",
+        menu_order=10,
+    ),
+    EffectRegistration(
+        name="rainbow_swirl",
+        kind=EffectKind.SOFTWARE,
+        runner=run_rainbow_swirl,
+        start_color=(255, 0, 0),
+        title="Rainbow Swirl",
+        menu_order=20,
+    ),
+    EffectRegistration(
+        name="spectrum_cycle",
+        kind=EffectKind.SOFTWARE,
+        runner=run_spectrum_cycle,
+        start_color=(255, 0, 0),
+        title="Spectrum Cycle",
+        menu_order=30,
+    ),
+    EffectRegistration(
+        name="color_cycle",
+        kind=EffectKind.SOFTWARE,
+        runner=run_color_cycle,
+        start_color=(255, 0, 0),
+        title="Color Cycle",
+        menu_order=40,
+    ),
+)

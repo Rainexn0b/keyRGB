@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from keyrgb.core.effects.colors import hsv_to_rgb
+from keyrgb.core.effects.effect_contract import CURRENT_COLOR, EffectKind, EffectRegistration
 from keyrgb.core.effects.matrix_layout import geometry_for_engine
 from keyrgb.core.effects.transitions import scaled_color_map_nonzero
 
@@ -252,3 +253,28 @@ def run_rain(engine: EffectsEngine, *, render_fn=_base.render) -> None:
 
         render_fn(engine, color_map=color_map)
         engine.stop_event.wait(nominal_dt)
+
+
+EFFECT_REGISTRATIONS = (
+    EffectRegistration(
+        name="chase",
+        kind=EffectKind.SOFTWARE,
+        runner=run_chase,
+        start_color=CURRENT_COLOR,
+        menu_order=50,
+    ),
+    EffectRegistration(
+        name="twinkle",
+        kind=EffectKind.SOFTWARE,
+        runner=run_twinkle,
+        start_color=CURRENT_COLOR,
+        menu_order=60,
+    ),
+    EffectRegistration(
+        name="strobe",
+        kind=EffectKind.SOFTWARE,
+        runner=run_strobe,
+        start_color=CURRENT_COLOR,
+        menu_order=70,
+    ),
+)

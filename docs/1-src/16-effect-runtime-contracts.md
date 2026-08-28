@@ -4,10 +4,27 @@ Status: **Done**
 
 ## Purpose
 
-Effect execution crosses three extension boundaries: the composed effects
-engine, reactive render loops, and backend hardware-effect payload builders.
-These boundaries must declare their dependencies directly; closure internals,
-mutated module globals, and exception message text are not contracts.
+Effect execution crosses four extension boundaries: software/reactive
+registration, the composed effects engine, reactive render loops, and backend
+hardware-effect payload builders. These boundaries must declare their
+dependencies directly; closure internals, mutated module globals, and
+exception message text are not contracts.
+
+## Software and reactive registration
+
+`keyrgb/core/effects/effect_contract.py` owns `EffectRegistration`. Implementation
+modules export `EFFECT_REGISTRATION` or `EFFECT_REGISTRATIONS`.
+`keyrgb/core/effects/registry.py` discovers those markers and is the source of
+truth for selectable software and reactive names, titles, menu order, start
+colours, and engine runners.
+
+`catalog.py` derives `SOFTWARE_EFFECTS`, `REACTIVE_EFFECTS`, and `SW_EFFECTS`
+from that registry. `HW_EFFECTS` remains a static firmware-name fallback;
+live hardware effects are backend-owned.
+
+Adding a selectable software/reactive effect is: implement `run_<name>`, export
+the marker, add a test. Do not edit `catalog.py` or engine start dispatch.
+Unmarked runners are not selectable. See `keyrgb/core/effects/README.md`.
 
 ## Engine support contract
 
@@ -60,11 +77,13 @@ The current in-tree hardware-effect backends with builders all publish metadata:
 
 ## Extension guidance
 
-1. New reactive loops receive a concrete dependency facade; do not use module
+1. New software or reactive effects export `EFFECT_REGISTRATION` from their
+   implementation module; catalog and engine start follow the marker.
+2. New reactive loops receive a concrete dependency facade; do not use module
    mutation as dependency injection.
-2. New hardware-effect builders use `hardware_effect_builder()` and list every
+3. New hardware-effect builders use `hardware_effect_builder()` and list every
    accepted field.
-3. Rejected builder fields use `UnsupportedHardwareEffectArgument`; callers
+4. Rejected builder fields use `UnsupportedHardwareEffectArgument`; callers
    must not infer behavior from exception strings.
-4. Any new cross-mixin engine dependency is added to `EngineSupportContract` and
+5. Any new cross-mixin engine dependency is added to `EngineSupportContract` and
    its construction-time validation list.

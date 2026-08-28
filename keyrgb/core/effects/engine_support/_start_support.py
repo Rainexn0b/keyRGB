@@ -62,10 +62,6 @@ class _ManagedEffectThread(Thread):
         )
 
 
-def _sw_effect_method(engine: object, method_name: str) -> Callable[[], None]:
-    return cast(Callable[[], None], getattr(engine, method_name))
-
-
 def _thread_generation_or_default(engine: object, *, default: int) -> int:
     try:
         thread_owner = cast(_ThreadGenerationOwner, engine)

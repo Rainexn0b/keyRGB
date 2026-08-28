@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import importlib
+from pathlib import Path
+
 from keyrgb.core.backends.base import BackendMetadata, BackendRegistration, BackendRole, BackendStability
 from keyrgb.core.backends.registry import (
     _invalidate_discovery_cache,
@@ -49,6 +52,21 @@ def test_metadata_drives_provider_tier_and_safety() -> None:
     assert mouse is not None
     assert mouse.role is BackendRole.AUXILIARY
     assert mouse.provider == "kernel-sysfs"
+
+
+def test_every_backend_package_exports_a_registration_marker() -> None:
+    backend_dir = Path(importlib.import_module("keyrgb.core.backends").__file__).resolve().parent
+    missing: list[str] = []
+    for child in sorted(backend_dir.iterdir()):
+        if not child.is_dir() or child.name.startswith("_") or child.name == "policies":
+            continue
+        if not (child / "__init__.py").exists():
+            continue
+        module = importlib.import_module(f"keyrgb.core.backends.{child.name}")
+        if not isinstance(getattr(module, "BACKEND_REGISTRATION", None), BackendRegistration):
+            missing.append(child.name)
+
+    assert missing == []
 
 
 def test_registration_marker_can_be_transformed_without_registry_edits() -> None:

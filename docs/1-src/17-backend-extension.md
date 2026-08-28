@@ -49,3 +49,10 @@ falls back to the backend name so existing one-controller sharing is preserved.
 
 Aliases for renamed backends still live in `registry._BACKEND_NAME_ALIASES`
 because they are compatibility data, not package identity.
+
+Every backend package directory (except `policies/` and `_*`) must export
+`BACKEND_REGISTRATION`. Tests fail if a package is added without the marker.
+
+Hardware firmware effects belong on the backend (`effects()` +
+`hardware_effect_builder()`), not in `catalog.HW_EFFECTS`. Software/reactive
+effects use `EFFECT_REGISTRATION`; see `docs/1-src/16-effect-runtime-contracts.md`.

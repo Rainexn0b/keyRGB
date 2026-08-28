@@ -14,6 +14,9 @@ specs for larger changes.
 
 ### Active follow-up plans
 
+- `2026-08-28/effect-and-backend-extension-friction.md` — pre-1.0 registration
+  path for software/reactive effects (backend discovery is already the model);
+  no new user-visible effects
 - `2026-08-11/architecture-concerns-plan.md` — confirmation and remediation
   tracker for the 2026-08-11 architecture review; one finding per pass, with
   test-first contracts and explicit confirmed/rejected status

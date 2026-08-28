@@ -4,6 +4,8 @@ import logging
 import time
 from typing import TYPE_CHECKING, cast
 
+from keyrgb.core.effects.effect_contract import CURRENT_COLOR, EffectKind, EffectRegistration
+
 from . import (
     _base_maps,
     _fade_loop,
@@ -141,3 +143,23 @@ def run_reactive_fade(engine: EffectsEngine) -> None:
 
 def run_reactive_ripple(engine: EffectsEngine) -> None:
     _ripple_loop.run_reactive_ripple_loop(engine, api=cast(_ripple_loop._ReactiveRippleApiProtocol, _ripple_api))
+
+
+EFFECT_REGISTRATIONS = (
+    EffectRegistration(
+        name="reactive_fade",
+        kind=EffectKind.REACTIVE,
+        runner=run_reactive_fade,
+        start_color=CURRENT_COLOR,
+        title="Reactive Typing (Fade)",
+        menu_order=10,
+    ),
+    EffectRegistration(
+        name="reactive_ripple",
+        kind=EffectKind.REACTIVE,
+        runner=run_reactive_ripple,
+        start_color=CURRENT_COLOR,
+        title="Reactive Typing (Ripple)",
+        menu_order=20,
+    ),
+)

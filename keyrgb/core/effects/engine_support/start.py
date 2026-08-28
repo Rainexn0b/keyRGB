@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from functools import partial
 from threading import RLock, Thread
-from typing import Final, Literal, cast
+from typing import Final, cast
 
 from keyrgb.core.backends.base import BackendCapabilities
+from keyrgb.core.effects.effect_contract import CURRENT_COLOR
+from keyrgb.core.effects.registry import get_effect_registration
 from keyrgb.core.utils import exceptions as core_exceptions
 
 from .. import catalog as effects_catalog, hw_payloads as effects_hw_payloads
@@ -20,18 +23,8 @@ build_hw_effect_payload = effects_hw_payloads.build_hw_effect_payload
 _ManagedEffectThread = _start_support._ManagedEffectThread
 _mark_device_unavailable_best_effort = _start_support._mark_device_unavailable_best_effort
 _notify_permission_error_callback_best_effort = _start_support._notify_permission_error_callback_best_effort
-_sw_effect_method = _start_support._sw_effect_method
 _thread_generation_or_default = _start_support._thread_generation_or_default
 _clamped_interval_method = engine_methods.clamped_interval_method
-_effect_chase_method = engine_methods.effect_chase_method
-_effect_color_cycle_method = engine_methods.effect_color_cycle_method
-_effect_rainbow_swirl_method = engine_methods.effect_rainbow_swirl_method
-_effect_rainbow_wave_method = engine_methods.effect_rainbow_wave_method
-_effect_reactive_fade_method = engine_methods.effect_reactive_fade_method
-_effect_reactive_ripple_method = engine_methods.effect_reactive_ripple_method
-_effect_spectrum_cycle_method = engine_methods.effect_spectrum_cycle_method
-_effect_strobe_method = engine_methods.effect_strobe_method
-_effect_twinkle_method = engine_methods.effect_twinkle_method
 _fade_in_per_key_method = engine_methods.fade_in_per_key_method
 _fade_uniform_color_method = engine_methods.fade_uniform_color_method
 _get_interval_method = engine_methods.get_interval_method
@@ -79,18 +72,6 @@ class _EngineStart:
     get_backend_colors: Callable[[], dict[str, object]]
 
     SW_EFFECTS = _SW_EFFECTS
-
-    _SW_START_SPECS: Final[dict[str, tuple[str, Literal["current"] | Color]]] = {
-        "rainbow_wave": ("_effect_rainbow_wave", (255, 0, 0)),
-        "rainbow_swirl": ("_effect_rainbow_swirl", (255, 0, 0)),
-        "spectrum_cycle": ("_effect_spectrum_cycle", (255, 0, 0)),
-        "color_cycle": ("_effect_color_cycle", (255, 0, 0)),
-        "chase": ("_effect_chase", "current"),
-        "twinkle": ("_effect_twinkle", "current"),
-        "strobe": ("_effect_strobe", "current"),
-        "reactive_fade": ("_effect_reactive_fade", "current"),
-        "reactive_ripple": ("_effect_reactive_ripple", "current"),
-    }
 
     def start_effect(
         self,
@@ -159,18 +140,17 @@ class _EngineStart:
         if force_hardware or (is_backend_hw_effect and effect_name not in self.SW_EFFECTS):
             self._start_hw_effect(effect_name)
         else:
-            spec = self._SW_START_SPECS.get(effect_name)
-            if spec is None:
+            registration = get_effect_registration(effect_name)
+            if registration is None:
                 raise ValueError(f"Unhandled effect: {effect_name}")
 
-            method_name, fade_to = spec
-            if fade_to == "current":
+            if registration.start_color == CURRENT_COLOR:
                 fade_to_color = self.current_color
             else:
-                fade_to_color = fade_to
+                fade_to_color = registration.start_color
 
             self._start_sw_effect(
-                target=_sw_effect_method(self, method_name),
+                target=partial(registration.runner, self),
                 prev_color=prev_color,
                 fade_to_color=fade_to_color,
                 from_sw_effect=prev_effect_was_sw,
@@ -319,12 +299,3 @@ class _EngineStart:
     _fade_uniform_color = _fade_uniform_color_method
     _fade_in_per_key = _fade_in_per_key_method
     _prime_per_key_frame = _prime_per_key_frame_method
-    _effect_rainbow_wave = _effect_rainbow_wave_method
-    _effect_rainbow_swirl = _effect_rainbow_swirl_method
-    _effect_spectrum_cycle = _effect_spectrum_cycle_method
-    _effect_color_cycle = _effect_color_cycle_method
-    _effect_chase = _effect_chase_method
-    _effect_twinkle = _effect_twinkle_method
-    _effect_strobe = _effect_strobe_method
-    _effect_reactive_fade = _effect_reactive_fade_method
-    _effect_reactive_ripple = _effect_reactive_ripple_method
