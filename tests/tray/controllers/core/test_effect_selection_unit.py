@@ -138,7 +138,6 @@ class TestApplyEffectSelection:
 
         hw_effects = [
             "rainbow",
-            "breathing",
             "wave",
             "ripple",
             "marquee",

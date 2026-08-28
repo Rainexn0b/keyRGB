@@ -27,6 +27,10 @@ def test_shipped_software_and_reactive_effects_are_discovered_in_catalog_order()
         "chase",
         "twinkle",
         "strobe",
+        "breathing",
+        "fire",
+        "rain",
+        "random",
     ]
     assert REACTIVE_EFFECTS == ["reactive_fade", "reactive_ripple"]
     assert SW_EFFECTS == [*SOFTWARE_EFFECTS, *REACTIVE_EFFECTS]
@@ -36,11 +40,11 @@ def test_shipped_software_and_reactive_effects_are_discovered_in_catalog_order()
     )
 
 
-def test_unlisted_software_runners_stay_unregistered() -> None:
+def test_promoted_software_runners_are_registered() -> None:
     _invalidate_discovery_cache()
     names = {item.name for item in discover_effect_registrations()}
 
-    assert names.isdisjoint({"breathing", "fire", "rain", "random"})
+    assert {"breathing", "fire", "rain", "random"} <= names
     assert callable(software_effects.run_breathing)
     assert callable(software_effects.run_fire)
     assert callable(software_effects.run_rain)
@@ -64,4 +68,11 @@ def test_registration_start_colors_and_titles_match_shipped_behavior() -> None:
     assert title_for_effect("reactive_ripple") == "Reactive Typing (Ripple)"
     assert title_for_effect("rainbow_wave") == "Rainbow Wave"
     assert title_for_effect("chase") == "Chase"
-    assert get_effect_registration("breathing") is None
+    breathing = get_effect_registration("breathing")
+    rain = get_effect_registration("rain")
+    assert breathing is not None
+    assert breathing.start_color == CURRENT_COLOR
+    assert rain is not None
+    assert rain.start_color == CURRENT_COLOR
+    assert title_for_effect("breathing") == "Breathing"
+    assert title_for_effect("fire") == "Fire"

@@ -277,4 +277,12 @@ EFFECT_REGISTRATIONS = (
         start_color=CURRENT_COLOR,
         menu_order=70,
     ),
+    EffectRegistration(
+        name="rain",
+        kind=EffectKind.SOFTWARE,
+        runner=run_rain,
+        start_color=CURRENT_COLOR,
+        title="Rain",
+        menu_order=100,
+    ),
 )

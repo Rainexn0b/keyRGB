@@ -3,7 +3,12 @@ from __future__ import annotations
 import pytest
 
 from keyrgb.core.backends.base import BackendCapabilities
-from keyrgb.core.effects.catalog import detected_backend_hw_effect_names, resolve_effect_name_for_backend
+from keyrgb.core.effects.catalog import (
+    detected_backend_hw_effect_names,
+    hardware_effect_selection_key,
+    normalize_effect_name,
+    resolve_effect_name_for_backend,
+)
 
 
 class _HardwareEffectsBackend:
@@ -23,6 +28,14 @@ def test_resolve_effect_name_preserves_backend_exposed_hardware_effect() -> None
             return {"wave": object()}
 
     assert resolve_effect_name_for_backend("wave", _Backend()) == "wave"
+
+
+def test_legacy_breathing_sw_alias_normalizes_to_software_breathing() -> None:
+    assert normalize_effect_name("breathing_sw") == "breathing"
+
+
+def test_firmware_collision_uses_hw_prefix_for_software_breathing() -> None:
+    assert hardware_effect_selection_key("breathing") == "hw:breathing"
 
 
 def test_resolve_effect_name_prefers_software_collision_without_hw_prefix() -> None:

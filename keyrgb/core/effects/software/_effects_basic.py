@@ -6,7 +6,7 @@ import time
 from typing import TYPE_CHECKING
 
 from keyrgb.core.effects.colors import hsv_to_rgb
-from keyrgb.core.effects.effect_contract import EffectKind, EffectRegistration
+from keyrgb.core.effects.effect_contract import CURRENT_COLOR, EffectKind, EffectRegistration
 from keyrgb.core.effects.matrix_layout import geometry_for_engine
 
 from ._buffers import fill_uniform_color_map, get_engine_color_map_buffer, scale_color_map_into
@@ -280,5 +280,29 @@ EFFECT_REGISTRATIONS = (
         start_color=(255, 0, 0),
         title="Color Cycle",
         menu_order=40,
+    ),
+    EffectRegistration(
+        name="breathing",
+        kind=EffectKind.SOFTWARE,
+        runner=run_breathing,
+        start_color=CURRENT_COLOR,
+        title="Breathing",
+        menu_order=80,
+    ),
+    EffectRegistration(
+        name="fire",
+        kind=EffectKind.SOFTWARE,
+        runner=run_fire,
+        start_color=CURRENT_COLOR,
+        title="Fire",
+        menu_order=90,
+    ),
+    EffectRegistration(
+        name="random",
+        kind=EffectKind.SOFTWARE,
+        runner=run_random,
+        start_color=CURRENT_COLOR,
+        title="Random",
+        menu_order=110,
     ),
 )

@@ -68,7 +68,7 @@ class TestOnSpeedClicked:
         mock_tray = MagicMock()
         mock_tray.is_off = False
         # Use a known hardware effect name that is NOT in SW_EFFECTS_SET.
-        mock_tray.config.effect = "breathing"
+        mock_tray.config.effect = "wave"
 
         with patch("keyrgb.tray.controllers.lighting_controller.start_current_effect") as mock_start:
             on_speed_clicked(mock_tray, "6")

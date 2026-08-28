@@ -60,7 +60,9 @@ _CATALOG_EFFECT_EXTRACTION_ERRORS: Final[tuple[type[BaseException], ...]] = (
 )
 
 
-_EFFECT_ALIASES: Final[dict[str, str]] = {}
+_EFFECT_ALIASES: Final[dict[str, str]] = {
+    "breathing_sw": "breathing",
+}
 
 
 def title_for_effect(effect_name: str) -> str:

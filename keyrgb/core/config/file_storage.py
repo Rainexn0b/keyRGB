@@ -116,13 +116,10 @@ def _load_config_inner(
             # Removed older software effects still normalize to a safe supported mode
             # instead of surfacing an unknown-effect failure during startup.
             older_effect_name = loaded.get("effect")
-            if older_effect_name in {"static", "pulse"} or older_effect_name in {
-                "breathing_sw",
-                "fire",
-                "random",
-                "rain",
-            }:
+            if older_effect_name in {"static", "pulse"}:
                 loaded["effect"] = "none"
+            elif older_effect_name == "breathing_sw":
+                loaded["effect"] = "breathing"
 
             if "return_effect_after_effect" in loaded and isinstance(loaded["return_effect_after_effect"], str):
                 loaded["return_effect_after_effect"] = loaded["return_effect_after_effect"].lower()

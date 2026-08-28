@@ -87,7 +87,7 @@ class TestLoadConfigSettings:
 
         assert result["return_effect_after_effect"] == "perkey"
 
-    @pytest.mark.parametrize("older_effect_name", ["static", "pulse", "breathing_sw", "fire", "random", "rain"])
+    @pytest.mark.parametrize("older_effect_name", ["static", "pulse"])
     def test_load_maps_removed_older_effect_names_to_none(self, temp_config_dir, older_effect_name):
         """Removed older effect names should be normalized to a safe fallback."""
         from keyrgb.core.config.file_storage import load_config_settings
@@ -102,6 +102,35 @@ class TestLoadConfigSettings:
         )
 
         assert result == {"effect": "none"}
+
+    @pytest.mark.parametrize("restored_effect_name", ["fire", "random", "rain"])
+    def test_load_keeps_restored_software_effect_names(self, temp_config_dir, restored_effect_name):
+        from keyrgb.core.config.file_storage import load_config_settings
+
+        config_file = temp_config_dir / "config.json"
+        config_file.write_text(json.dumps({"effect": restored_effect_name}), encoding="utf-8")
+
+        result = load_config_settings(
+            config_file=config_file,
+            defaults={},
+            logger=logging.getLogger(),
+        )
+
+        assert result == {"effect": restored_effect_name}
+
+    def test_load_maps_legacy_breathing_sw_to_software_breathing(self, temp_config_dir):
+        from keyrgb.core.config.file_storage import load_config_settings
+
+        config_file = temp_config_dir / "config.json"
+        config_file.write_text(json.dumps({"effect": "breathing_sw"}), encoding="utf-8")
+
+        result = load_config_settings(
+            config_file=config_file,
+            defaults={},
+            logger=logging.getLogger(),
+        )
+
+        assert result == {"effect": "breathing"}
 
     def test_load_retries_on_json_decode_error(self, temp_config_dir):
         """If JSON is malformed, load should retry and eventually return None."""
