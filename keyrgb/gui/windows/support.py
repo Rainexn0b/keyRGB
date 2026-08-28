@@ -2,10 +2,20 @@ from __future__ import annotations
 
 import logging
 import os
+import tkinter as tk
+import webbrowser
+from tkinter import filedialog, messagebox, scrolledtext, ttk
 from typing import TYPE_CHECKING
 
-from . import _support_window_runtime_deps
-from ._support import _support_window_geometry
+from ._support import (
+    _support_window_actions as support_actions,
+    _support_window_geometry,
+    _support_window_jobs as support_jobs,
+    _support_window_runtime_services,
+    _support_window_session_bridge as support_session_bridge,
+    _support_window_state as support_window_state,
+    _support_window_ui as support_window_ui,
+)
 from ._support._support_window_text_io import copy_text, save_text_via_dialog, set_status, set_text
 
 if TYPE_CHECKING:
@@ -18,39 +28,29 @@ if TYPE_CHECKING:
         _WidgetProtocol,
     )
 
-tk = _support_window_runtime_deps.tk
-filedialog = _support_window_runtime_deps.filedialog
-messagebox = _support_window_runtime_deps.messagebox
-scrolledtext = _support_window_runtime_deps.scrolledtext
-ttk = _support_window_runtime_deps.ttk
-webbrowser = _support_window_runtime_deps.webbrowser
+_runtime_services = _support_window_runtime_services.SupportWindowRuntimeServices
 
-Config = _support_window_runtime_deps.Config
-collect_device_discovery = _support_window_runtime_deps.collect_device_discovery
-format_device_discovery_text = _support_window_runtime_deps.format_device_discovery_text
-ISSUE_URL = _support_window_runtime_deps.ISSUE_URL
-build_additional_evidence_plan = _support_window_runtime_deps.build_additional_evidence_plan
-build_backend_speed_probe_plan = _support_window_runtime_deps.build_backend_speed_probe_plan
-build_issue_report_with_evidence = _support_window_runtime_deps.build_issue_report_with_evidence
-build_support_bundle_payload = _support_window_runtime_deps.build_support_bundle_payload
-collect_additional_evidence = _support_window_runtime_deps.collect_additional_evidence
-collect_diagnostics_text = _support_window_runtime_deps.collect_diagnostics_text
-apply_clam_theme = _support_window_runtime_deps.apply_clam_theme
-run_in_thread = _support_window_runtime_deps.run_in_thread
-center_window_on_screen = _support_window_runtime_deps.center_window_on_screen
-apply_keyrgb_window_icon = _support_window_runtime_deps.apply_keyrgb_window_icon
-compute_centered_window_geometry = _support_window_runtime_deps.compute_centered_window_geometry
-support_actions = _support_window_runtime_deps.support_actions
-support_jobs = _support_window_runtime_deps.support_jobs
-support_session_bridge = _support_window_runtime_deps.support_session_bridge
-support_window_state = _support_window_runtime_deps.support_window_state
-support_window_ui = _support_window_runtime_deps.support_window_ui
+Config = _runtime_services.Config
+collect_device_discovery = _runtime_services.collect_device_discovery
+format_device_discovery_text = _runtime_services.format_device_discovery_text
+ISSUE_URL = _runtime_services.ISSUE_URL
+build_additional_evidence_plan = _runtime_services.build_additional_evidence_plan
+build_backend_speed_probe_plan = _runtime_services.build_backend_speed_probe_plan
+build_issue_report_with_evidence = _runtime_services.build_issue_report_with_evidence
+build_support_bundle_payload = _runtime_services.build_support_bundle_payload
+collect_additional_evidence = _runtime_services.collect_additional_evidence
+collect_diagnostics_text = _runtime_services.collect_diagnostics_text
+apply_clam_theme = _runtime_services.apply_clam_theme
+run_in_thread = _runtime_services.run_in_thread
+center_window_on_screen = _runtime_services.center_window_on_screen
+apply_keyrgb_window_icon = _runtime_services.apply_keyrgb_window_icon
+compute_centered_window_geometry = _runtime_services.compute_centered_window_geometry
 
 
 logger = logging.getLogger(__name__)
-_TK_RUNTIME_ERRORS = _support_window_runtime_deps._TK_RUNTIME_ERRORS
-_BROWSER_OPEN_ERRORS = _support_window_runtime_deps._BROWSER_OPEN_ERRORS
-_GEOMETRY_APPLY_ERRORS = _support_window_runtime_deps._GEOMETRY_APPLY_ERRORS
+_TK_RUNTIME_ERRORS = (tk.TclError, RuntimeError)
+_BROWSER_OPEN_ERRORS = (webbrowser.Error, OSError)
+_GEOMETRY_APPLY_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
 
 
 class SupportToolsGUI(support_session_bridge.SupportWindowSessionBridgeMixin):

@@ -11,11 +11,13 @@ from tkinter import ttk
 from typing import TYPE_CHECKING, cast
 
 from keyrgb.gui.windows import (
-    _reactive_color_geometry as _geometry,
-    _reactive_color_init_adapter as _init_adapter,
-    _reactive_color_runtime as _runtime,
-    _reactive_color_settings_adapter as _settings_adapter,
-    _reactive_color_wiring as _wiring,
+    _reactive_color_geometry,
+    _reactive_color_init_adapter,
+    _reactive_color_interactions,
+    _reactive_color_settings_adapter,
+    _reactive_color_state,
+    _reactive_color_ui,
+    _reactive_color_wiring,
 )
 
 if TYPE_CHECKING:
@@ -27,16 +29,23 @@ logger = logging.getLogger(__name__)
 _GEOMETRY_APPLY_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
 _WRAP_SYNC_ERRORS = (RuntimeError, tk.TclError, TypeError, ValueError)
 
+Config = _reactive_color_init_adapter.Config
+ColorWheel = _reactive_color_init_adapter.ColorWheel
+apply_clam_theme = _reactive_color_init_adapter.apply_clam_theme
+apply_keyrgb_window_icon = _reactive_color_init_adapter.apply_keyrgb_window_icon
+compute_centered_window_geometry = _reactive_color_init_adapter.compute_centered_window_geometry
+reactive_color_bootstrap = _reactive_color_init_adapter.reactive_color_bootstrap
+reactive_color_interactions = _reactive_color_interactions
+reactive_color_ui = _reactive_color_ui
+_geometry = _reactive_color_geometry
+_init_adapter = _reactive_color_init_adapter
+_settings_adapter = _reactive_color_settings_adapter
+_state = _reactive_color_state
+_wiring = _reactive_color_wiring
 
-Config = _runtime.Config
-select_backend = _runtime.select_backend
-ColorWheel = _runtime.ColorWheel
-apply_clam_theme = _runtime.apply_clam_theme
-apply_keyrgb_window_icon = _runtime.apply_keyrgb_window_icon
-compute_centered_window_geometry = _runtime.compute_centered_window_geometry
-reactive_color_bootstrap = _runtime.reactive_color_bootstrap
-reactive_color_interactions = _runtime.reactive_color_interactions
-reactive_color_ui = _runtime.reactive_color_ui
+# Preserve the window-level monkeypatch seam while keeping backend selection
+# behind the dedicated initialization adapter.
+select_backend = _init_adapter.select_backend
 
 
 class ReactiveColorGUI:
@@ -124,7 +133,12 @@ class ReactiveColorGUI:
                 # _Variable/_StatusLabel protocols (set() value types / config
                 # overloads). The instance provides those members at runtime.
                 cast(_settings_adapter._ReactiveColorSettingsGUI, self),
-                runtime_module=_runtime,
+                # `_state` provides the same call surface as the old runtime
+                # aggregation module, but with narrower (Protocol) parameter
+                # types. The adapter expects `object`-typed parameters, so we
+                # keep the delegation local rather than retaining a separate
+                # pass-through module.
+                runtime_module=cast(_settings_adapter._ReactiveColorRuntime, _state),
                 tk_error=tk.TclError,
                 logger=logger,
             )
@@ -188,7 +202,7 @@ class ReactiveColorGUI:
             interactions_module=reactive_color_interactions,
             tk_error=tk.TclError,
             logger=logger,
-            sync_color_wheel_brightness_fn=_runtime.sync_color_wheel_brightness,
+            sync_color_wheel_brightness_fn=_state.sync_color_wheel_brightness,
             time_monotonic=time.monotonic,
         )
 
@@ -198,7 +212,7 @@ class ReactiveColorGUI:
             interactions_module=reactive_color_interactions,
             tk_error=tk.TclError,
             logger=logger,
-            sync_color_wheel_brightness_fn=_runtime.sync_color_wheel_brightness,
+            sync_color_wheel_brightness_fn=_state.sync_color_wheel_brightness,
             time_monotonic=time.monotonic,
         )
 

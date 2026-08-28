@@ -10,8 +10,6 @@ from __future__ import annotations
 from enum import Enum
 from types import MappingProxyType
 
-from . import defaults as _defaults
-
 
 class ConfigDomain(str, Enum):
     """Logical owner for a group of config keys."""
@@ -110,16 +108,6 @@ DOMAIN_KEYS: MappingProxyType[ConfigDomain, frozenset[str]] = MappingProxyType(
 
 ALL_KNOWN_KEYS: frozenset[str] = frozenset().union(*DOMAIN_KEYS.values())
 
-_KEY_TO_DOMAIN: MappingProxyType[str, ConfigDomain] = MappingProxyType(
-    {key: domain for domain, keys in DOMAIN_KEYS.items() for key in keys}
-)
-
-
-def domain_for_key(key: str) -> ConfigDomain | None:
-    """Return the owning domain for a known key, else None (extras)."""
-
-    return _KEY_TO_DOMAIN.get(key)
-
 
 def project_domain(values: dict[str, object], domain: ConfigDomain) -> dict[str, object]:
     """Return a detached mapping of keys owned by ``domain`` that are present."""
@@ -132,26 +120,3 @@ def project_extras(values: dict[str, object]) -> dict[str, object]:
     """Return detached unknown keys preserved for forward compatibility."""
 
     return {key: value for key, value in values.items() if key not in ALL_KNOWN_KEYS}
-
-
-def assert_defaults_partitioned(defaults: dict[str, object] | None = None) -> None:
-    """Raise ``AssertionError`` if defaults keys are missing from domain ownership.
-
-    Used by unit tests to keep DEFAULTS and DOMAIN_KEYS aligned.
-    """
-
-    source = defaults if defaults is not None else _defaults.DEFAULTS
-    missing = sorted(str(key) for key in source if key not in ALL_KNOWN_KEYS)
-    if missing:
-        raise AssertionError(f"DEFAULTS keys missing from config domains: {missing}")
-
-    overlaps: list[str] = []
-    seen: dict[str, ConfigDomain] = {}
-    for domain, keys in DOMAIN_KEYS.items():
-        for key in keys:
-            prior = seen.get(key)
-            if prior is not None and prior is not domain:
-                overlaps.append(f"{key} ({prior.value} vs {domain.value})")
-            seen[key] = domain
-    if overlaps:
-        raise AssertionError(f"config domain key overlaps: {overlaps}")

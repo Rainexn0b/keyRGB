@@ -309,18 +309,6 @@ def _seed_reactive_restore_damp_best_effort(tray: IdlePowerTrayProtocol) -> None
         return
 
 
-def _configured_recovery_brightness(tray: IdlePowerTrayProtocol) -> int:
-    """Brightness level to reassert during blank recovery (config intent)."""
-
-    intent = _configured_brightness_intent(tray)
-    if intent > 0:
-        return int(intent)
-    try:
-        return max(0, int(tray.engine.brightness))
-    except _BRIGHTNESS_COERCION_ERRORS:
-        return 0
-
-
 def _effect_engine_is_running(tray: IdlePowerTrayProtocol) -> bool:
     engine = getattr(tray, "engine", None)
     if engine is None:

@@ -67,6 +67,7 @@ scripts/build/
 *.backup
 *.broken
 *.old
+*.orig
 
 # Upstream reference clones (not shipped)
 # Keep vendor content ignored by default, but allow committing the vendored

@@ -5,7 +5,7 @@ import ast
 from dataclasses import dataclass
 from pathlib import Path
 
-_TOP_LEVEL_ROOT_FILES = ("keyrgb.sh", "keyrgb-tuxedo")
+_TOP_LEVEL_ROOT_FILES = ("keyrgb.sh",)
 _EXTERNAL_ROOT_DIRS = ("scripts",)
 
 
@@ -282,22 +282,26 @@ def _scan_external_dependencies(root: Path, path: Path, module_index: dict[str, 
     return dependencies
 
 
+_REGISTRATION_MARKER_NAMES = ("BACKEND_REGISTRATION", "EFFECT_REGISTRATION", "EFFECT_REGISTRATIONS")
+
+
 def _collect_registration_marker_roots(files: list[Path]) -> set[Path]:
     """Treat package registration markers as discovery roots.
 
     Backend packages are imported by name after scanning for
-    ``BACKEND_REGISTRATION``. That is a real runtime edge the static import
-    graph cannot see from ``registry.py`` alone.
+    ``BACKEND_REGISTRATION`` and effect packages after scanning for
+    ``EFFECT_REGISTRATION`` / ``EFFECT_REGISTRATIONS``. Those are real runtime
+    edges the static import graph cannot see from the registries alone.
     """
 
     roots: set[Path] = set()
     for path in files:
-        if _defines_backend_registration(path):
+        if _defines_registration_marker(path):
             roots.add(path)
     return roots
 
 
-def _defines_backend_registration(path: Path) -> bool:
+def _defines_registration_marker(path: Path) -> bool:
     try:
         source = path.read_text(encoding="utf-8", errors="replace")
     except OSError:
@@ -307,14 +311,14 @@ def _defines_backend_registration(path: Path) -> bool:
     except SyntaxError:
         return False
     for node in tree.body:
+        targets: list[str] = []
         if isinstance(node, ast.Assign):
-            if any(isinstance(target, ast.Name) and target.id == "BACKEND_REGISTRATION" for target in node.targets):
-                return True
-        elif (
-            isinstance(node, ast.AnnAssign)
-            and isinstance(node.target, ast.Name)
-            and node.target.id == "BACKEND_REGISTRATION"
-        ):
+            targets = [target.id for target in node.targets if isinstance(target, ast.Name)]
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            targets = [node.target.id]
+        else:
+            continue
+        if any(name in _REGISTRATION_MARKER_NAMES for name in targets):
             return True
     return False
 

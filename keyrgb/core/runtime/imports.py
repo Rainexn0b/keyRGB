@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from pathlib import Path
 
 
@@ -100,40 +100,3 @@ def launch_module_subprocess(
     if env is None:
         return subprocess.Popen(argv, cwd=cwd)
     return subprocess.Popen(argv, cwd=cwd, env=dict(env))
-
-
-def ensure_on_sys_path(path: Path) -> bool:
-    """Ensure *path* is present on sys.path (at front)."""
-
-    path_str = str(path)
-    if path_str in sys.path:
-        return False
-    sys.path.insert(0, path_str)
-    return True
-
-
-def ensure_repo_root_on_sys_path(anchor: str | Path) -> Path:
-    """Ensure the repo root is on sys.path and return it."""
-
-    root = repo_root_from(anchor)
-    ensure_on_sys_path(root)
-    return root
-
-
-def ensure_repo_root_on_sys_path_str(anchor: str | Path) -> str:
-    """Ensure the repo root is on ``sys.path`` and return it as ``str``."""
-
-    return str(ensure_repo_root_on_sys_path(anchor))
-
-
-def add_first_existing_to_sys_path(paths: Iterable[Path]) -> Path | None:
-    """Insert the first existing path from *paths* to sys.path and return it."""
-
-    for path in paths:
-        try:
-            if path.exists():
-                ensure_on_sys_path(path)
-                return path
-        except OSError:
-            continue
-    return None

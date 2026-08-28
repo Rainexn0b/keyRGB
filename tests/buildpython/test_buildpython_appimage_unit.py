@@ -14,6 +14,20 @@ from buildpython.steps.appimage import (
 )
 
 
+def test_pip_install_args_construction(tmp_path: Path) -> None:
+    site_packages = tmp_path / "site-packages"
+    args = appimage_build._pip_install_args(("pystray>=0.19.5", "Pillow>=12.2.0"), site_packages)
+    assert args[0] == appimage_build.python_exe()
+    assert args[1:4] == ["-m", "pip", "install"]
+    assert "pystray>=0.19.5" in args
+    assert "Pillow>=12.2.0" in args
+    assert "--target" in args
+    target_index = args.index("--target")
+    assert args[target_index + 1] == str(site_packages)
+    # All specifiers must precede --target.
+    assert target_index == 4 + 2
+
+
 def test_appimagetool_is_pinned_to_versioned_release_with_digest() -> None:
     assert "continuous" not in appimage_build.APPIMAGETOOL_URL
     assert f"/{appimage_build.APPIMAGETOOL_VERSION}/" in appimage_build.APPIMAGETOOL_URL

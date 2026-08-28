@@ -152,35 +152,3 @@ def safe_str_attr(obj: object, name: str, *, default: str = "") -> str:
         return default
 
     return str(raw)
-
-
-def safe_optional_int_attr(obj: object, name: str, *, min_v: int | None = None, max_v: int | None = None) -> int | None:
-    """Safely get an optional integer attribute (preserves None).
-
-    Unlike safe_int_attr, this returns None when the attribute is None or missing,
-    rather than a default value. Useful for config values where None means "not set".
-
-    Args:
-        obj: Object to get attribute from
-        name: Attribute name
-        min_v: Optional minimum value (clamps if not None)
-        max_v: Optional maximum value (clamps if not None)
-
-    Returns:
-        Integer value or None
-    """
-    raw = _safe_getattr_or_none(obj, name)
-
-    if raw is None:
-        return None
-
-    val = _coerce_int_like(raw, default=None)
-    if val is None:
-        return None
-
-    if min_v is not None and val < min_v:
-        val = min_v
-    if max_v is not None and val > max_v:
-        val = max_v
-
-    return val

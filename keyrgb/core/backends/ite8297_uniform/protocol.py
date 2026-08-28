@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from keyrgb.core.effects import colors as _effects_colors
+
 VENDOR_ID = 0x048D
 SUPPORTED_PRODUCT_IDS: tuple[int, ...] = (0x8297,)
 HIDRAW_PATH_ENV = "KEYRGB_ITE8297_HIDRAW_PATH"
@@ -23,20 +25,8 @@ def clamp_ui_brightness(value: int) -> int:
     return max(0, min(UI_BRIGHTNESS_MAX, int(value)))
 
 
-def scale_color_for_brightness(color, brightness: int) -> tuple[int, int, int]:
-    red, green, blue = color
-    level = clamp_ui_brightness(brightness)
-    if level <= 0:
-        return (0, 0, 0)
-    if level >= UI_BRIGHTNESS_MAX:
-        return (clamp_channel(red), clamp_channel(green), clamp_channel(blue))
-
-    scale = level / UI_BRIGHTNESS_MAX
-    return (
-        clamp_channel(round(int(red) * scale)),
-        clamp_channel(round(int(green) * scale)),
-        clamp_channel(round(int(blue) * scale)),
-    )
+# Re-export the backend-neutral shared helper (no duplicated logic).
+scale_color_for_brightness = _effects_colors.scale_color_for_brightness
 
 
 def build_uniform_color_report(color) -> bytes:

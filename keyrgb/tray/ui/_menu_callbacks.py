@@ -106,13 +106,6 @@ def checked_device_context(
     return _checked
 
 
-def software_target_callback(tray: _SoftwareTargetCallbackHost, target_key: str) -> _MenuAction:
-    def _action(_icon: object, _item: object) -> None:
-        tray._on_software_effect_target_clicked(target_key)
-
-    return _action
-
-
 def toggle_enabled_lighting_areas_callback(tray: _SoftwareTargetCallbackHost) -> _MenuAction:
     """Toggle animated output between keyboard-only and enabled areas."""
 

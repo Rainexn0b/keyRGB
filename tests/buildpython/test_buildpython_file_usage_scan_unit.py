@@ -200,6 +200,51 @@ def test_unreferenced_scan_treats_backend_registration_markers_as_roots(tmp_path
     assert rows == []
 
 
+def test_unreferenced_scan_treats_effect_registration_markers_as_roots(tmp_path) -> None:
+    _write_minimal_pyproject(tmp_path)
+    _write_python_file(
+        tmp_path / "keyrgb" / "app.py",
+        """
+        def main() -> None:
+            return None
+        """,
+    )
+    _write_python_file(
+        tmp_path / "keyrgb" / "effects" / "pulse" / "__init__.py",
+        """
+        from keyrgb.effects.pulse.support import build_pulse
+
+        EFFECT_REGISTRATION = build_pulse
+        """,
+    )
+    _write_python_file(
+        tmp_path / "keyrgb" / "effects" / "pulse" / "support.py",
+        """
+        def build_pulse() -> int:
+            return 1
+        """,
+    )
+    _write_python_file(
+        tmp_path / "keyrgb" / "effects" / "wave" / "__init__.py",
+        """
+        from keyrgb.effects.wave.support import build_wave
+
+        EFFECT_REGISTRATIONS = [build_wave]
+        """,
+    )
+    _write_python_file(
+        tmp_path / "keyrgb" / "effects" / "wave" / "support.py",
+        """
+        def build_wave() -> int:
+            return 2
+        """,
+    )
+
+    rows = scan_unreferenced_file_candidates(tmp_path, roots=("keyrgb",))
+
+    assert rows == []
+
+
 def test_unreferenced_scan_treats_launch_module_subprocess_targets_as_roots(tmp_path) -> None:
     _write_minimal_pyproject(tmp_path)
     _write_python_file(

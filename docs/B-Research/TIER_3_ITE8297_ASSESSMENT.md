@@ -132,7 +132,7 @@ python3 -c "import liquidctl; print(dir(liquidctl))"
 ```
 
 **If supported:**
-- Add liquidctl to requirements.txt
+- Add liquidctl to `[project].dependencies` in pyproject.toml
 - Create wrapper backend (like ite8291r3.py)
 - Patch device IDs in install.sh if needed
 - Estimated time: **4-6 hours**
@@ -151,11 +151,11 @@ python3 -c "import liquidctl; print(dir(liquidctl))"
    - Release v0.6.1
 
 2. **If liquidctl supports 8297:**
-   - Create `keyrgb/core/backends/ite8297.py` wrapper
-   - Add liquidctl to install.sh
-   - Update requirements.txt
-   - Test with device (if available)
-   - Release v0.6.1
+    - Create `keyrgb/core/backends/ite8297.py` wrapper
+    - Add liquidctl to install.sh
+    - Update `[project].dependencies` in pyproject.toml
+    - Test with device (if available)
+    - Release v0.6.1
 
 #### Path B: Custom Implementation (Medium Effort)
 1. **Create `keyrgb/core/backends/ite8297_custom.py`:**

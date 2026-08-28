@@ -99,9 +99,6 @@ fi
 log_info "Updating pip tooling..."
 python3 -m pip install --user -U pip setuptools wheel
 
-log_info "Installing Python dependencies..."
-python3 -m pip install --user -r "$REPO_DIR/requirements.txt"
-
 log_info "Installing KeyRGB (editable)..."
 python3 -m pip install --user -e "$REPO_DIR"
 

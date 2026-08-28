@@ -77,12 +77,6 @@ class BackendSelectionReport:
     selected: KeyboardBackend | None
 
 
-def _spec_for_backend(factory: type[KeyboardBackend]) -> BackendSpec:
-    """Build a registry spec from class metadata without constructing a backend."""
-
-    return BackendSpec(name=factory.name, priority=factory.priority, factory=factory)
-
-
 def _spec_from_registration(reg: BackendRegistration) -> BackendSpec:
     """Build a registry spec from a ``BackendRegistration`` marker."""
 

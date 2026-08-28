@@ -198,14 +198,6 @@ class ConfigStateResolveTrayProtocol(
     """Narrow protocol for reading config state signatures."""
 
 
-@runtime_checkable
-class ConfigFastPathTrayProtocol(
-    _RefreshUi,
-    Protocol,
-):
-    """Narrow protocol for applying config fast-path side effects."""
-
-
 # ---------------------------------------------------------------------------
 # Minimal protocol for tray lighting controller
 # ---------------------------------------------------------------------------

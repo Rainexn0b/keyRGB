@@ -13,6 +13,7 @@ from keyrgb.core.backends.ite8297_uniform.backend import (
     _open_matching_transport,
 )
 from keyrgb.core.backends.ite8297_uniform.device import Ite8297KeyboardDevice
+from keyrgb.core.effects import colors
 
 
 def test_protocol_builds_64_byte_uniform_color_report() -> None:
@@ -21,6 +22,23 @@ def test_protocol_builds_64_byte_uniform_color_report() -> None:
     assert len(report) == 64
     assert report[:7].hex() == "ccb00101123456"
     assert report[7:] == bytes(57)
+
+
+def test_protocol_scale_color_for_brightness_is_shared_helper() -> None:
+    # The backend re-exports the backend-neutral shared helper (no duplicate logic).
+    assert protocol.scale_color_for_brightness is colors.scale_color_for_brightness
+
+    samples = [
+        ((100, 50, 25), 0),
+        ((100, 50, 25), 25),
+        ((100, 50, 25), 50),
+        ((300, -10, 128), 25),
+        ((10.7, 20.3, 30.9), 50),
+    ]
+    for color, brightness in samples:
+        assert protocol.scale_color_for_brightness(color, brightness) == colors.scale_color_for_brightness(
+            color, brightness
+        )
 
 
 def test_device_scales_color_by_brightness() -> None:

@@ -5,6 +5,8 @@ from dataclasses import dataclass
 import pytest
 
 from keyrgb.core.backends.base import (
+    BackendMetadata,
+    BackendRegistration,
     BackendStability,
     ExperimentalEvidence,
     ProbeResult,
@@ -19,7 +21,7 @@ from keyrgb.core.backends.policies.backend_selection import (
 from keyrgb.core.backends.registry import (
     BackendSpec,
     _probe_backend,
-    _spec_for_backend,
+    _spec_from_registration,
     build_backend_selection_report,
     iter_backends,
     select_backend,
@@ -62,19 +64,21 @@ class _BrokenStrValue:
         raise AssertionError("unexpected stringification")
 
 
-def test_spec_for_backend_reads_class_metadata_without_construction() -> None:
-    class ConstructionGuardBackend:
-        name = "construction-guard"
-        priority = 42
-
-        def __init__(self) -> None:
+def test_spec_from_registration_reads_metadata_without_constructing_factory() -> None:
+    class ConstructionGuardFactory:
+        def __call__(self) -> None:
             raise AssertionError("backend must remain lazy")
 
-    spec = _spec_for_backend(ConstructionGuardBackend)  # type: ignore[arg-type]
+    reg = BackendRegistration(
+        metadata=BackendMetadata(name="construction-guard", priority=42),
+        factory=ConstructionGuardFactory(),
+    )
+
+    spec = _spec_from_registration(reg)
 
     assert spec.name == "construction-guard"
     assert spec.priority == 42
-    assert spec.factory is ConstructionGuardBackend
+    assert spec.factory is reg.factory
 
 
 @pytest.mark.parametrize(

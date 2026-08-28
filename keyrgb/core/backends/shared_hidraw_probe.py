@@ -19,10 +19,6 @@ from typing import TYPE_CHECKING, Protocol, TypeVar
 
 if TYPE_CHECKING:
     from .ite8291_perkey.hidraw import HidrawDeviceInfo, HidrawFeatureOutputTransport
-    from .ite8910_perkey.hidraw import (
-        HidrawDeviceInfo as Ite8910HidrawDeviceInfo,
-        HidrawFeatureTransport as Ite8910HidrawFeatureTransport,
-    )
 
 _MatchT = TypeVar("_MatchT")
 
@@ -135,34 +131,3 @@ def find_matching_ite8910_style_hidraw_device(
         if match is not None:
             return match
     return None
-
-
-def open_matching_ite8910_style_hidraw_transport(
-    *,
-    vendor_id: int,
-    product_ids: tuple[int, ...],
-    forced_path_env: str,
-    forced_product_id: int,
-    backend_name: str,
-    missing_label: str,
-    find_matching_fn: Callable[[int, int], Ite8910HidrawDeviceInfo | None],
-    device_info_factory: Callable[..., Ite8910HidrawDeviceInfo],
-) -> tuple[Ite8910HidrawFeatureTransport, Ite8910HidrawDeviceInfo]:
-    """Open a feature transport for an ite8910-style matched device."""
-    from .ite8910_perkey import hidraw
-
-    supported = tuple(int(pid) for pid in product_ids)
-    info = find_matching_ite8910_style_hidraw_device(
-        vendor_id=int(vendor_id),
-        product_ids=supported,
-        forced_path_env=forced_path_env,
-        forced_product_id=int(forced_product_id),
-        find_matching_fn=find_matching_fn,
-        device_info_factory=device_info_factory,
-    )
-    if info is None:
-        raise FileNotFoundError(
-            f"No hidraw device found for supported {missing_label} IDs: "
-            + ", ".join(f"0x{int(vendor_id):04x}:0x{pid:04x}" for pid in supported)
-        )
-    return hidraw.HidrawFeatureTransport(info.devnode, backend_name=backend_name), info

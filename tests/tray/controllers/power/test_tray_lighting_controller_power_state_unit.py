@@ -447,7 +447,6 @@ class TestPowerTurnOffRestore:
         assert mock_tray.tray_idle_power_state.controller_sleep_resume_guard is False
 
 
-
 class TestIdleFadeDuration:
     def test_defaults_when_config_lacks_setting(self):
         assert idle_fade_duration_s(SimpleNamespace()) == DEFAULT_IDLE_FADE_DURATION_S

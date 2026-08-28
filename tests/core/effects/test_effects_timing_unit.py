@@ -60,20 +60,3 @@ class TestClampedInterval:
         # speed=0 → interval = (100*11*0.8)/1000 = 0.88; min_s=0.1 → returns 0.88
         result = clamped_interval(100, speed=0, min_s=0.1)
         assert abs(result - (100 * 11 * 0.8) / 1000.0) < 1e-9
-
-
-class TestBrightnessFactor:
-    def test_zero(self):
-        from keyrgb.core.effects.timing import brightness_factor
-
-        assert brightness_factor(0) == 0.0
-
-    def test_half(self):
-        from keyrgb.core.effects.timing import brightness_factor
-
-        assert abs(brightness_factor(25) - 0.5) < 1e-9
-
-    def test_full(self):
-        from keyrgb.core.effects.timing import brightness_factor
-
-        assert abs(brightness_factor(50) - 1.0) < 1e-9

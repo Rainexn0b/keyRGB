@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Literal, Protocol, TypeAlias, cast
+from typing import Literal, Protocol, TypeAlias
 
 Color: TypeAlias = tuple[int, int, int]
 ColorApplyResult = bool | Literal["deferred"]
@@ -10,22 +10,6 @@ ColorApplyErrorTypes: TypeAlias = tuple[type[Exception], ...]
 
 class _SetStatusFn(Protocol):
     def __call__(self, message: str, *, ok: bool) -> None: ...
-
-
-class _ApplyColorFn(Protocol):
-    def __call__(self, r: int, g: int, b: int, brightness: int) -> ColorApplyResult: ...
-
-
-class _GetColorFn(Protocol):
-    def __call__(self) -> Color: ...
-
-
-class _ColorWheel(Protocol):
-    def get_color(self) -> Color: ...
-
-
-class _ColorWheelHolder(Protocol):
-    color_wheel: _ColorWheel | None
 
 
 class _UniformConfig(Protocol):
@@ -53,36 +37,6 @@ class _OnColorChangeGui(_UniformDragState, Protocol):
 
 class _ApplyColorGui(Protocol):
     kb: _UniformKeyboard | None
-
-
-class _StatusfulUniformGui(Protocol):
-    _target_label: object
-
-    def _ensure_brightness_nonzero(self) -> int: ...
-
-    def _commit_color_to_config(self, r: int, g: int, b: int) -> None: ...
-
-    def _apply_color(self, r: int, g: int, b: int, brightness: int) -> ColorApplyResult: ...
-
-    def _set_status(self, message: str, *, ok: bool) -> None: ...
-
-
-class _OnColorReleaseGui(_UniformDragState, _StatusfulUniformGui, Protocol):
-    pass
-
-
-class _OnApplyGui(_StatusfulUniformGui, Protocol):
-    _color_supported: bool
-
-
-def _color_wheel_get_color_fn(gui: object) -> _GetColorFn | None:
-    try:
-        color_wheel = cast(_ColorWheelHolder, gui).color_wheel
-    except AttributeError:
-        return None
-    if color_wheel is None:
-        return None
-    return color_wheel.get_color
 
 
 def apply_status_message(*, target_label: str, color: Color, result: ColorApplyResult) -> tuple[str, bool]:
@@ -160,57 +114,3 @@ def apply_color(
     except device_write_errors as exc:
         log_color_apply_failure_fn(exc)
         return False
-
-
-def on_color_release(
-    gui: _OnColorReleaseGui,
-    r: int,
-    g: int,
-    b: int,
-    *,
-    time_monotonic: Callable[[], float],
-    apply_color_fn: _ApplyColorFn | None = None,
-    set_status_fn: _SetStatusFn | None = None,
-) -> None:
-    color: Color = (r, g, b)
-    brightness = int(gui._ensure_brightness_nonzero())
-    gui._commit_color_to_config(r, g, b)
-
-    gui._last_drag_committed_color = color
-    gui._last_drag_commit_ts = time_monotonic()
-
-    active_apply_color_fn = gui._apply_color if apply_color_fn is None else apply_color_fn
-    active_set_status_fn = gui._set_status if set_status_fn is None else set_status_fn
-    result = active_apply_color_fn(r, g, b, brightness)
-    set_apply_status(
-        target_label=str(gui._target_label),
-        color=color,
-        result=result,
-        set_status_fn=active_set_status_fn,
-    )
-
-
-def on_apply(
-    gui: _OnApplyGui,
-    *,
-    get_color_fn: _GetColorFn | None = None,
-    apply_color_fn: _ApplyColorFn | None = None,
-    set_status_fn: _SetStatusFn | None = None,
-) -> None:
-    active_get_color_fn = get_color_fn if get_color_fn is not None else _color_wheel_get_color_fn(gui)
-    active_set_status_fn = gui._set_status if set_status_fn is None else set_status_fn
-    if not gui._color_supported or active_get_color_fn is None:
-        active_set_status_fn("✗ RGB color control is not supported on this backend", ok=False)
-        return
-    r, g, b = active_get_color_fn()
-    brightness = int(gui._ensure_brightness_nonzero())
-    gui._commit_color_to_config(r, g, b)
-
-    active_apply_color_fn = gui._apply_color if apply_color_fn is None else apply_color_fn
-    result = active_apply_color_fn(r, g, b, brightness)
-    set_apply_status(
-        target_label=str(gui._target_label),
-        color=(r, g, b),
-        result=result,
-        set_status_fn=active_set_status_fn,
-    )

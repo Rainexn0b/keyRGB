@@ -11,8 +11,6 @@ from keyrgb.core.config.domains import (
     ALL_KNOWN_KEYS,
     DOMAIN_KEYS,
     ConfigDomain,
-    assert_defaults_partitioned,
-    domain_for_key,
     project_domain,
     project_extras,
 )
@@ -25,7 +23,22 @@ def _make_config(tmp_path, monkeypatch) -> Config:
 
 
 def test_defaults_keys_are_fully_partitioned_into_domains() -> None:
-    assert_defaults_partitioned(DEFAULTS)
+    # Coverage: every DEFAULTS key must be owned by a domain.
+    missing = sorted(str(key) for key in DEFAULTS if key not in ALL_KNOWN_KEYS)
+    assert not missing, f"DEFAULTS keys missing from config domains: {missing}"
+
+    # No overlaps: a key must not be claimed by more than one domain.
+    overlaps: list[str] = []
+    seen: dict[str, ConfigDomain] = {}
+    for domain, keys in DOMAIN_KEYS.items():
+        for key in keys:
+            prior = seen.get(key)
+            if prior is not None and prior is not domain:
+                overlaps.append(f"{key} ({prior.value} vs {domain.value})")
+            seen[key] = domain
+    assert not overlaps, f"config domain key overlaps: {overlaps}"
+
+    # Known/unknown key evidence via domain ownership.
     assert "effect" in DOMAIN_KEYS[ConfigDomain.LIGHTING]
     assert "power_management_enabled" in DOMAIN_KEYS[ConfigDomain.POWER]
     assert "time_scheduler_enabled" in DOMAIN_KEYS[ConfigDomain.SCHEDULER]
@@ -33,22 +46,22 @@ def test_defaults_keys_are_fully_partitioned_into_domains() -> None:
     assert "secondary_device_state" in DOMAIN_KEYS[ConfigDomain.SECONDARY]
     assert "controller_sleep_respect" in DOMAIN_KEYS[ConfigDomain.IDLE_DISPLAY]
     assert "tray_device_context" in DOMAIN_KEYS[ConfigDomain.APP]
+    assert "future_vendor_flag" not in ALL_KNOWN_KEYS
 
 
-def test_domain_for_key_and_projections_preserve_extras() -> None:
+def test_projections_preserve_extras() -> None:
     values = {
         "effect": "wave",
         "power_management_enabled": True,
         "future_vendor_flag": 7,
         "secondary_device_state": {"lightbar": {"enabled": True}},
     }
-    assert domain_for_key("effect") is ConfigDomain.LIGHTING
-    assert domain_for_key("future_vendor_flag") is None
+    assert "effect" in DOMAIN_KEYS[ConfigDomain.LIGHTING]
+    assert "future_vendor_flag" not in ALL_KNOWN_KEYS
     assert project_domain(values, ConfigDomain.LIGHTING) == {"effect": "wave"}
     assert project_domain(values, ConfigDomain.POWER) == {"power_management_enabled": True}
     assert project_domain(values, ConfigDomain.SECONDARY) == {"secondary_device_state": {"lightbar": {"enabled": True}}}
     assert project_extras(values) == {"future_vendor_flag": 7}
-    assert "future_vendor_flag" not in ALL_KNOWN_KEYS
 
 
 def test_config_document_section_views_are_readonly(tmp_path, monkeypatch) -> None:

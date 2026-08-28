@@ -16,6 +16,7 @@ from keyrgb.core.backends.ite8233_none_chassis_lightbar_clevo.backend import (
     _open_matching_transport,
 )
 from keyrgb.core.backends.ite8233_none_chassis_lightbar_clevo.device import Ite8233LightbarDevice
+from keyrgb.core.effects import colors
 
 
 def test_ite8233_backend_metadata_is_research_backed_experimental() -> None:
@@ -241,6 +242,23 @@ def test_ite8233_protocol_builds_expected_uniform_color_report() -> None:
     report = ite8233_protocol.build_uniform_color_report((0x12, 0x34, 0x56))
 
     assert report == bytes((0x14, 0x00, 0x01, 0x12, 0x34, 0x56, 0x00, 0x00))
+
+
+def test_ite8233_protocol_scale_color_for_brightness_is_shared_helper() -> None:
+    # The backend re-exports the backend-neutral shared helper (no duplicate logic).
+    assert ite8233_protocol.scale_color_for_brightness is colors.scale_color_for_brightness
+
+    samples = [
+        ((0x20, 0x40, 0x60), 0),
+        ((0x20, 0x40, 0x60), 25),
+        ((0x20, 0x40, 0x60), 50),
+        ((300, -10, 128), 25),
+        ((10.7, 20.3, 30.9), 50),
+    ]
+    for color, brightness in samples:
+        assert ite8233_protocol.scale_color_for_brightness(color, brightness) == colors.scale_color_for_brightness(
+            color, brightness
+        )
 
 
 def test_ite8233_protocol_builds_expected_uniform_color_report_for_7000() -> None:

@@ -319,9 +319,3 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):  # type: ignore[misc]  # "size"
 
         self._update_selection()
         self._update_preview()
-
-
-if __name__ == "__main__":
-    from .demo import main
-
-    main()

@@ -43,6 +43,7 @@ dev = [
     "black>=26.3.1",
     "mypy>=1.20.0,<3.0",
     "vulture>=2.14",
+    "tomli>=2.0.1; python_version < '3.11'",
 ]
 
 [project.urls]

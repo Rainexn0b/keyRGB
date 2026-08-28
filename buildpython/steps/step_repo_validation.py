@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ..utils.paths import repo_root
+from ..utils.project_metadata import ProjectMetadataError, read_project_dependencies
 from ..utils.subproc import RunResult
 
 _REQUIRED_FILES = [
@@ -10,7 +11,6 @@ _REQUIRED_FILES = [
     "LICENSE",
     "install.sh",
     "pyproject.toml",
-    "requirements.txt",
 ]
 
 _AUTOSTART_INSTALLER_FILES = [
@@ -52,6 +52,11 @@ def repo_validation_runner() -> RunResult:
         py_text = _read_text(pyproject_path)
         if "[project.urls]" not in py_text or "github.com/Rainexn0b/keyRGB" not in py_text:
             warnings.append("pyproject.toml: project.urls does not appear to point at Rainexn0b/keyRGB")
+
+        try:
+            read_project_dependencies(pyproject_path)
+        except ProjectMetadataError as exc:
+            errors.append(f"pyproject.toml: {exc}")
 
     # install.sh can be a dispatcher; accept autostart handling in the delegated user installer path.
     if not _installer_mentions_autostart(root):

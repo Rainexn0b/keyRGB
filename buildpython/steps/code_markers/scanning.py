@@ -24,10 +24,6 @@ def iter_source_files() -> list[Path]:
             continue
         files.append(path)
 
-    for path in [root / "keyrgb", root / "keyrgb-tuxedo"]:
-        if path.exists() and path.is_file():
-            files.append(path)
-
     return files
 
 

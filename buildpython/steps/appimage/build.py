@@ -4,6 +4,7 @@ import shutil
 from pathlib import Path
 
 from ...utils.paths import repo_root
+from ...utils.project_metadata import ProjectMetadataError, read_project_dependencies
 from ...utils.subproc import RunResult, python_exe, run
 from . import (
     bundle_libappindicator,
@@ -32,6 +33,18 @@ def _first_existing_asset(root: Path, *relative_paths: str) -> Path | None:
         if candidate.exists():
             return candidate
     return None
+
+
+def _pip_install_args(specifiers: tuple[str, ...], site_packages: Path) -> list[str]:
+    return [
+        python_exe(),
+        "-m",
+        "pip",
+        "install",
+        *specifiers,
+        "--target",
+        str(site_packages),
+    ]
 
 
 def build_appimage() -> Path:
@@ -88,21 +101,11 @@ def build_appimage() -> Path:
     site_packages.mkdir(parents=True, exist_ok=True)
 
     if not skip_deps:
-        req = root / "requirements.txt"
-        if req.exists():
-            run_checked(
-                [
-                    python_exe(),
-                    "-m",
-                    "pip",
-                    "install",
-                    "-r",
-                    str(req),
-                    "--target",
-                    str(site_packages),
-                ],
-                cwd=root,
-            )
+        try:
+            specifiers = read_project_dependencies(root / "pyproject.toml")
+        except ProjectMetadataError as exc:
+            raise SystemExit(f"Cannot determine AppImage runtime dependencies: {exc}") from exc
+        run_checked(_pip_install_args(specifiers, site_packages), cwd=root)
 
         bundle_pygobject(appdir=appdir, site_packages=site_packages)
 

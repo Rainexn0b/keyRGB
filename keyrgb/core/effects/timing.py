@@ -33,9 +33,3 @@ def clamped_interval(
 ) -> float:
     interval = get_interval(base_ms, speed=speed, slowdown=slowdown)
     return max(float(min_s), float(interval))
-
-
-def brightness_factor(brightness: int) -> float:
-    """Convert the hardware brightness scale (0-50) to a 0..1 factor."""
-
-    return float(brightness) / 50.0

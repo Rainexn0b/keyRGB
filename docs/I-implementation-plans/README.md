@@ -14,9 +14,6 @@ specs for larger changes.
 
 ### Active follow-up plans
 
-- `2026-08-28/effect-and-backend-extension-friction.md` — pre-1.0 registration
-  path for software/reactive effects (backend discovery is already the model);
-  no new user-visible effects
 - `2026-08-11/architecture-concerns-plan.md` — confirmation and remediation
   tracker for the 2026-08-11 architecture review; one finding per pass, with
   test-first contracts and explicit confirmed/rejected status
@@ -35,6 +32,13 @@ specs for larger changes.
 
 ### Implemented dependencies / historical plans
 
+- `2026-08-28/effect-and-backend-extension-friction.md` — implemented the
+  registration-plus-test path for shipped software/reactive effects and the
+  backend package-marker completeness tripwire, with no new visible effects
+- `2026-08-27/dead-code-and-debloating-campaign.md` — completed W1–W9 across
+  dead-code removal, dependency-source consolidation, facade auditing, and
+  pure color-math deduplication; optional package-data/assets W10 remains
+  deferred
 - `secondary-lighting-profile-editor-and-simulation-plan.md` — implemented issue #7
   static scene/profile UX, tray target cleanup, and secondary-device simulation mode;
   reporter hardware validation remains pending and is tracked in the plan

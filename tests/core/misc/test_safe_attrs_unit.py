@@ -10,7 +10,6 @@ from keyrgb.core.utils.safe_attrs import (
     safe_bool_attr,
     safe_float_attr,
     safe_int_attr,
-    safe_optional_int_attr,
     safe_str_attr,
 )
 
@@ -99,24 +98,6 @@ class TestSafeStrAttr:
         assert safe_str_attr(obj, "effect") == "42"
 
 
-class TestSafeOptionalIntAttr:
-    def test_returns_value_when_present(self) -> None:
-        obj = SimpleNamespace(override=30)
-        assert safe_optional_int_attr(obj, "override") == 30
-
-    def test_returns_none_when_missing(self) -> None:
-        obj = SimpleNamespace()
-        assert safe_optional_int_attr(obj, "override") is None
-
-    def test_returns_none_when_none(self) -> None:
-        obj = SimpleNamespace(override=None)
-        assert safe_optional_int_attr(obj, "override") is None
-
-    def test_clamps_when_present(self) -> None:
-        obj = SimpleNamespace(override=100)
-        assert safe_optional_int_attr(obj, "override", max_v=50) == 50
-
-
 class TestEdgeCases:
     def test_handles_getattr_exception(self) -> None:
         class BadObj:
@@ -155,28 +136,6 @@ class TestEdgeCases:
 
         with pytest.raises(AssertionError, match="unexpected float bug"):
             safe_int_attr(SimpleNamespace(value=BadCoerce()), "value", default=5)
-
-    def test_handles_broken_float_fallback_for_optional_int(self) -> None:
-        class BadCoerce:
-            def __int__(self) -> int:
-                raise TypeError("force float fallback")
-
-            def __float__(self) -> float:
-                raise RuntimeError("boom")
-
-        obj = SimpleNamespace(value=BadCoerce())
-        assert safe_optional_int_attr(obj, "value") is None
-
-    def test_propagates_unexpected_float_fallback_failure_for_optional_int(self) -> None:
-        class BadCoerce:
-            def __int__(self) -> int:
-                raise TypeError("force float fallback")
-
-            def __float__(self) -> float:
-                raise AssertionError("unexpected float bug")
-
-        with pytest.raises(AssertionError, match="unexpected float bug"):
-            safe_optional_int_attr(SimpleNamespace(value=BadCoerce()), "value")
 
     def test_handles_zero_correctly(self) -> None:
         # This is the key bug the old pattern had: `or 0` treats 0 as falsy

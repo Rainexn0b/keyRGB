@@ -19,7 +19,6 @@ RECOVERY_USER_MODE_SAVE_ENV = "KEYRGB_RECOVERY_USER_MODE_SAVE"
 #   KEYRGB_PER_KEY_MODE_POLICY=init_once
 # Failure mode when a device DOES need the reassert: the deck freezes, reverts
 # to a hardware effect, or goes dark mid-animation. Unset = backend default.
-_PERKEY_CONFIG_LOAD_ERRORS = (AttributeError, ImportError, LookupError, OSError, TypeError, ValueError)
 _ENABLE_USER_MODE_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 _HIDDEN_PERKEY_RESTORE_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 _T = TypeVar("_T")
@@ -47,24 +46,6 @@ def _run_with_recoverable_logging(
             exc=exc,
         )
         return fallback
-
-
-def load_per_key_colors_from_config() -> dict[tuple[int, int], tuple[int, int, int]]:
-    """Best-effort load of per-key colors from the legacy config."""
-
-    def _load_colors() -> dict[tuple[int, int], tuple[int, int, int]]:
-        from keyrgb.core.config import Config
-
-        cfg = Config()
-        return dict(getattr(cfg, "per_key_colors", {}) or {})
-
-    return _run_with_recoverable_logging(
-        fn=_load_colors,
-        recoverable_errors=_PERKEY_CONFIG_LOAD_ERRORS,
-        throttle_key="legacy.perkey_animation.load_config",
-        msg="Failed to load per-key colors from config",
-        fallback={},
-    )
 
 
 def build_full_color_grid(
@@ -97,24 +78,6 @@ def build_full_color_grid(
             continue
 
     return full
-
-
-def scaled_color_map(
-    full_colors: dict[tuple[int, int], tuple[int, int, int]],
-    *,
-    scale: float,
-) -> dict[tuple[int, int], tuple[int, int, int]]:
-    """Return a new color map with each channel scaled by `scale`."""
-
-    s = float(scale)
-    out: dict[tuple[int, int], tuple[int, int, int]] = {}
-    for (row, col), (r, g, b) in full_colors.items():
-        out[(row, col)] = (
-            max(0, min(255, int(r * s))),
-            max(0, min(255, int(g * s))),
-            max(0, min(255, int(b * s))),
-        )
-    return out
 
 
 def enable_user_mode_once(*, kb, kb_lock, brightness: int, save: bool = False) -> None:
