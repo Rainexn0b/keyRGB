@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Effects: Offer Breathing, Fire, Rain, and Random as controller-agnostic software effects. Firmware effects that share those names stay available as `hw:breathing` / `hw:rain` / `hw:random`. Old `breathing_sw` config values map to software Breathing.
+
 ## 0.33.1 (2026-08-22)
 
 Follow-up to the 0.33.0 `src` → `keyrgb` rename: keep the installable package, test bootstrap, and launch paths from reintroducing the old import root.

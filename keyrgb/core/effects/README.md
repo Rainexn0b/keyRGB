@@ -31,6 +31,10 @@ from those markers. Unmarked runners are not user-selectable.
 Optional: re-export `run_<name>` from `software/effects.py` only if callers need
 a stable import path. Engine start does not require that wrapper.
 
+Unprefixed names that also exist as firmware effects (`breathing`, `rain`,
+`random`) select the software loop. The matching controller effect is stored
+and started as `hw:<name>`.
+
 ## Hardware firmware effects
 
 Do not add names to `catalog.HW_EFFECTS` to ship a new firmware effect. Expose
