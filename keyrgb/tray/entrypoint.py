@@ -11,6 +11,7 @@ import signal
 import sys
 from collections.abc import Sequence
 
+from keyrgb.core.diagnostics.diagnostic_session import diagnostic_session_from_cli
 from keyrgb.core.diagnostics.runtime_capture import capture_runtime_log_from_cli
 
 from .app.application import KeyRGBTray
@@ -54,10 +55,19 @@ def _shutdown_engine_best_effort(app: object | None) -> None:
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    capture_exit_code = capture_runtime_log_from_cli(
-        tuple(sys.argv[1:] if argv is None else argv),
-        prog="keyrgb",
-    )
+    argv_tuple = tuple(sys.argv[1:] if argv is None else argv)
+
+    # Diagnostic session takes priority: it launches a full debug child in the
+    # foreground and returns that child's exit status. Keep this before the
+    # capture-log path so a single ``--diagnostic-session`` does not also trigger
+    # the older capture-only flow.
+    session_exit_code = diagnostic_session_from_cli(argv_tuple, prog="keyrgb")
+    if session_exit_code is not None:
+        if session_exit_code != 0:
+            raise SystemExit(session_exit_code)
+        return
+
+    capture_exit_code = capture_runtime_log_from_cli(argv_tuple, prog="keyrgb")
     if capture_exit_code is not None:
         if capture_exit_code != 0:
             raise SystemExit(capture_exit_code)

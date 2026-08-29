@@ -6,7 +6,7 @@ Use this document to choose the right support path before opening an issue.
 
 - Read [README.md](README.md), especially the install, troubleshooting, and hardware-support sections.
 - Run `keyrgb-diagnostics` and keep the JSON output ready.
-- If the issue is runtime-related, also capture `KEYRGB_DEBUG=1 keyrgb` output.
+- If the issue is runtime-related, run `keyrgb --diagnostic-session`, reproduce it, and include the reported session directory (or its relevant logs).
 - Stop other RGB tools or vendor daemons before reproducing the problem.
 
 ## Which Issue Path To Use

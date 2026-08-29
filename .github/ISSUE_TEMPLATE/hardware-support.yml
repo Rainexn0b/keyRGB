@@ -38,8 +38,8 @@ body:
   - type: textarea
     id: debug_logs
     attributes:
-      label: Debug logs
-      description: Run `KEYRGB_DEBUG=1 keyrgb` and paste relevant output (especially any errors).
+      label: Diagnostic-session logs
+      description: Run `keyrgb --diagnostic-session`, reproduce the problem, then attach `keyrgb-debug.log` and relevant `journal-*.log` files from the printed session directory. Review logs for personal data first.
       render: text
     validations:
       required: false

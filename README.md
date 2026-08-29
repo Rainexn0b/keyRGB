@@ -162,7 +162,9 @@ If you installed via the installer, run KeyRGB from your app menu or start it fr
 | Command | Description |
 | --- | --- |
 | `keyrgb` | Start the tray app (background). |
-| `keyrgb --capture-runtime-log` | Capture a full foreground runtime diagnostic log. |
+| `keyrgb --diagnostic-session` | Run the canonical foreground diagnostic session; saves debug logs, before/after diagnostics, and journal slices in a timestamped cache directory. |
+| `keyrgb-diagnostic-launch` | Same diagnostic session as a dedicated command. From a checkout it uses source code; otherwise it uses the installed runtime. |
+| `keyrgb --capture-runtime-log` | Capture only a foreground runtime log. |
 | `./keyrgb.sh` | Run attached to the terminal from a source checkout. |
 | `keyrgb-perkey` | Open the per-key editor. |
 | `keyrgb-uniform` | Open the uniform-color GUI. |
@@ -252,6 +254,7 @@ installs the matching KeyRGB udev rules for supported USB / hidraw access.
 | `KEYRGB_<BACKEND>_REPORT_DELAY_MS` | Per-backend HID pacing, punctuation normalized to underscores (for example `KEYRGB_ITE8291R3_PERKEY_REPORT_DELAY_MS`). Falls back to `KEYRGB_HID_REPORT_DELAY_MS`. |
 | `KEYRGB_DEBUG=1` | Enable verbose debug logging. |
 | `KEYRGB_DEBUG_BRIGHTNESS=1` | Detailed brightness / sysfs write logs. Example: `KEYRGB_DEBUG_BRIGHTNESS=1 ./keyrgb.sh`. |
+| `KEYRGB_DEBUG_REACTIVE_INPUT=1` | Log reactive-effect key input. It is included by the `full` capture and diagnostic-session modes. |
 | `KEYRGB_TK_SCALING` | Float override for UI scaling (High-DPI / fractional scaling). |
 | `KEYRGB_RECOVERY_USER_MODE_SAVE` | After hidden controller-sleep recovery, save the restored scene as the controller's user mode (default on). Set to `0` to opt out. |
 
@@ -330,6 +333,14 @@ Most supported controllers use a fixed LED matrix (e.g., 6×21). To map this to 
 | Brightness works but color does not (kernel / `kbd_backlight`) | The sysfs node is likely **brightness-only** (no `multi_intensity`, `color`, or `rgb` under `/sys/class/leds/*kbd_backlight*`). KeyRGB can only change color when the kernel exposes RGB attributes. On ASUS ROG, use `asusctl` / rog-control-center for Aura/RGB. |
 | Per-key editor not available | The editor needs a backend that can address individual LEDs (typically USB ITE / TongFang). Many kernel drivers expose only uniform brightness, and sometimes uniform RGB, not per-key RGB. |
 | Keyboard backlight turns off by itself after ~10 minutes without typing | This is the ITE controller's own firmware sleep timer; host software cannot disable it. By default KeyRGB re-lights the deck automatically (a brief blink). To leave it dark until the next keypress, enable **Settings → Screen idle/blanking sync → "Let the controller's own sleep timeout turn the keyboard off"**. |
+
+For a suspend/resume or runtime problem, use **Diagnostic Session** from the KeyRGB app-menu entry (after reinstalling to refresh desktop integration), or run:
+
+```bash
+keyrgb --diagnostic-session
+```
+
+It opens in the foreground so you can close an already-running tray first, reproduce the issue, then press `Ctrl-C`. The printed session directory under `~/.cache/keyrgb/diagnostic-sessions/` contains `keyrgb-debug.log`, diagnostics snapshots, and best-effort journal slices. Review the bundle for personal information before sharing it.
 
 ## Hardware support and contributing
 

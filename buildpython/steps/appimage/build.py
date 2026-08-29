@@ -35,6 +35,35 @@ def _first_existing_asset(root: Path, *relative_paths: str) -> Path | None:
     return None
 
 
+def _appimage_desktop_entry() -> str:
+    """Return the embedded AppImage ``.desktop`` contents.
+
+    The ``Diagnostic Session`` action launches the same ``keyrgb`` Exec convention
+    used for the main entrypoint, so the AppImage's bundled launcher resolves it.
+    """
+
+    return "\n".join(  # noqa: FLY002 - desktop entry lines are clearer as an explicit list
+        [
+            "[Desktop Entry]",
+            "Type=Application",
+            "Name=KeyRGB",
+            "Comment=RGB Keyboard Controller",
+            "Exec=keyrgb",
+            "Icon=keyrgb",
+            "Terminal=false",
+            "Categories=Utility;System;",
+            "StartupNotify=false",
+            "Actions=DiagnosticSession;",
+            "",
+            "[Desktop Action DiagnosticSession]",
+            "Name=Diagnostic Session",
+            "Exec=keyrgb --diagnostic-session",
+            "Terminal=true",
+            "",
+        ]
+    )
+
+
 def _pip_install_args(specifiers: tuple[str, ...], site_packages: Path) -> list[str]:
     return [
         python_exe(),
@@ -121,20 +150,7 @@ def build_appimage() -> Path:
 
     write_text(
         appdir / "keyrgb.desktop",
-        "\n".join(  # noqa: FLY002 - desktop entry lines are clearer as an explicit list
-            [
-                "[Desktop Entry]",
-                "Type=Application",
-                "Name=KeyRGB",
-                "Comment=RGB Keyboard Controller",
-                "Exec=keyrgb",
-                "Icon=keyrgb",
-                "Terminal=false",
-                "Categories=Utility;System;",
-                "StartupNotify=false",
-                "",
-            ]
-        ),
+        _appimage_desktop_entry(),
     )
 
     apprun = "\n".join(  # noqa: FLY002 - shell bootstrap lines are clearer as an explicit list

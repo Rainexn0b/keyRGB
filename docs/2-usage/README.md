@@ -8,6 +8,7 @@ operating KeyRGB.
 - `venv/setup.md` — virtual environment and system dependency setup
 - `venv/local_environment.md` — local environment quick start
 - `04-hardware_tests.md` — opt-in hardware tests
+- `logs/diagnostic_sessions.md` — canonical runtime diagnostic bundles
 - `logs/brightness_logging.md` — brightness and runtime debug logging
 - `artifacts/appimage.md` — AppImage release artifact notes
 - `artifacts/package_build.md` — optional Python package build

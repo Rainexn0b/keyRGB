@@ -59,6 +59,7 @@ keyrgb-reactive-color = "keyrgb.gui.windows.reactive_color:main"
 keyrgb-calibrate = "keyrgb.gui.calibrator:main"
 keyrgb-settings = "keyrgb.gui.settings:main"
 keyrgb-diagnostics = "keyrgb.core.diagnostics:main"
+keyrgb-diagnostic-launch = "keyrgb.core.diagnostics.diagnostic_session:diagnostic_session_main"
 
 [tool.setuptools]
 include-package-data = true

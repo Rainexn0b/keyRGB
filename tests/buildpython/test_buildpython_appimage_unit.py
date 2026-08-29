@@ -126,3 +126,17 @@ def test_ldd_deps_parses_resolved_paths(monkeypatch, tmp_path) -> None:
         "libXft.so.2": Path("/usr/lib/libXft.so.2"),
         "ld-linux-x86-64.so.2": Path("/lib64/ld-linux-x86-64.so.2"),
     }
+
+
+def test_appimage_desktop_entry_includes_diagnostic_session_action() -> None:
+    desktop = appimage_build._appimage_desktop_entry()
+
+    assert "Exec=keyrgb" in desktop
+    assert "Terminal=false" in desktop
+    # Normal Exec and autostart convention is unchanged: the action launches via
+    # the same `keyrgb` Exec convention.
+    assert "Actions=DiagnosticSession;" in desktop
+    assert "[Desktop Action DiagnosticSession]" in desktop
+    assert "Name=Diagnostic Session" in desktop
+    assert "Exec=keyrgb --diagnostic-session" in desktop
+    assert "Terminal=true" in desktop

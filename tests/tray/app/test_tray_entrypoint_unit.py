@@ -28,6 +28,21 @@ def test_main_runtime_capture_dispatches_before_tray_startup(monkeypatch):
     assert calls == [(("--capture-runtime-log=full", "--runtime-log-launcher=source"), "keyrgb")]
 
 
+def test_main_diagnostic_session_dispatches_before_runtime_capture(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        entry,
+        "diagnostic_session_from_cli",
+        lambda argv, *, prog: calls.append((argv, prog)) or 0,
+    )
+    monkeypatch.setattr(entry, "capture_runtime_log_from_cli", lambda *_args, **_kwargs: pytest.fail("capture called"))
+    monkeypatch.setattr(entry, "configure_logging", lambda: pytest.fail("tray startup called"))
+
+    entry.main(["--diagnostic-session"])
+
+    assert calls == [(("--diagnostic-session",), "keyrgb")]
+
+
 def test_main_runtime_capture_propagates_failure_status(monkeypatch):
     monkeypatch.setattr(entry, "capture_runtime_log_from_cli", lambda _argv, *, prog: 2)
 

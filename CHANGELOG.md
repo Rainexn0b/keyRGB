@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Diagnostics/Support: Add a canonical `keyrgb --diagnostic-session` / `keyrgb-diagnostic-launch` workflow that records full runtime logs, before/after diagnostics, and journal slices in a timestamped user-cache bundle. Installed desktop entries and the AppImage desktop template now expose a terminal **Diagnostic Session** action; AppImage sessions avoid recursive self-launching.
+- Docs: Make diagnostic sessions the canonical runtime-report path in usage guides, support guidance, and issue templates; add a documentation landing page without bypassing the permanent lane-ID structure.
 - Effects: Offer Breathing, Fire, Rain, and Random as controller-agnostic software effects. Firmware effects that share those names stay available as `hw:breathing` / `hw:rain` / `hw:random`. Old `breathing_sw` config values map to software Breathing.
 
 ## 0.33.1 (2026-08-22)

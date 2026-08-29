@@ -56,8 +56,8 @@ body:
   - type: textarea
     id: logs
     attributes:
-      label: Logs
-      description: Paste `KEYRGB_DEBUG=1 keyrgb` output around the failure.
+      label: Diagnostic-session logs
+      description: Run `keyrgb --diagnostic-session`, reproduce the failure, stop it with Ctrl-C, then attach `keyrgb-debug.log` and relevant `journal-*.log` files from the printed session directory. Review logs for personal data first.
       render: text
     validations:
       required: false

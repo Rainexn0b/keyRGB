@@ -20,6 +20,8 @@ right evidence without needing maintainer-only knowledge first.
 - `keyrgb/core/diagnostics/backend_speed_probe.py`
 - `keyrgb/core/diagnostics/support_reports.py`
 - `keyrgb/core/diagnostics/additional_evidence.py`
+- `keyrgb/core/diagnostics/diagnostic_session.py`
+- `keyrgb/core/diagnostics/diagnostic_session_evidence.py`
 
 ## Current flow
 
@@ -68,6 +70,7 @@ appear and work.
 - combined support bundle
 - generated issue draft and recommended template link
 - optional deeper-evidence attachments when needed
+- foreground diagnostic-session bundle (runtime log, before/after snapshots, and journal slices)
 
 ## Testing
 

@@ -1,6 +1,19 @@
 # Brightness logging
 
-## Full reactive typing investigation (recommended for flash/flicker reports)
+## Diagnostic session (recommended for runtime reports)
+
+For a suspend/resume, flash, flicker, or other runtime report, start the
+canonical session first:
+
+```bash
+keyrgb --diagnostic-session
+```
+
+It writes a timestamped bundle with full runtime logging, diagnostics snapshots,
+and best-effort journal slices. See [Diagnostic sessions](diagnostic_sessions.md)
+for the workflow, source-checkout command, and privacy guidance.
+
+## Focused reactive typing investigation
 
 Quit any existing KeyRGB tray instance, then run this command from the project
 checkout. It launches the installed KeyRGB runtime by default, preserving its

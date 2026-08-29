@@ -170,6 +170,12 @@ Icon=$desktop_icon
 Terminal=false
 Categories=Utility;System;
 StartupNotify=false
+Actions=DiagnosticSession;
+
+[Desktop Action DiagnosticSession]
+Name=Diagnostic Session
+Exec=$keyrgb_exec --diagnostic-session
+Terminal=true
 EOF
 
   cat >"$autostart_file" <<EOF

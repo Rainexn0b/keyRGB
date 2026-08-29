@@ -53,3 +53,16 @@ def test_install_icon_and_desktop_entries_writes_isolated_session_files(tmp_path
     assert "Name=KeyRGB" in desktop_text
     assert f"Exec={launcher}" in desktop_text
     assert "X-KDE-autostart-after=plasma-workspace" in autostart.read_text(encoding="utf-8")
+
+    # The Diagnostic Session desktop action must launch through the same
+    # executable and must not alter the normal/autostart Exec lines.
+    assert "Actions=DiagnosticSession;" in desktop_text
+    assert "[Desktop Action DiagnosticSession]" in desktop_text
+    assert "Name=Diagnostic Session" in desktop_text
+    assert f"Exec={launcher} --diagnostic-session" in desktop_text
+    assert "Terminal=true" in desktop_text
+    assert "Terminal=false" in desktop_text
+    # Autostart entry must remain a plain normal launch (no diagnostic action).
+    autostart_text = autostart.read_text(encoding="utf-8")
+    assert f"Exec={launcher}" in autostart_text
+    assert "DiagnosticSession" not in autostart_text

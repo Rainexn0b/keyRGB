@@ -83,8 +83,8 @@ body:
   - type: textarea
     id: logs
     attributes:
-      label: Debug logs
-      description: Paste `KEYRGB_DEBUG=1 keyrgb` output from a successful run, especially backend selection lines.
+      label: Diagnostic-session logs
+      description: Run `keyrgb --diagnostic-session` during a successful run, then attach `keyrgb-debug.log` from the printed session directory (especially backend-selection lines). Review logs for personal data first.
       render: text
     validations:
       required: false
