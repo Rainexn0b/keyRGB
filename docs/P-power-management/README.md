@@ -7,6 +7,8 @@ and related runtime behavior.
 
 - `controller-sleep-policy.md` — backend-declared controller sleep, automatic
   recovery, and opt-in dark-until-keypress behavior
+- `keyboard-sleep-wake-hardening-campaign.md` — investigation/correction tracker
+  for controller sleep, effect shutdown, and computer suspend/resume ordering
 - `power-mode-verification-refactor-plan.md` — power-mode verification refactor
 
 ## See also
