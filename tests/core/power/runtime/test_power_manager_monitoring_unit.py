@@ -140,7 +140,15 @@ class TestPowerManagerMonitorLoopFallbacks:
         pm = PowerManager(mock_kb)
         pm.monitoring = True
 
-        with patch("keyrgb.core.power.management.manager.monitor_prepare_for_sleep") as mon:
+        def _mock_monitor(**kwargs):
+            # Disable monitoring on the first run so the restart loop terminates
+            # and we can assert the single invocation's wiring.
+            pm.monitoring = False
+
+        with patch(
+            "keyrgb.core.power.management.manager.monitor_prepare_for_sleep",
+            side_effect=_mock_monitor,
+        ) as mon:
             pm._monitor_loop()
 
         mon.assert_called_once()
@@ -172,23 +180,153 @@ class TestPowerManagerMonitorLoopFallbacks:
         warn.assert_called_once()
         pm._monitor_acpi_events.assert_called_once()
 
-    def test_monitor_loop_catches_unexpected_exceptions(self):
+    def test_monitor_loop_restarts_after_recoverable_callback_error(self):
         from keyrgb.core.power.management.manager import PowerManager
 
         mock_kb = MagicMock()
         pm = PowerManager(mock_kb)
         pm.monitoring = True
 
+        calls = {"n": 0}
+
+        def _side_effect(**kwargs):
+            # The real monitor invokes on_started once it spawns the process,
+            # before any suspend/resume callbacks run.
+            on_started = kwargs.get("on_started")
+            if on_started is not None:
+                on_started()
+            calls["n"] += 1
+            if calls["n"] == 1:
+                # A recoverable runtime error from the suspend/resume callbacks
+                # must not permanently end monitoring.
+                raise RuntimeError("boom")
+            # The restarted monitor ends cleanly by disabling monitoring.
+            pm.monitoring = False
+
+        with (
+            patch(
+                "keyrgb.core.power.management.manager.monitor_prepare_for_sleep",
+                side_effect=_side_effect,
+            ),
+            patch(
+                "keyrgb.core.power.management._monitor_runner._interruptible_sleep",
+                return_value=None,
+            ),
+            patch("keyrgb.core.power.management.manager.logger.exception") as exc,
+            patch.object(pm, "_start_lid_monitor"),
+        ):
+            pm._monitor_loop()
+
+        assert calls["n"] == 2
+        exc.assert_called_once()
+        # The recoverable error is logged with a restart intent (lazy % formatting
+        # means the delay is still a template token in call_args).
+        assert any("restarting in" in str(c.args) for c in exc.call_args_list)
+
+    def test_monitor_loop_restarts_after_eof_without_duplicate_lid_start(self):
+        from keyrgb.core.power.management.manager import PowerManager
+
+        mock_kb = MagicMock()
+        pm = PowerManager(mock_kb)
+        pm.monitoring = True
+
+        calls = {"n": 0}
+
+        def _side_effect(**kwargs):
+            # The real monitor invokes on_started once it spawns the process.
+            on_started = kwargs.get("on_started")
+            if on_started is not None:
+                on_started()
+            calls["n"] += 1
+            if calls["n"] < 3:
+                # dbus-monitor exits immediately (EOF / child exit).
+                return
+            pm.monitoring = False
+
+        with (
+            patch(
+                "keyrgb.core.power.management.manager.monitor_prepare_for_sleep",
+                side_effect=_side_effect,
+            ),
+            patch(
+                "keyrgb.core.power.management._monitor_runner._interruptible_sleep",
+                return_value=None,
+            ),
+            patch("keyrgb.core.power.management.manager.logger.warning") as warn,
+            patch.object(pm, "_start_lid_monitor") as lid,
+        ):
+            pm._monitor_loop()
+
+        assert calls["n"] == 3
+        # Lid monitoring is owned by one thread; restarts must not duplicate it.
+        lid.assert_called_once()
+        assert sum(1 for c in warn.call_args_list if "restarting" in str(c.args)) >= 2
+
+    def test_monitor_loop_stops_cleanly_without_restart_on_shutdown(self):
+        from keyrgb.core.power.management.manager import PowerManager
+
+        mock_kb = MagicMock()
+        pm = PowerManager(mock_kb)
+        pm.monitoring = True
+
+        calls = []
+
+        def _side_effect(**kwargs):
+            calls.append(1)
+            # Monitoring disabled while the monitor runs: clean shutdown.
+            pm.monitoring = False
+
+        with (
+            patch(
+                "keyrgb.core.power.management.manager.monitor_prepare_for_sleep",
+                side_effect=_side_effect,
+            ),
+            patch(
+                "keyrgb.core.power.management._monitor_runner._interruptible_sleep",
+                return_value=None,
+            ) as sleep,
+        ):
+            pm._monitor_loop()
+
+        assert len(calls) == 1
+        # No restart backoff sleep on clean shutdown.
+        sleep.assert_not_called()
+
+    def test_monitor_loop_bounded_backoff_caps_at_max(self):
+        from keyrgb.core.power.management._monitor_runner import (
+            _MONITOR_RESTART_INITIAL_DELAY_S,
+            _MONITOR_RESTART_MAX_DELAY_S,
+        )
+        from keyrgb.core.power.management.manager import PowerManager
+
+        mock_kb = MagicMock()
+        pm = PowerManager(mock_kb)
+        pm.monitoring = True
+
+        sleeps = []
+
+        def _sleep(duration_s, is_running, *, interval_s=_MONITOR_RESTART_INITIAL_DELAY_S):
+            sleeps.append(duration_s)
+            if len(sleeps) >= 8:
+                pm.monitoring = False
+
         with (
             patch(
                 "keyrgb.core.power.management.manager.monitor_prepare_for_sleep",
                 side_effect=RuntimeError("boom"),
             ),
-            patch("keyrgb.core.power.management.manager.logger.exception") as exc,
+            patch(
+                "keyrgb.core.power.management._monitor_runner._interruptible_sleep",
+                side_effect=_sleep,
+            ),
         ):
             pm._monitor_loop()
 
-        exc.assert_called_once()
+        assert sleeps
+        assert sleeps[0] == _MONITOR_RESTART_INITIAL_DELAY_S
+        # Backoff grows but never exceeds the cap even under repeated failure.
+        assert max(sleeps) <= _MONITOR_RESTART_MAX_DELAY_S
+        assert len({s for s in sleeps if s >= _MONITOR_RESTART_MAX_DELAY_S}) >= 1
 
     def test_monitor_loop_propagates_unexpected_exceptions(self):
         from keyrgb.core.power.management.manager import PowerManager

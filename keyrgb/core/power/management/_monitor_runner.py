@@ -3,10 +3,40 @@
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Callable
 from typing import Protocol
 
 logger = logging.getLogger(__name__)
+
+# Bounded restart/backoff for the primary login1 (dbus-monitor) suspend/resume
+# monitor. These bounds exist so a monitor that exits while the manager still
+# wants monitoring (EOF, child exit, or a recoverable callback exception) is
+# retried without busy-looping during repeated failure or shutdown.
+_MONITOR_RESTART_INITIAL_DELAY_S = 1.0
+_MONITOR_RESTART_MAX_DELAY_S = 30.0
+_MONITOR_RESTART_BACKOFF_FACTOR = 2.0
+_MONITOR_STABLE_RUN_THRESHOLD_S = 5.0
+_MONITOR_SHUTDOWN_POLL_INTERVAL_S = 0.5
+
+
+def _interruptible_sleep(
+    duration_s: float,
+    is_running: Callable[[], bool],
+    *,
+    interval_s: float = _MONITOR_SHUTDOWN_POLL_INTERVAL_S,
+) -> None:
+    """Sleep for ``duration_s`` but return early if ``is_running`` becomes false.
+
+    Used during restart backoff so a shutdown request is honored promptly
+    instead of blocking for the full backoff window.
+    """
+
+    remaining = float(duration_s)
+    while remaining > 0 and is_running():
+        step = min(interval_s, remaining)
+        time.sleep(step)
+        remaining -= step
 
 
 class _JoinableThreadProtocol(Protocol):
@@ -154,25 +184,97 @@ def run_monitor_loop(
     start_lid_monitor_fn: Callable[[], None],
     monitor_acpi_events_fn: Callable[[], None],
 ) -> None:
-    """Run the primary login1 monitor with ACPI fallback."""
+    """Run the primary login1 monitor with restart and ACPI fallback.
 
-    try:
-        logger.info("Power monitoring started using dbus-monitor")
+    The login1 monitor is a single long-running ``dbus-monitor`` invocation that
+    ends on EOF, child exit, or a raised exception. None of those conditions must
+    silently terminate suspend/resume monitoring while ``manager.monitoring`` is
+    still true, so a clean (non-shutdown) exit is retried with bounded exponential
+    backoff. ``FileNotFoundError`` (dbus-monitor absent) is a stable condition and
+    fails over to the ACPI lid monitor exactly once.
 
-        monitor_prepare_for_sleep_fn(
-            is_running=lambda: manager.monitoring,
-            on_started=start_lid_monitor_fn,
-            on_suspend=manager._on_suspend,
-            on_resume=manager._on_resume,
-            on_process_started=manager._register_monitor_process,
-            on_process_stopped=manager._unregister_monitor_process,
-        )
+    Lid monitoring is started at most once across all monitor invocations: a
+    restart spawns a fresh ``dbus-monitor`` but the already-running lid thread
+    keeps owning lid callbacks, so re-invoking the lid starter would duplicate
+    them.
+    """
 
-    except FileNotFoundError:
-        logger.warning("dbus-monitor not available, trying alternative method")
-        monitor_acpi_events_fn()
-    except monitor_errors:  # @quality-exception exception-transparency: login1 monitoring is an external runtime boundary and power monitoring must remain available on recoverable runtime failures
-        logger.exception("Power monitoring error")
+    lid_started = False
+
+    def _on_started_once() -> None:
+        nonlocal lid_started
+        if lid_started:
+            logger.debug("Lid monitor already started; skipping duplicate start on monitor restart")
+            return
+        start_lid_monitor_fn()
+        # Mark started only after a successful start so a transient failure is
+        # retried on the next monitor restart instead of being permanently skipped.
+        lid_started = True
+
+    logger.info("Power monitoring started using dbus-monitor")
+
+    retry_delay_s = _MONITOR_RESTART_INITIAL_DELAY_S
+    consecutive_failures = 0
+
+    while manager.monitoring:
+        run_start = time.monotonic()
+        try:
+            monitor_prepare_for_sleep_fn(
+                is_running=lambda: manager.monitoring,
+                on_started=_on_started_once,
+                on_suspend=manager._on_suspend,
+                on_resume=manager._on_resume,
+                on_process_started=manager._register_monitor_process,
+                on_process_stopped=manager._unregister_monitor_process,
+            )
+        except FileNotFoundError:
+            logger.warning("dbus-monitor not available, trying alternative method")
+            monitor_acpi_events_fn()
+            return
+        except monitor_errors as exc:  # @quality-exception exception-transparency: login1 monitoring is an external runtime boundary and power monitoring must remain available on recoverable runtime failures
+            if not manager.monitoring:
+                logger.info("Power monitoring stopping after recoverable error")
+                return
+            consecutive_failures += 1
+            logger.exception(
+                "Power monitoring recovered from %s after recoverable error; "
+                "restarting in %.1fs (attempt %d)",
+                type(exc).__name__,
+                retry_delay_s,
+                consecutive_failures,
+            )
+            _interruptible_sleep(retry_delay_s, lambda: manager.monitoring)
+            if not manager.monitoring:
+                logger.info("Power monitoring stopping during restart backoff")
+                return
+            retry_delay_s = min(retry_delay_s * _MONITOR_RESTART_BACKOFF_FACTOR, _MONITOR_RESTART_MAX_DELAY_S)
+            continue
+        else:
+            if not manager.monitoring:
+                logger.info("Power monitoring stopped cleanly during dbus-monitor run")
+                return
+            run_duration = time.monotonic() - run_start
+            # dbus-monitor ended (EOF or child exit) while the manager still
+            # wants monitoring: restart it. A run that lasted long enough is
+            # treated as stable and resets the backoff so a later transient exit
+            # is not penalized indefinitely.
+            if run_duration >= _MONITOR_STABLE_RUN_THRESHOLD_S:
+                consecutive_failures = 0
+                retry_delay_s = _MONITOR_RESTART_INITIAL_DELAY_S
+            else:
+                consecutive_failures += 1
+            logger.warning(
+                "dbus-monitor ended unexpectedly (EOF or process exit); "
+                "restarting in %.1fs (attempt %d)",
+                retry_delay_s,
+                consecutive_failures,
+            )
+            _interruptible_sleep(retry_delay_s, lambda: manager.monitoring)
+            if not manager.monitoring:
+                logger.info("Power monitoring stopping during restart backoff")
+                return
+            retry_delay_s = min(retry_delay_s * _MONITOR_RESTART_BACKOFF_FACTOR, _MONITOR_RESTART_MAX_DELAY_S)
+            continue
 
 
 def start_lid_monitoring(
