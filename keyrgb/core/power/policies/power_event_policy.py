@@ -46,6 +46,10 @@ class PowerEventPolicy:
         # want to remember whether the keyboard was already off so we can decide
         # whether to restore on the matching resume/open event.
         if not bool(inputs.enabled):
+            # Management was disabled: end any pending save/restore epoch so a
+            # later re-enable starts from the current state instead of an
+            # unmatched previous suspend/resume cycle.
+            self._saved_was_off = None
             return PowerEventResult(actions=())
 
         if self._saved_was_off is None:
@@ -58,6 +62,10 @@ class PowerEventPolicy:
 
     def handle_power_restore_event(self, inputs: PowerEventInputs) -> PowerEventResult:
         if not bool(inputs.enabled):
+            # Management was disabled on resume: the matching save was not
+            # consumed, so drop the stale intent rather than leaking it into a
+            # future independent suspend cycle.
+            self._saved_was_off = None
             return PowerEventResult(actions=())
 
         if self._saved_was_off is None:
