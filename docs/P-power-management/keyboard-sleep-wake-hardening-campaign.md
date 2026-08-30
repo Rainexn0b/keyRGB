@@ -2,9 +2,9 @@
 
 **Started:** 2026-08-30  
 **Lane:** `P-power-management`  
-**Status:** active — investigation and correction campaign  
-**Hardware validation gate:** deferred until every workstream has a recorded
-disposition and all accepted corrections pass merged validation
+**Status:** software gate complete — live hardware matrix pending
+**Hardware validation gate:** open — every software workstream has a recorded
+disposition and all accepted corrections passed merged validation
 
 ## Purpose
 
@@ -89,11 +89,11 @@ session proves that suspend stays dark and resume restores exactly once.
 | KSW-1 | Suspending an already controller-sleep-dark deck may wake it to perform a fade | P1 | S | monitoring |
 | KSW-2 | `dbus-monitor` exit or callback failure can permanently end suspend/resume monitoring | P1 | M | done |
 | KSW-3 | A non-reactive software effect may commit one final frame after mode-off is latched | P1 | S | done |
-| KSW-4 | Starting a new effect may not cancel an in-flight brightness fade | P2 | S | reported |
-| KSW-5 | Concurrent direct `start_effect()` calls may leave two software workers alive | P2 | M | reported |
+| KSW-4 | Starting a new effect may not cancel an in-flight brightness fade | P2 | S | done |
+| KSW-5 | Concurrent direct `start_effect()` calls may leave two software workers alive | P2 | M | done |
 | KSW-6 | Disabling power management between suspend and resume may retain stale saved intent | P2 | S | done |
 | KSW-7 | Firmware wake during temporary dim policy may restore the wrong brightness policy | P2 | S | monitoring |
-| KSW-8 | Final merged software validation and live hardware matrix | P0 | M | blocked on KSW-0–KSW-7 |
+| KSW-8 | Final merged software validation and live hardware matrix | P0 | M | blocked — live hardware |
 
 ---
 
@@ -214,6 +214,13 @@ effect's own fade.
 **Required tests if corrected.** No old-token brightness writes after effect
 start; turn-off's own fade still completes; no new lock-order inversion.
 
+**Disposition.** Confirmed at the engine facade even though coordinated tray
+callers serialize the common production path. `start_effect()` now invalidates
+the prior brightness token before writing, and fade steps, flatten writes, and
+terminal off/target commits all recheck ownership inside `kb_lock`. Serialized
+turn-off and brightness operations retain their complete behavior. Deterministic
+race coverage and the complete engine suite pass.
+
 ## KSW-5 — Concurrent direct effect starts
 
 **Question.** Can two direct `EffectsEngine.start_effect()` calls both pass
@@ -232,6 +239,13 @@ locking.
 **Required tests if corrected.** Concurrent starts leave exactly one current
 worker; stale workers exit; stop/close timeout behavior and `kb_lock` ordering
 remain unchanged.
+
+**Disposition.** Confirmed and corrected at the engine lifecycle owner. A
+dedicated outer start lock now serializes the complete stop/configure/publish
+region. A second direct start waits, stops the first published worker, and only
+then publishes its replacement; existing timeout refusal and `kb_lock` behavior
+remain intact. Deterministic concurrent-start coverage and the complete engine
+suite pass.
 
 ## KSW-6 — Saved power intent across enable/disable changes
 
@@ -378,3 +392,29 @@ produces evidence:
 - `python -m buildpython --run-steps=19` passed with no new broad-exception debt.
 - Left KSW-1 and KSW-7 in `monitoring` because their final visible behavior is
   part of the deferred KSW-8 hardware matrix; KSW-2, KSW-3, and KSW-6 are done.
+
+### 2026-08-30 — KSW-4 and KSW-5 lifecycle correction pass
+
+- Confirmed that the engine facade had no explicit owner-thread-only contract:
+  an old brightness operation could outlive a replacement start, and concurrent
+  direct starts could publish two live software workers.
+- Added token-owned brightness/off commits for KSW-4 and a dedicated serialized
+  start lifecycle for KSW-5.
+- Primary-side KSW-4 focused validation passed: 57 tests plus targeted Ruff.
+- Primary-side merged engine validation passed after KSW-5: 78 tests, targeted
+  Ruff, `git diff --check`, and Step 19.
+- All KSW-0–KSW-7 items now have a terminal or monitoring disposition. KSW-8 is
+  active for final merged software validation and the checkout-based live matrix.
+
+### 2026-08-30 — KSW-8 software exit gate
+
+- Final merged power/effects/idle/hardware validation passed: 1068 tests.
+- Broad targeted Ruff, `git diff --check`, and
+  `python -m buildpython --run-steps=19` passed.
+- The first BuildPython Step 2 run reached 3686 passing tests but failed the
+  three ITE probe tests because the system Python lacked the declared `pyusb`
+  dependency. An isolated `pyusb==1.3.1` target under `/tmp/opencode` was added
+  to `PYTHONPATH`; the authoritative rerun passed with 3689 tests and 1 skip.
+- The software exit gate is complete. KSW-8 remains blocked only on the physical
+  live matrix, which must use
+  `./keyrgb.sh --diagnostic-session --diagnostic-mode=full` from this checkout.
