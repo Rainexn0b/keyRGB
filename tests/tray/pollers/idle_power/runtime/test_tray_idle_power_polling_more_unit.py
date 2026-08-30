@@ -330,6 +330,34 @@ def test_restore_from_idle_loop_effect_uses_soft_on_start() -> None:
     assert received["fade_in"] is True
 
 
+@pytest.mark.parametrize("effect", ["static", "reactive_ripple"])
+def test_controller_sleep_restore_preserves_active_temp_dim_policy(effect: str) -> None:
+    """KSW-7: evdev-first wake must not bypass temporary screen dim."""
+
+    import keyrgb.tray.pollers.idle_power.polling as ipp
+
+    received: dict[str, object] = {}
+
+    def capture_start(**kwargs):
+        received.update(kwargs)
+
+    tray = _idle_tray(
+        last_resume_at=0.0,
+        dim_temp_active=True,
+        dim_temp_target_brightness=5,
+        config=SimpleNamespace(brightness=33, effect=effect),
+        _start_current_effect=capture_start,
+    )
+
+    ipp._restore_from_idle(tray)
+
+    assert received["brightness_override"] == 5
+    assert received["fade_in"] is False
+    assert tray.tray_idle_power_state.last_resume_at == 0.0
+    assert tray.engine._hw_brightness_cap == 5
+    assert tray.engine._dim_temp_active is True
+
+
 def test_restore_from_idle_reactive_effect_seeds_restore_timers_after_restart(
     monkeypatch,
 ) -> None:

@@ -940,7 +940,7 @@ def test_firmware_wake_restart_uses_public_fallback(monkeypatch) -> None:
     tray = make_owner_backed_simple_tray(engine=SimpleNamespace(), last_resume_at=0.0)
     monkeypatch.setattr(
         "keyrgb.tray.controllers.lighting_controller.start_current_effect",
-        lambda target: calls.append(target) or True,
+        lambda target, **kwargs: calls.append(target) or True,
     )
 
     assert _controller_sleep.restart_effect_after_firmware_wake_best_effort(tray, now=50.0) is True

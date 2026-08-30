@@ -619,6 +619,79 @@ def test_nonzero_read_while_controller_sleep_off_restarts_stopped_effect(monkeyp
     assert start_calls == ["start"]
 
 
+def test_firmware_wake_under_active_temp_dim_restores_at_dim_target(monkeypatch) -> None:
+    """KSW-7: a controller firmware wake while a temporary screen-dim brightness
+    policy owns the deck must relight at the dim target, not the full configured
+    brightness. The firmware wake and the screen wake are the same keypress, so
+    the idle/evdev path must remain free to restore full brightness afterwards
+    (do not stamp the post-resume suppression timestamp for the dim case).
+    """
+
+    from tests.tray.fakes import attach_idle_power_owner, make_idle_power_owner
+
+    tray = _DummyTray(brightness=25, is_off=True)
+    attach_idle_power_owner(
+        tray,
+        make_idle_power_owner(
+            dim_temp_active=True,
+            dim_temp_target_brightness=5,
+            last_brightness=5,
+        ),
+    )
+    tray.config.controller_sleep_respect = True
+    owner = tray.tray_idle_power_state
+    owner.controller_sleep_off = True
+    owner.controller_sleep_off_at = 100.0
+    start_calls: list[dict] = []
+    tray._start_current_effect = lambda **kwargs: start_calls.append(kwargs) or True
+    monkeypatch.setattr("keyrgb.tray.pollers.hardware_polling.time.monotonic", lambda: 101.0)
+
+    result = _apply_polled_hardware_state(
+        tray,
+        current_brightness=25,
+        current_off=False,
+        last_brightness=0,
+        last_off_state=True,
+    )
+
+    # One firmware-wake restore, at the dim target (not full brightness).
+    assert len(start_calls) == 1
+    assert start_calls[0] == {"brightness_override": 5}
+    assert result == (25, False)
+    assert owner.controller_sleep_off is False
+    assert tray.is_off is False
+    # No post-resume suppression: the screen-wake restore is still allowed.
+    assert owner.last_resume_at == 0.0
+
+
+def test_firmware_wake_without_temp_dim_still_restores_full_brightness(monkeypatch) -> None:
+    """Non-dim firmware wake keeps its prior contract: full brightness and a
+    post-resume suppression timestamp so idle does not race a second restore."""
+
+    tray = _DummyTray(brightness=25, is_off=True)
+    tray.config.controller_sleep_respect = True
+    owner = tray.tray_idle_power_state
+    owner.controller_sleep_off = True
+    owner.controller_sleep_off_at = 100.0
+    start_calls: list[dict] = []
+    tray._start_current_effect = lambda **kwargs: start_calls.append(kwargs) or True
+    monkeypatch.setattr("keyrgb.tray.pollers.hardware_polling.time.monotonic", lambda: 101.0)
+
+    result = _apply_polled_hardware_state(
+        tray,
+        current_brightness=25,
+        current_off=False,
+        last_brightness=0,
+        last_off_state=True,
+    )
+
+    assert len(start_calls) == 1
+    # No brightness override -> full configured brightness; no forced-off dim.
+    assert start_calls[0] == {}
+    assert result == (25, False)
+    assert owner.last_resume_at == 101.0
+
+
 def test_nonzero_fade_sample_does_not_wake_controller_sleep_during_power_forced_off(monkeypatch) -> None:
     """Suspend turn-off must beat a poll sampled while its fade is in flight."""
 

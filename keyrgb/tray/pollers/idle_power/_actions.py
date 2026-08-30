@@ -112,6 +112,27 @@ def _dim_temp_state_matches(tray: object, *, target_brightness: int) -> bool:
     return bool(dim_temp_active) and int(dim_temp_target) == int(target_brightness)
 
 
+def _active_dim_temp_target(tray: object) -> int | None:
+    """Return the active temporary-dim target, if that policy owns output."""
+
+    if not read_idle_power_state_bool_field(
+        tray,
+        attr_name="_dim_temp_active",
+        state_name="dim_temp_active",
+        default=False,
+    ):
+        return None
+    target = read_idle_power_state_optional_int_field(
+        tray,
+        attr_name="_dim_temp_target_brightness",
+        state_name="dim_temp_target_brightness",
+        default=None,
+    )
+    if target is None:
+        return None
+    return max(0, min(50, int(target)))
+
+
 def _log_tray_boundary_exception(
     tray: object,
     *,
@@ -255,15 +276,17 @@ def restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
         start_current_effect_for_idle_restore,
     )
 
-    try:
-        set_idle_power_state_field(
-            tray,
-            attr_name="_last_resume_at",
-            state_name="last_resume_at",
-            value=float(time.monotonic()),
-        )
-    except (AttributeError, TypeError, ValueError, RuntimeError):
-        pass
+    dim_temp_target = _active_dim_temp_target(tray)
+    if dim_temp_target is None:
+        try:
+            set_idle_power_state_field(
+                tray,
+                attr_name="_last_resume_at",
+                state_name="last_resume_at",
+                value=float(time.monotonic()),
+            )
+        except (AttributeError, TypeError, ValueError, RuntimeError):
+            pass
 
     tray.is_off = False
     set_idle_power_state_field(tray, attr_name="_idle_forced_off", state_name="idle_forced_off", value=False)
@@ -280,7 +303,10 @@ def restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
         value=0.0,
     )
     if hasattr(tray, "engine"):
-        _set_engine_hw_brightness_cap(tray.engine, None)
+        # Controller-sleep input can win the race with the compositor's screen
+        # wake while temporary dim still owns brightness. Preserve that policy
+        # until the normal restore_brightness action clears it.
+        _set_engine_hw_brightness_cap(tray.engine, dim_temp_target)
 
     try:
         if hasattr(tray, "engine"):
@@ -298,21 +324,28 @@ def restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
         tray.config,
         soft_on_start_brightness=SOFT_ON_START_BRIGHTNESS,
     )
+    brightness_override = restore_start_policy.brightness_override
+    fade_in = restore_start_policy.fade_in
+    if dim_temp_target is not None:
+        # Do not fade toward configured full brightness while the screen is
+        # still dim. The later screen-wake action performs that restoration.
+        brightness_override = int(dim_temp_target)
+        fade_in = False
     fade_duration_s = idle_fade_duration_s(tray.config)
     logger.info(
         "EVENT idle_power:restore_start_policy effect=%s dim_sync_mode=%s brightness_override=%s fade_in=%s fade_in_duration_s=%.2f",
         safe_str_attr(tray.config, "effect", default="none") or "none",
         safe_str_attr(tray.config, "screen_dim_sync_mode", default="off") or "off",
-        restore_start_policy.brightness_override,
-        restore_start_policy.fade_in,
+        brightness_override,
+        fade_in,
         float(fade_duration_s),
     )
 
     _call_runtime_boundary(
         lambda: start_current_effect_for_idle_restore(
             tray,
-            brightness_override=restore_start_policy.brightness_override,
-            fade_in=restore_start_policy.fade_in,
+            brightness_override=brightness_override,
+            fade_in=fade_in,
             fade_in_duration_s=fade_duration_s,
         ),
         on_recoverable=lambda exc: _log_tray_boundary_exception(

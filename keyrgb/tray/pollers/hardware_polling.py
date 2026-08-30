@@ -106,9 +106,18 @@ def _apply_polled_hardware_state(
             # genuine native sleep can latch again.
             if _controller_sleep_resume_guard_active(tray):
                 _set_controller_sleep_resume_guard(tray, False)
+            # A temporary screen-dim brightness is a brightness policy, not an
+            # off owner: the firmware wake happened while that policy still owns
+            # the deck, so restore at the dim target rather than relighting to
+            # the full configured brightness and bypassing the temporary target.
+            # The idle/evdev path restores full brightness once the screen wakes.
+            wake_brightness_override = None
+            if dim_temp_active and dim_temp_target is not None:
+                wake_brightness_override = int(dim_temp_target)
             restored = _restart_effect_after_controller_firmware_wake_best_effort(
                 tray,
                 now=time.monotonic(),
+                brightness_override=wake_brightness_override,
             )
             _log_polled_hardware_event(
                 tray,
