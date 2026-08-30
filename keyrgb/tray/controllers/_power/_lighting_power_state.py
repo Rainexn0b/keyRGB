@@ -4,7 +4,11 @@ import time
 from collections.abc import Callable
 
 from keyrgb.tray._power_restore_policy import normalize_lighting_power_restore_policy_state
-from keyrgb.tray.idle_power_state import read_last_brightness, set_idle_power_state_field
+from keyrgb.tray.idle_power_state import (
+    read_idle_power_state_bool_field,
+    read_last_brightness,
+    set_idle_power_state_field,
+)
 from keyrgb.tray.protocols import LightingTrayProtocol
 
 from ._transition_constants import (
@@ -57,6 +61,23 @@ def _set_controller_sleep_resume_guard(tray: LightingTrayProtocol, value: bool) 
 def _set_last_resume_at(tray: LightingTrayProtocol, value: float) -> None:
     """Set last_resume_at timestamp via idle power state bridge."""
     set_idle_power_state_field(tray, attr_name="_last_resume_at", state_name="last_resume_at", value=value)
+
+
+def _read_controller_sleep_off(tray: LightingTrayProtocol) -> bool:
+    """Read whether the controller has native-slept the deck dark.
+
+    This is the firmware-input-timeout sleep, distinct from an explicit off:
+    the physical deck is already dark but the engine's cached brightness is
+    untouched. A fade-off would flatten and re-enter user mode at that cached
+    brightness and briefly relight the deck before fading it back to off.
+    """
+
+    return read_idle_power_state_bool_field(
+        tray,
+        attr_name="_controller_sleep_off",
+        state_name="controller_sleep_off",
+        default=False,
+    )
 
 
 def turn_off_impl(
@@ -126,7 +147,16 @@ def power_turn_off_impl(
     _set_idle_forced_off(tray, False)
     _set_controller_sleep_resume_guard(tray, False)
     tray.is_off = True
-    tray.engine.turn_off(fade=True, fade_duration_s=idle_fade_duration_s(tray.config))
+    # If the controller already native-slept the deck dark
+    # (controller_sleep_off), an explicit off keeps it dark without a
+    # wake-capable flatten/fade write: the engine's cached brightness is still
+    # the last user value, so a fade would re-enter user mode at that brightness
+    # and visibly relight the deck before turning it off. An ordinary on-state
+    # suspend still fades to off as configured.
+    if _read_controller_sleep_off(tray):
+        tray.engine.turn_off()
+    else:
+        tray.engine.turn_off(fade=True, fade_duration_s=idle_fade_duration_s(tray.config))
     if software_effect_target_routes_aux_devices(tray):
         turn_off_secondary_software_targets(tray)
     if turn_off_secondary_profile_areas is not None:

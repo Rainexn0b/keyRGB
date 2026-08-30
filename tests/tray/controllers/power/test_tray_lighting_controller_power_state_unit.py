@@ -157,6 +157,53 @@ class TestPowerTurnOffRestore:
             fade_duration_s=DEFAULT_IDLE_FADE_DURATION_S,
         )
 
+    def test_power_turn_off_already_controller_sleep_off_uses_immediate_off_no_fade(self):
+        from keyrgb.tray.controllers.lighting_controller import power_turn_off
+        from tests.tray.fakes import make_owner_backed_mock_tray
+
+        mock_tray = make_owner_backed_mock_tray(is_off=False)
+        # Controller already native-slept the deck dark (firmware input-timeout).
+        mock_tray.tray_idle_power_state.controller_sleep_off = True
+
+        with (
+            patch(
+                "keyrgb.tray.controllers.software_target_controller.software_effect_target_routes_aux_devices",
+                return_value=True,
+            ),
+            patch(
+                "keyrgb.tray.controllers.software_target_controller.turn_off_secondary_software_targets"
+            ) as turn_off_aux,
+            patch("keyrgb.tray.controllers.secondary_static_scene.turn_off_secondary_profile_areas") as turn_off_areas,
+        ):
+            power_turn_off(mock_tray)
+
+        # Power-forced state, is_off, and the deck-stay-dark flags are intact.
+        assert mock_tray._power_forced_off is True
+        assert mock_tray._idle_forced_off is False
+        assert mock_tray.tray_idle_power_state.power_forced_off is True
+        assert mock_tray.is_off is True
+        # The already-dark deck must not be woken by a flatten/fade write: a
+        # single explicit off with no fade args.
+        mock_tray.engine.turn_off.assert_called_once_with()
+        for call in mock_tray.engine.turn_off.call_args_list:
+            assert call.kwargs.get("fade") is not True
+        turn_off_aux.assert_called_once_with(mock_tray)
+        turn_off_areas.assert_called_once_with(mock_tray)
+
+    def test_power_turn_off_ordinary_suspend_still_uses_configured_fade(self):
+        from keyrgb.tray.controllers.lighting_controller import power_turn_off
+        from tests.tray.fakes import make_owner_backed_mock_tray
+
+        mock_tray = make_owner_backed_mock_tray(is_off=False)
+        # Default controller_sleep_off is False: an on-state suspend fades.
+
+        power_turn_off(mock_tray)
+
+        mock_tray.engine.turn_off.assert_called_once_with(
+            fade=True,
+            fade_duration_s=DEFAULT_IDLE_FADE_DURATION_S,
+        )
+
     def test_power_restore_restores_when_power_forced(self):
         from keyrgb.tray.controllers.lighting_controller import power_restore
         from tests.tray.fakes import make_owner_backed_mock_tray
