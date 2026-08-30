@@ -86,13 +86,13 @@ session proves that suspend stays dark and resume restores exactly once.
 | ID | Concern | Priority | Effort | Status |
 |---|---|:---:|:---:|---|
 | KSW-0 | Forced-off transition can be mistaken for controller firmware wake | P0 | S | monitoring |
-| KSW-1 | Suspending an already controller-sleep-dark deck may wake it to perform a fade | P1 | S | reported |
-| KSW-2 | `dbus-monitor` exit or callback failure can permanently end suspend/resume monitoring | P1 | M | reported |
-| KSW-3 | A non-reactive software effect may commit one final frame after mode-off is latched | P1 | S | reported |
+| KSW-1 | Suspending an already controller-sleep-dark deck may wake it to perform a fade | P1 | S | monitoring |
+| KSW-2 | `dbus-monitor` exit or callback failure can permanently end suspend/resume monitoring | P1 | M | done |
+| KSW-3 | A non-reactive software effect may commit one final frame after mode-off is latched | P1 | S | done |
 | KSW-4 | Starting a new effect may not cancel an in-flight brightness fade | P2 | S | reported |
 | KSW-5 | Concurrent direct `start_effect()` calls may leave two software workers alive | P2 | M | reported |
-| KSW-6 | Disabling power management between suspend and resume may retain stale saved intent | P2 | S | reported |
-| KSW-7 | Firmware wake during temporary dim policy may restore the wrong brightness policy | P2 | S | reported |
+| KSW-6 | Disabling power management between suspend and resume may retain stale saved intent | P2 | S | done |
+| KSW-7 | Firmware wake during temporary dim policy may restore the wrong brightness policy | P2 | S | monitoring |
 | KSW-8 | Final merged software validation and live hardware matrix | P0 | M | blocked on KSW-0–KSW-7 |
 
 ---
@@ -139,6 +139,12 @@ and resume eligibility.
 writes; ordinary on-state suspend still uses the configured fade; secondary
 targets still turn off.
 
+**Disposition.** Confirmed and corrected. The already-dark path now skips the
+wake-capable flatten/fade sequence and performs an immediate explicit off while
+preserving forced-off ownership and secondary-target shutdown. Focused and
+merged software suites pass. Keep `monitoring` until KSW-8 confirms there is no
+physical flash during pre-suspend native sleep.
+
 ## KSW-2 — Suspend/resume monitor lifecycle reliability
 
 **Question.** Can `dbus-monitor` EOF, process failure, malformed output, or a
@@ -163,6 +169,12 @@ callback failures must be logged without silently removing future monitoring.
 **Required tests.** EOF restart, callback failure continuation, bounded backoff,
 shutdown termination, and no duplicate callback from one signal.
 
+**Disposition.** Confirmed and corrected in the manager monitor runner. Clean
+EOF/process exit and recoverable callback failures restart with interruptible,
+bounded exponential backoff; shutdown exits without restart; lid monitoring is
+started at most once; and a missing `dbus-monitor` retains the ACPI fallback.
+Focused, merged, Ruff, and Step 19 validation pass.
+
 ## KSW-3 — Post-off software-frame commit
 
 **Question.** Can a non-reactive software effect pass its loop stop check, wait
@@ -178,6 +190,11 @@ on loop exit or a later corrective off.
 
 **Required tests.** Both per-key and uniform software rendering perform no
 primary or secondary output after mode-off; ordinary rendering remains intact.
+
+**Disposition.** Confirmed and corrected at the final locked software-render
+commit boundaries. Per-key and uniform workers now recheck both running and
+device-mode-off state after acquiring `kb_lock`, before primary or secondary
+output. Deterministic race coverage and the merged effects suite pass.
 
 ## KSW-4 — In-flight brightness fade versus new effect
 
@@ -232,6 +249,11 @@ behavior.
 **Required tests.** The toggle sequence starts the next cycle from current
 intent; ordinary lid+suspend overlap still saves intent once and restores once.
 
+**Disposition.** Confirmed and corrected in `PowerEventPolicy`. Disabling global
+management now ends any pending save/restore epoch, while per-action disable and
+normal overlapping lid+suspend events retain their existing pairing behavior.
+Focused and merged power-policy suites pass.
+
 ## KSW-7 — Firmware wake under temporary dim policy
 
 **Question.** If firmware wakes while screen dim synchronization owns a temporary
@@ -249,6 +271,13 @@ necessarily an off owner.
 
 **Required tests if corrected.** Firmware-first and evdev-first wake ordering
 produce one restore and the same policy-correct brightness.
+
+**Disposition.** Confirmed and corrected. Firmware-first wake restarts at the
+active temporary-dim target without stamping post-resume suppression. Evdev-first
+wake preserves the same target and hardware cap until the normal screen-wake
+brightness restore clears the dim policy. Uniform and per-key policy routes are
+covered and merged idle/hardware suites pass. Keep `monitoring` until KSW-8
+confirms the physical dim/wake sequence.
 
 ## KSW-8 — Merged validation and live hardware matrix
 
@@ -339,3 +368,13 @@ produces evidence:
 - Deferred new live logging until every software workstream has a disposition
   and merged validation is green.
 - No production behavior was changed by this documentation pass.
+
+### 2026-08-30 — KSW-1, KSW-2, KSW-3, KSW-6, and KSW-7 correction pass
+
+- Independently confirmed all five concerns and applied owner-local corrections.
+- Primary-side focused validation passed: 149 tests, targeted Ruff, and
+  `git diff --check`.
+- Primary-side merged power/effects/idle/hardware validation passed: 1057 tests.
+- `python -m buildpython --run-steps=19` passed with no new broad-exception debt.
+- Left KSW-1 and KSW-7 in `monitoring` because their final visible behavior is
+  part of the deferred KSW-8 hardware matrix; KSW-2, KSW-3, and KSW-6 are done.
