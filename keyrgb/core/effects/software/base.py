@@ -167,6 +167,25 @@ def has_per_key(engine: EffectsEngine) -> bool:
     return supports_per_key_output(_engine_attr_or_none(engine, "backend_caps"), _engine_attr_or_none(engine, "kb"))
 
 
+def _software_hardware_writes_allowed(engine: EffectsEngine) -> bool:
+    """Skip in-flight frames once the engine is stopping or mode-off.
+
+    Mirror the reactive hardware-write guard at the final locked commit
+    boundary. A software worker can pass its loop stop-check, then block on
+    ``kb_lock`` while a power turn-off or controller-native sleep latches
+    ``_device_mode_off`` (and clears ``running``). Re-checking inside the lock
+    prevents one committed frame from re-lighting a deck that was just turned
+    off. Engines that omit those attrs still write (legacy/non-contract use).
+    """
+
+    if getattr(engine, "running", True) is False:
+        return False
+    try:
+        return engine._device_mode_off is not True
+    except AttributeError:
+        return True
+
+
 def base_color_map(engine: EffectsEngine) -> dict[Key, Color]:
     base_color_src = _current_color_or_default(engine, default=(255, 0, 0))
     base_color = (
@@ -213,6 +232,8 @@ def render(engine: EffectsEngine, *, color_map: Mapping[Key, Color]) -> None:
     if has_per_key(engine):
         try:
             with engine.kb_lock, optional_output_transaction(engine.kb):
+                if not _software_hardware_writes_allowed(engine):
+                    return
                 brightness_hw = int(engine.brightness)
                 reassert_every_frame = per_key_mode_requires_frame_reassert(engine.kb)
                 last_hw_brightness = _last_hw_mode_brightness_or_none(engine)
@@ -284,6 +305,8 @@ def render(engine: EffectsEngine, *, color_map: Mapping[Key, Color]) -> None:
 
     r, g, b = avoid_full_black(rgb=rgb, target_rgb=rgb, brightness=int(engine.brightness))
     with engine.kb_lock, optional_output_transaction(engine.kb):
+        if not _software_hardware_writes_allowed(engine):
+            return
         enable_user_mode_once(kb=engine.kb, kb_lock=engine.kb_lock, brightness=int(engine.brightness))
         engine.kb.set_color((r, g, b), brightness=int(engine.brightness))
         render_secondary_uniform_rgb(
