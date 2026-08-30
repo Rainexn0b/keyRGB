@@ -66,6 +66,7 @@ class _EngineStart:
     _thread_generation: int
     stop: Callable[[], None]
     _ensure_device_available: Callable[[], bool]
+    _invalidate_brightness_fade: Callable[[], int]
 
     _permission_error_cb: Callable[[Exception], None] | None
     get_backend_effects: Callable[[], dict[str, HardwareEffectBuilder]]
@@ -87,6 +88,14 @@ class _EngineStart:
         preserve_last_rendered_brightness: bool = False,
     ):
         """Start an effect (hardware or software)."""
+
+        # A brightness fade (screen-dim/idle turn_off, power brightness change)
+        # can still be stepping on another thread. Advance the fade token before
+        # any write this start performs, so the superseded operation commits no
+        # later brightness step, off, or target write over the replacement
+        # effect. The replacement's own fades (_fade_uniform_color /
+        # _fade_in_per_key) do not consult the token, so they stay intact.
+        self._invalidate_brightness_fade()
 
         prev_color = self.current_color
         prev_effect_was_sw = self.current_effect in self.SW_EFFECTS

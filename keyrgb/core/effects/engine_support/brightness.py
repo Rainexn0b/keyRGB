@@ -70,6 +70,31 @@ class _EngineBrightness:
             logger.exception("Failed to advance brightness fade token")
             return -1
 
+    def _invalidate_brightness_fade(self) -> int:
+        """Cancel an in-flight fade *and* its still-pending terminal commit.
+
+        Called from lifecycle boundaries (a replacement ``start_effect``) that
+        take ownership of brightness output.  Advancing the token while holding
+        ``kb_lock`` is what makes the cancellation atomic: every brightness/off
+        commit re-checks the token inside that same lock, so a superseded
+        ``turn_off``/``set_brightness`` either already finished a locked write
+        before this call or performs no further write at all.  Lock order stays
+        ``kb_lock`` -> ``_brightness_fade_lock``, matching the only other nested
+        use of the fade lock.
+        """
+
+        with self.kb_lock:
+            return self._bump_brightness_fade_token()
+
+    def _brightness_fade_token_is_current(self, token: int) -> bool:
+        """Whether *token* still owns brightness output. Never raises."""
+
+        try:
+            return int(token) == int(self._brightness_fade_token)
+        except _INT_ATTR_ERRORS:
+            logger.exception("Failed to compare brightness fade token")
+            return False
+
     def _fade_brightness(
         self,
         *,
@@ -104,17 +129,21 @@ class _EngineBrightness:
                 self._ensure_device_available()
 
             for i in range(1, steps + 1):
-                try:
-                    if int(token) != int(self._brightness_fade_token):
-                        return
-                except _INT_ATTR_ERRORS:
-                    logger.exception("Failed to compare brightness fade token")
+                # Cheap unlocked pre-check: stop sleeping through a cancelled
+                # fade without waiting for the write lock.
+                if not self._brightness_fade_token_is_current(token):
                     return
                 t = float(i) / float(steps)
                 val = round(s + (e - s) * t)
                 if val == s:
                     continue
                 with self.kb_lock:
+                    # Authoritative re-check inside the write lock. A step can
+                    # pass the pre-check and then block on kb_lock while a
+                    # replacement start_effect takes over brightness output;
+                    # without this, the stale step would still commit.
+                    if not self._brightness_fade_token_is_current(token):
+                        return
                     self.brightness = val
                     if apply_to_hardware:
                         self.kb.set_brightness(int(val))
@@ -144,7 +173,7 @@ class _EngineBrightness:
                 # Fading global brightness on that uneven map dims perceptually
                 # non-uniformly and reads as flicker.  Flatten to a uniform base
                 # color at the current brightness first so the ramp is smooth.
-                self._flatten_perkey_frame_for_fade(prev)
+                self._flatten_perkey_frame_for_fade(prev, token=token)
                 self._fade_brightness(
                     start=prev,
                     end=1,
@@ -155,6 +184,12 @@ class _EngineBrightness:
                 )
 
         with self.kb_lock:
+            # A replacement start_effect advances the token under kb_lock, so
+            # reaching here with a stale token means this off was superseded
+            # while it faded. Committing it would blank the new effect.
+            if not self._brightness_fade_token_is_current(token):
+                logger.debug("turn_off: superseded by a newer lighting operation; skipping off commit")
+                return
             try:
                 self.brightness = 0
             except _INT_ATTR_ERRORS:
@@ -165,7 +200,7 @@ class _EngineBrightness:
             # the next start must reassert user mode first.
             self._device_mode_off = True
 
-    def _flatten_perkey_frame_for_fade(self, prev: int) -> None:
+    def _flatten_perkey_frame_for_fade(self, prev: int, *, token: int) -> None:
         """Write a uniform base-color frame before an off-fade (best-effort).
 
         Only meaningful for per-key/reactive output, where a stopped effect
@@ -188,6 +223,8 @@ class _EngineBrightness:
                 fallback = getattr(self, "current_color", None) or (255, 0, 0)
                 color = (int(fallback[0]), int(fallback[1]), int(fallback[2]))
             with self.kb_lock:
+                if not self._brightness_fade_token_is_current(token):
+                    return
                 set_color((int(color[0]), int(color[1]), int(color[2])), brightness=int(prev))
         except _BRIGHTNESS_FADE_RUNTIME_ERRORS:
             logger.debug("turn_off: per-key flatten before fade failed", exc_info=True)
@@ -222,6 +259,13 @@ class _EngineBrightness:
             )
 
         with self.kb_lock:
+            # Same rule as turn_off: a replacement start_effect that advanced
+            # the token owns brightness now, so this superseded target must not
+            # land on the new effect (cache or hardware).
+            if not self._brightness_fade_token_is_current(token):
+                logger.debug("set_brightness: superseded by a newer lighting operation; skipping target commit")
+                return
+
             try:
                 prev = int(self.brightness)
             except _INT_ATTR_ERRORS:

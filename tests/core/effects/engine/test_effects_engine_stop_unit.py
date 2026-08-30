@@ -253,6 +253,93 @@ def test_start_effect_accepts_backend_exposed_hw_name() -> None:
     assert payload["color"] == (3, 2, 1)
 
 
+class _FadeSleepGate:
+    """Park a brightness fade between steps, where it holds no lock.
+
+    ``_fade_brightness`` sleeps outside ``kb_lock``, so parking there lets a
+    replacement ``start_effect()`` run to completion on the main thread — the
+    exact interleaving KSW-4 describes — without any lock contention timing.
+    """
+
+    def __init__(self) -> None:
+        self.parked = Event()
+        self.release = Event()
+        self._gate_armed = True
+
+    def sleep(self, _seconds: float) -> None:
+        if not self._gate_armed:
+            return
+        self._gate_armed = False
+        self.parked.set()
+        assert self.release.wait(timeout=5.0), "fade gate was never released"
+
+
+def test_start_effect_invalidates_in_flight_turn_off_fade(monkeypatch) -> None:
+    """A replacement effect must survive a concurrent fading turn_off.
+
+    A screen-dim/idle ``turn_off(fade=True)`` runs on the power thread. If a
+    replacement ``start_effect()`` lands mid-fade, the old operation must commit
+    neither further brightness steps nor its terminal ``kb.turn_off()``.
+    """
+
+    import keyrgb.core.effects.engine_support.brightness as brightness_mod
+
+    class SpyKeyboard(NullKeyboard):
+        def __init__(self):
+            self.brightness_writes: list[int] = []
+            self.turn_off_calls = 0
+            self.payloads: list[object] = []
+
+        def set_brightness(self, brightness: int) -> None:
+            self.brightness_writes.append(int(brightness))
+
+        def turn_off(self) -> None:
+            self.turn_off_calls += 1
+
+        def set_effect(self, effect_data) -> None:
+            self.payloads.append(effect_data)
+
+    class DummyBackend(_HardwareEffectsBackend):
+        def effects(self):
+            return {"wave": _effect_builder("wave", extra=("color",))}
+
+        def colors(self):
+            return {}
+
+    engine = EffectsEngine(backend=DummyBackend())
+    spy = SpyKeyboard()
+    engine.kb = spy
+    engine.device_available = True
+    engine._ensure_device_available = lambda: True  # type: ignore[assignment]
+    engine.brightness = 40
+    engine._device_mode_off = False
+
+    gate = _FadeSleepGate()
+    # Replace the module-level ``time`` name so only brightness fades are parked.
+    monkeypatch.setattr(brightness_mod, "time", gate)
+
+    fader = threading.Thread(target=lambda: engine.turn_off(fade=True, fade_duration_s=0.2), daemon=True)
+    fader.start()
+    assert gate.parked.wait(timeout=5.0), "turn_off never started fading"
+    writes_before_replacement = list(spy.brightness_writes)
+    assert writes_before_replacement, "expected at least one pre-replacement fade step"
+
+    # Replacement effect takes ownership of brightness output.
+    engine.start_effect("wave", speed=5, brightness=25, color=(3, 2, 1))
+    assert spy.payloads
+
+    gate.release.set()
+    fader.join(timeout=5.0)
+    assert not fader.is_alive()
+
+    # No stale step write and no stale terminal off after the replacement start.
+    assert spy.brightness_writes == writes_before_replacement
+    assert spy.turn_off_calls == 0
+    assert engine._device_mode_off is False
+    assert engine.current_effect == "wave"
+    assert engine.brightness == 25
+
+
 def test_start_effect_prefers_software_for_hw_sw_name_collision() -> None:
     class DummyBackend(_HardwareEffectsBackend):
         def effects(self):
