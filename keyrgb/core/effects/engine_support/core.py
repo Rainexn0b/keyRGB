@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from threading import Event, RLock, Thread
+from threading import Event, Lock, RLock, Thread
 from typing import Protocol, TypeVar, cast
 
 from keyrgb.core.backends.base import BackendCapabilities, normalize_backend_capabilities
@@ -143,6 +143,16 @@ class _EngineCore:
         self.backend_caps = _backend_capabilities(backend)
         self.effect_geometry = _backend_effect_geometry(backend, capabilities=self.backend_caps)
         self.kb_lock = RLock()
+        # Dedicated lifecycle/start lock (KSW-5). Serializes the public
+        # start_effect stop/configure/publish region so two concurrent direct
+        # starts cannot both publish a software worker. It is the outermost
+        # engine lock: kb_lock/_brightness_fade_lock are only ever acquired
+        # *inside* it, never the reverse, so lock order stays
+        # _start_lock -> kb_lock -> _brightness_fade_lock. It intentionally
+        # remains held while stop() joins the previous worker so no competing
+        # start can publish until that lifecycle is resolved; kb_lock is not
+        # held during the join.
+        self._start_lock = Lock()
         self.device_available = False
         self.kb: KeyboardDeviceProtocol = NullKeyboard()
 

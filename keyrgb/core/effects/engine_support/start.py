@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from functools import partial
-from threading import RLock, Thread
+from threading import Lock, RLock, Thread
 from typing import Final, cast
 
 from keyrgb.core.backends.base import BackendCapabilities
@@ -48,6 +48,7 @@ class _EngineStart:
     """Effect selection and start/stop orchestration."""
 
     kb_lock: RLock
+    _start_lock: Lock
     kb: KeyboardDeviceProtocol
     backend_caps: BackendCapabilities
     running: bool
@@ -89,81 +90,92 @@ class _EngineStart:
     ):
         """Start an effect (hardware or software)."""
 
-        # A brightness fade (screen-dim/idle turn_off, power brightness change)
-        # can still be stepping on another thread. Advance the fade token before
-        # any write this start performs, so the superseded operation commits no
-        # later brightness step, off, or target write over the replacement
-        # effect. The replacement's own fades (_fade_uniform_color /
-        # _fade_in_per_key) do not consult the token, so they stay intact.
-        self._invalidate_brightness_fade()
+        # The whole stop/configure/publish region runs under the dedicated
+        # lifecycle lock (KSW-5). Two concurrent direct starts would otherwise
+        # interleave: both could clear the previous worker and publish their own
+        # software worker, orphaning the first as a second live deck writer that
+        # keeps repainting forever. Holding _start_lock here makes the region
+        # atomic — only one start at a time can reach the publish step, and it
+        # always stops the previously published worker first. _start_lock is the
+        # outermost engine lock (kb_lock/_brightness_fade_lock are taken only
+        # inside it). It remains held across stop()'s worker join by design, but
+        # kb_lock is not held there, so the worker can finish any final output.
+        with self._start_lock:
+            # A brightness fade (screen-dim/idle turn_off, power brightness change)
+            # can still be stepping on another thread. Advance the fade token before
+            # any write this start performs, so the superseded operation commits no
+            # later brightness step, off, or target write over the replacement
+            # effect. The replacement's own fades (_fade_uniform_color /
+            # _fade_in_per_key) do not consult the token, so they stay intact.
+            self._invalidate_brightness_fade()
 
-        prev_color = self.current_color
-        prev_effect_was_sw = self.current_effect in self.SW_EFFECTS
-        preserved_last_rendered = self._last_rendered_brightness if preserve_last_rendered_brightness else None
+            prev_color = self.current_color
+            prev_effect_was_sw = self.current_effect in self.SW_EFFECTS
+            preserved_last_rendered = self._last_rendered_brightness if preserve_last_rendered_brightness else None
 
-        self.stop()
-        previous_thread = self.thread
-        if previous_thread is not None and previous_thread.is_alive():
-            raise RuntimeError("Previous effect thread is still stopping; replacement effect was not started")
-        if preserved_last_rendered is not None:
-            # Config-apply restarts happen while the keyboard is already lit.
-            # Restore this baseline before the replacement render thread is
-            # created so its first frame cannot observe the stop() sentinel.
-            self._last_rendered_brightness = preserved_last_rendered
-        self._ensure_device_available()
+            self.stop()
+            previous_thread = self.thread
+            if previous_thread is not None and previous_thread.is_alive():
+                raise RuntimeError("Previous effect thread is still stopping; replacement effect was not started")
+            if preserved_last_rendered is not None:
+                # Config-apply restarts happen while the keyboard is already lit.
+                # Restore this baseline before the replacement render thread is
+                # created so its first frame cannot observe the stop() sentinel.
+                self._last_rendered_brightness = preserved_last_rendered
+            self._ensure_device_available()
 
-        requested_effect_name = normalize_effect_name(effect_name)
-        force_hardware = is_forced_hardware_effect(requested_effect_name)
-        effect_name = strip_effect_namespace(requested_effect_name)
-        backend_effects = self.get_backend_effects()
-        available_hw_effects = frozenset(str(name or "").strip().lower() for name in backend_effects)
-        known_effects = frozenset(self.SW_EFFECTS) | available_hw_effects
+            requested_effect_name = normalize_effect_name(effect_name)
+            force_hardware = is_forced_hardware_effect(requested_effect_name)
+            effect_name = strip_effect_namespace(requested_effect_name)
+            backend_effects = self.get_backend_effects()
+            available_hw_effects = frozenset(str(name or "").strip().lower() for name in backend_effects)
+            known_effects = frozenset(self.SW_EFFECTS) | available_hw_effects
 
-        if effect_name not in known_effects:
-            raise ValueError(f"Unknown effect: {effect_name}. Valid: {', '.join(sorted(known_effects))}")
+            if effect_name not in known_effects:
+                raise ValueError(f"Unknown effect: {effect_name}. Valid: {', '.join(sorted(known_effects))}")
 
-        self.current_effect = effect_name
-        self.speed = max(0, min(10, speed))
-        self.brightness = max(0, min(50, brightness))
+            self.current_effect = effect_name
+            self.speed = max(0, min(10, speed))
+            self.brightness = max(0, min(50, brightness))
 
-        if color:
-            self.current_color = color
+            if color:
+                self.current_color = color
 
-        if reactive_color is not None:
-            self.reactive_color = reactive_color
+            if reactive_color is not None:
+                self.reactive_color = reactive_color
 
-        if reactive_use_manual_color is not None:
-            self.reactive_use_manual_color = bool(reactive_use_manual_color)
+            if reactive_use_manual_color is not None:
+                self.reactive_use_manual_color = bool(reactive_use_manual_color)
 
-        if reactive_visual_mode is not None:
-            normalized_visual_mode = str(reactive_visual_mode or "subtle").strip().lower()
-            self.reactive_visual_mode = (
-                normalized_visual_mode if normalized_visual_mode in {"subtle", "vivid"} else "subtle"
-            )
+            if reactive_visual_mode is not None:
+                normalized_visual_mode = str(reactive_visual_mode or "subtle").strip().lower()
+                self.reactive_visual_mode = (
+                    normalized_visual_mode if normalized_visual_mode in {"subtle", "vivid"} else "subtle"
+                )
 
-        if direction is not None:
-            self.direction = direction
+            if direction is not None:
+                self.direction = direction
 
-        is_backend_hw_effect = effect_name in available_hw_effects
+            is_backend_hw_effect = effect_name in available_hw_effects
 
-        if force_hardware or (is_backend_hw_effect and effect_name not in self.SW_EFFECTS):
-            self._start_hw_effect(effect_name)
-        else:
-            registration = get_effect_registration(effect_name)
-            if registration is None:
-                raise ValueError(f"Unhandled effect: {effect_name}")
-
-            if registration.start_color == CURRENT_COLOR:
-                fade_to_color = self.current_color
+            if force_hardware or (is_backend_hw_effect and effect_name not in self.SW_EFFECTS):
+                self._start_hw_effect(effect_name)
             else:
-                fade_to_color = registration.start_color
+                registration = get_effect_registration(effect_name)
+                if registration is None:
+                    raise ValueError(f"Unhandled effect: {effect_name}")
 
-            self._start_sw_effect(
-                target=partial(registration.runner, self),
-                prev_color=prev_color,
-                fade_to_color=fade_to_color,
-                from_sw_effect=prev_effect_was_sw,
-            )
+                if registration.start_color == CURRENT_COLOR:
+                    fade_to_color = self.current_color
+                else:
+                    fade_to_color = registration.start_color
+
+                self._start_sw_effect(
+                    target=partial(registration.runner, self),
+                    prev_color=prev_color,
+                    fade_to_color=fade_to_color,
+                    from_sw_effect=prev_effect_was_sw,
+                )
 
     def _start_sw_effect(
         self,
