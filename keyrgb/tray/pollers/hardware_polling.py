@@ -96,7 +96,7 @@ def _apply_polled_hardware_state(
     # brightness register while reporting is_off=True; that is still dark and
     # must not clear the honored-sleep flag.
     if _controller_sleep_off_active(tray):
-        if current_brightness > 0 and not current_off:
+        if current_brightness > 0 and not current_off and not (user_forced_off or power_forced_off or idle_forced_off):
             # The firmware's own first-keypress wake won the race with the
             # idle-power evdev loop. Claim the transition before restarting so
             # that loop will not run a second off->soft-on restore.
@@ -116,6 +116,11 @@ def _apply_polled_hardware_state(
                 effect_restored=bool(restored),
             )
         else:
+            # Forced-off policy wins over a stale/non-zero poll sampled during
+            # the fade to off. In particular, a suspend transition can begin
+            # while controller_sleep_off is still latched; treating an
+            # in-flight fade sample as firmware wake would restart the effect
+            # and relight the deck immediately before suspend.
             return current_brightness, True
 
     # A non-zero hardware read means the ITE transient-0 window has cleared

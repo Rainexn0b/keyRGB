@@ -619,6 +619,33 @@ def test_nonzero_read_while_controller_sleep_off_restarts_stopped_effect(monkeyp
     assert start_calls == ["start"]
 
 
+def test_nonzero_fade_sample_does_not_wake_controller_sleep_during_power_forced_off(monkeypatch) -> None:
+    """Suspend turn-off must beat a poll sampled while its fade is in flight."""
+
+    tray = _DummyTray(brightness=25, is_off=True, power_forced_off=True)
+    tray.config.controller_sleep_respect = True
+    owner = tray.tray_idle_power_state
+    owner.controller_sleep_off = True
+    owner.controller_sleep_off_at = 100.0
+    start_calls: list[str] = []
+    tray._start_current_effect = lambda: start_calls.append("start") or True
+    monkeypatch.setattr("keyrgb.tray.pollers.hardware_polling.time.monotonic", lambda: 101.0)
+
+    result = _apply_polled_hardware_state(
+        tray,
+        current_brightness=3,
+        current_off=False,
+        last_brightness=0,
+        last_off_state=True,
+    )
+
+    assert result == (3, True)
+    assert owner.controller_sleep_off is True
+    assert owner.controller_sleep_off_at == 100.0
+    assert tray.is_off is True
+    assert start_calls == []
+
+
 def test_nonzero_brightness_register_stays_asleep_when_hardware_is_off() -> None:
     """Corrective turn_off may retain brightness but must remain logically dark."""
 
