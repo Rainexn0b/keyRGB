@@ -10,7 +10,7 @@ set -euo pipefail
 
 KEYRGB_REPO_OWNER="${KEYRGB_REPO_OWNER:-Rainexn0b}"
 KEYRGB_REPO_NAME="${KEYRGB_REPO_NAME:-keyRGB}"
-KEYRGB_BOOTSTRAP_REF="${KEYRGB_BOOTSTRAP_REF:-v0.33.1}"
+KEYRGB_BOOTSTRAP_REF="${KEYRGB_BOOTSTRAP_REF:-v0.34.0}"
 
 usage() {
   cat <<'EOF'
@@ -18,7 +18,7 @@ Usage:
   uninstall.sh [--ref <git-ref>] [--help] [...uninstall args]
 
 Bootstrap (curl installs):
-  --ref <git-ref>    Git ref for downloading scripts/ from GitHub raw (default: v0.33.1)
+  --ref <git-ref>    Git ref for downloading scripts/ from GitHub raw (default: v0.34.0)
   KEYRGB_BOOTSTRAP_REF can also be used.
 
 Example:
@@ -71,6 +71,28 @@ command -v curl >/dev/null 2>&1 || {
   echo "❌ curl is required for curl-pipe uninstalls" >&2
   exit 1
 }
+
+# Validate GitHub owner/repo identifiers to prevent URL manipulation.
+# GitHub usernames/org names: alphanumeric + hyphens, 1-39 chars.
+# GitHub repo names: alphanumeric + hyphens + underscores + dots, 1-100 chars.
+_validate_github_owner() {
+  local value="$1"
+  if ! printf '%s' "$value" | grep -Eq '^[a-zA-Z0-9-]{1,39}$'; then
+    echo "❌ Invalid KEYRGB_REPO_OWNER '${value}': only alphanumeric characters and hyphens (1-39 chars) are allowed" >&2
+    exit 1
+  fi
+}
+
+_validate_github_repo() {
+  local value="$1"
+  if ! printf '%s' "$value" | grep -Eq '^[A-Za-z0-9._-]{1,100}$'; then
+    echo "❌ Invalid KEYRGB_REPO_NAME '${value}': only alphanumeric characters, hyphens, underscores, and dots (1-100 chars) are allowed" >&2
+    exit 1
+  fi
+}
+
+_validate_github_owner "$KEYRGB_REPO_OWNER"
+_validate_github_repo "$KEYRGB_REPO_NAME"
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT

@@ -71,9 +71,7 @@ def _fake_session_popen(command, **kwargs):
     return _FakeProcess()
 
 
-def test_run_diagnostic_session_creates_expected_files_and_prints_dir(
-    tmp_path: Path, monkeypatch, capsys
-) -> None:
+def test_run_diagnostic_session_creates_expected_files_and_prints_dir(tmp_path: Path, monkeypatch, capsys) -> None:
     session_root = tmp_path / "sessions"
     monkeypatch.setattr(diagnostic_session._runtime_capture, "discover_source_root", lambda: tmp_path)
     monkeypatch.setattr(diagnostic_session.subprocess, "Popen", _fake_session_popen)
@@ -103,9 +101,7 @@ def test_run_diagnostic_session_creates_expected_files_and_prints_dir(
     assert "close any running keyrgb tray" in captured.out.lower()
 
 
-def test_run_diagnostic_session_returns_child_status_when_collection_fails(
-    tmp_path: Path, monkeypatch, capsys
-) -> None:
+def test_run_diagnostic_session_returns_child_status_when_collection_fails(tmp_path: Path, monkeypatch, capsys) -> None:
     session_root = tmp_path / "sessions"
     monkeypatch.setattr(diagnostic_session._runtime_capture, "discover_source_root", lambda: tmp_path)
     monkeypatch.setattr(diagnostic_session.subprocess, "Popen", _fake_session_popen)
@@ -125,9 +121,7 @@ def test_run_diagnostic_session_returns_child_status_when_collection_fails(
     assert "journalctl is not available" in note
 
 
-def test_run_diagnostic_session_source_without_checkout_fails_handled(
-    tmp_path: Path, monkeypatch, capsys
-) -> None:
+def test_run_diagnostic_session_source_without_checkout_fails_handled(tmp_path: Path, monkeypatch, capsys) -> None:
     session_root = tmp_path / "sessions"
     monkeypatch.setattr(diagnostic_session._runtime_capture, "discover_source_root", lambda: None)
     monkeypatch.setattr(diagnostic_session.subprocess, "Popen", _fake_session_popen)
@@ -135,9 +129,7 @@ def test_run_diagnostic_session_source_without_checkout_fails_handled(
     monkeypatch.setattr(dsev.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=0))
     monkeypatch.setattr(diagnostics_pkg, "collect_diagnostics", lambda **_kwargs: _FakeDiagnostics())
 
-    exit_code = diagnostic_session.run_diagnostic_session(
-        launcher="source", output_dir_root=session_root
-    )
+    exit_code = diagnostic_session.run_diagnostic_session(launcher="source", output_dir_root=session_root)
 
     # Must be a handled RuntimeLogCaptureError, not an AssertionError, and the
     # session directory must still be reported.
@@ -149,9 +141,7 @@ def test_run_diagnostic_session_source_without_checkout_fails_handled(
     assert "failed to launch" in captured.err
 
 
-def test_run_diagnostic_session_uses_distinct_dirs_on_same_second(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_run_diagnostic_session_uses_distinct_dirs_on_same_second(tmp_path: Path, monkeypatch) -> None:
     session_root = tmp_path / "sessions"
 
     class _FixedNow:
@@ -166,9 +156,7 @@ def test_run_diagnostic_session_uses_distinct_dirs_on_same_second(
     monkeypatch.setattr(diagnostic_session._runtime_capture, "_wait_with_signal_forwarding", lambda _process: 0)
     monkeypatch.setattr(dsev.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=0))
     monkeypatch.setattr(diagnostics_pkg, "collect_diagnostics", lambda **_kwargs: _FakeDiagnostics())
-    monkeypatch.setattr(
-        diagnostic_session, "datetime", _FixedNow(datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc))
-    )
+    monkeypatch.setattr(diagnostic_session, "datetime", _FixedNow(datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc)))
 
     first = diagnostic_session.run_diagnostic_session(output_dir_root=session_root)
     second = diagnostic_session.run_diagnostic_session(output_dir_root=session_root)
@@ -258,9 +246,7 @@ def test_collect_journal_log_writes_note_when_journalctl_missing(tmp_path: Path)
 
     dsev.subprocess.run = _fake_run
     try:
-        status = dsev._collect_journal_log(
-            target, since="2026-01-01 00:00:00", cmd=["journalctl", "--user"]
-        )
+        status = dsev._collect_journal_log(target, since="2026-01-01 00:00:00", cmd=["journalctl", "--user"])
     finally:
         dsev.subprocess.run = orig_run
 
@@ -277,9 +263,7 @@ def test_collect_journal_log_notes_nonzero_exit(tmp_path: Path) -> None:
 
     dsev.subprocess.run = _fake_run
     try:
-        status = dsev._collect_journal_log(
-            target, since="2026-01-01 00:00:00", cmd=["journalctl", "-k"]
-        )
+        status = dsev._collect_journal_log(target, since="2026-01-01 00:00:00", cmd=["journalctl", "-k"])
     finally:
         dsev.subprocess.run = orig_run
 

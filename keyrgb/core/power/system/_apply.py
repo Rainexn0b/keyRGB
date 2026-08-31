@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -10,6 +9,9 @@ import keyrgb.core.power.system.modes as _modes
 
 if TYPE_CHECKING:
     from keyrgb.core.power.system.modes import PowerMode
+
+_PRIVILEGED_BIN_NAMES = frozenset({"pkexec", "sudo", "pkcheck"})
+_PRIVILEGED_BIN_DIRS = (Path("/usr/bin"), Path("/bin"))
 
 
 def _write_mode_epp_preferences(mode: PowerMode, *, policies: list[Path]) -> None:
@@ -98,6 +100,21 @@ def _apply_mode_sysfs(mode: PowerMode, *, root: Path, extreme_cap_khz: int) -> N
     _write_mode_epp_preferences(mode, policies=policies)
 
 
+def _privileged_bin(name: str) -> str | None:
+    """Return pkexec/sudo/pkcheck from fixed absolute dirs, never PATH."""
+
+    if name not in _PRIVILEGED_BIN_NAMES:
+        return None
+    for directory in _PRIVILEGED_BIN_DIRS:
+        candidate = directory / name
+        try:
+            if candidate.is_file() and os.access(candidate, os.X_OK):
+                return str(candidate)
+        except OSError:
+            continue
+    return None
+
+
 def _pkexec_noninteractive_authorized(pkcheck: str) -> bool:
     try:
         cp = subprocess.run(
@@ -131,13 +148,13 @@ def _run_privileged_helper(mode: PowerMode, *, extreme_cap_khz: int, allow_inter
         cp = subprocess.run(argv, check=False, capture_output=True, text=True)
         return cp.returncode == 0
 
-    pkexec = shutil.which("pkexec")
+    pkexec = _privileged_bin("pkexec")
     if pkexec:
         if allow_interactive:
             cp = subprocess.run([pkexec, *argv], check=False, capture_output=True, text=True)
             return cp.returncode == 0
 
-        pkcheck = shutil.which("pkcheck")
+        pkcheck = _privileged_bin("pkcheck")
         if pkcheck and _pkexec_noninteractive_authorized(pkcheck):
             cp = subprocess.run(
                 [pkexec, "--disable-internal-agent", *argv],
@@ -148,7 +165,7 @@ def _run_privileged_helper(mode: PowerMode, *, extreme_cap_khz: int, allow_inter
             if cp.returncode == 0:
                 return True
 
-    sudo = shutil.which("sudo")
+    sudo = _privileged_bin("sudo")
     if sudo:
         sudo_argv = [sudo, *argv] if allow_interactive else [sudo, "-n", *argv]
         cp = subprocess.run(sudo_argv, check=False, capture_output=True, text=True)

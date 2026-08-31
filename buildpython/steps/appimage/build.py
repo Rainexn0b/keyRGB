@@ -58,7 +58,6 @@ def _appimage_desktop_entry() -> str:
             "[Desktop Action DiagnosticSession]",
             "Name=Diagnostic Session",
             "Exec=keyrgb --diagnostic-session",
-            "Terminal=true",
             "",
         ]
     )

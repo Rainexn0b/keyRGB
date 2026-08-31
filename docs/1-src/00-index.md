@@ -65,5 +65,5 @@ boundaries.
 
 ## Notes
 
-- The `buildpython` architecture series lives under `docs/architecture/buildpython/`.
-- Repository-structure notes live under `docs/architecture/repo/`.
+- The `buildpython` architecture series lives under `docs/1-buildpython/`.
+- Repository-structure notes live under `docs/1-repo/`.

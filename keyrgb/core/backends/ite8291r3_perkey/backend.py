@@ -214,9 +214,9 @@ class Ite8291r3Backend(KeyboardBackend):
             return ProbeResult(available=False, reason="no matching usb device", confidence=0)
         except scan_error_types as exc:
             return ProbeResult(
-                available=True,
+                available=False,
                 reason=f"importable but usb scan unavailable: {exc}",
-                confidence=60,
+                confidence=0,
             )
 
     def capabilities(self) -> BackendCapabilities:

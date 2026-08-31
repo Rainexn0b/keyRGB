@@ -60,8 +60,9 @@ def test_install_icon_and_desktop_entries_writes_isolated_session_files(tmp_path
     assert "[Desktop Action DiagnosticSession]" in desktop_text
     assert "Name=Diagnostic Session" in desktop_text
     assert f"Exec={launcher} --diagnostic-session" in desktop_text
-    assert "Terminal=true" in desktop_text
     assert "Terminal=false" in desktop_text
+    action_block = desktop_text.split("[Desktop Action DiagnosticSession]", 1)[1]
+    assert "Terminal=" not in action_block
     # Autostart entry must remain a plain normal launch (no diagnostic action).
     autostart_text = autostart.read_text(encoding="utf-8")
     assert f"Exec={launcher}" in autostart_text

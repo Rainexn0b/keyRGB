@@ -17,12 +17,9 @@ Backends live under `keyrgb/core/backends/`.
 
 - `base.py`: backend interface + `BackendCapabilities`
 - `registry.py`: backend enumeration + selection (`KEYRGB_BACKEND`)
-- `sysfs/`: kernel / LED-class backend
-- `ite8291r3/`: ITE 8291r3 USB backend (protocol-scoped package)
-- `ite8910/`: reverse-engineered hidraw backend with per-key support
-- `ite8297/`: experimental hidraw backend for uniform RGB paths
-- `ite8233/`: experimental auxiliary lightbar backend
-- `asusctl/`: subprocess-backed Aura integration
+- Canonical inventory, naming rules, and aliases: [`keyrgb/core/backends/README.md`](../../keyrgb/core/backends/README.md)
+
+The current mix includes kernel sysfs (`sysfs/`, `sysfs_mouse/`), ITE USB/hidraw families (`ite8291r3_perkey/`, `ite8910_perkey/`, `ite8291_*`, `ite8258_*`, `ite8295_*`, `ite8297_uniform/`, `ite8233_none_chassis_lightbar_clevo/`), and `asusctl/` for Aura.
 
 Notes:
 

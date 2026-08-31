@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import os
 import re
-import shutil
 import subprocess
 from pathlib import Path
 
@@ -12,10 +11,27 @@ logger = logging.getLogger(__name__)
 _LED_NAME_RE = re.compile(r"^[A-Za-z0-9:_\-.]+$")
 _HELPER_COLOR_KINDS = frozenset({"brightness", "multi_intensity", "color"})
 _DEBUG_LOGGING_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_PRIVILEGED_BIN_NAMES = frozenset({"pkexec", "sudo", "pkcheck"})
+_PRIVILEGED_BIN_DIRS = (Path("/usr/bin"), Path("/bin"))
 
 
 def _power_helper() -> str:
     return os.environ.get("KEYRGB_POWER_HELPER", "/usr/local/bin/keyrgb-power-helper")
+
+
+def _privileged_bin(name: str) -> str | None:
+    """Return pkexec/sudo/pkcheck from fixed absolute dirs, never PATH."""
+
+    if name not in _PRIVILEGED_BIN_NAMES:
+        return None
+    for directory in _PRIVILEGED_BIN_DIRS:
+        candidate = directory / name
+        try:
+            if candidate.is_file() and os.access(candidate, os.X_OK):
+                return str(candidate)
+        except OSError:
+            continue
+    return None
 
 
 def _is_ite8297_channel(name: str) -> bool:
@@ -81,13 +97,13 @@ def run_led_apply(*, led: str, brightness: int, rgb: tuple[int, int, int] | None
         _log(cp, via="root")
         return cp.returncode == 0
 
-    pkexec = shutil.which("pkexec")
+    pkexec = _privileged_bin("pkexec")
     if pkexec:
         cp = subprocess.run([pkexec, *argv], check=False, capture_output=True, text=True)
         _log(cp, via="pkexec")
         return cp.returncode == 0
 
-    sudo = shutil.which("sudo")
+    sudo = _privileged_bin("sudo")
     if sudo:
         cp = subprocess.run([sudo, *argv], check=False, capture_output=True, text=True)
         _log(cp, via="sudo")

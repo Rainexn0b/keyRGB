@@ -2,9 +2,19 @@
 
 ## Unreleased
 
-- Diagnostics/Support: Add a canonical `keyrgb --diagnostic-session` / `keyrgb-diagnostic-launch` workflow that records full runtime logs, before/after diagnostics, and journal slices in a timestamped user-cache bundle. Installed desktop entries and the AppImage desktop template now expose a terminal **Diagnostic Session** action; AppImage sessions avoid recursive self-launching.
-- Docs: Make diagnostic sessions the canonical runtime-report path in usage guides, support guidance, and issue templates; add a documentation landing page without bypassing the permanent lane-ID structure.
-- Effects: Offer Breathing, Fire, Rain, and Random as controller-agnostic software effects. Firmware effects that share those names stay available as `hw:breathing` / `hw:rain` / `hw:random`. Old `breathing_sw` config values map to software Breathing.
+## 0.34.0 (2026-08-31)
+
+Sleep/wake software corrections for ITE firmware sleep and system suspend, plus diagnostic-session support and installer/privilege hygiene. Public entrypoints and on-disk config stay compatible.
+
+- Tray/Idle-Power: Keep the deck dark through controller sleep, suspend, and scheduler updates. Forced-off beats firmware-wake, already-dark suspend does not fade back on, software frames stop after mode-off, in-flight fades cancel on effect start, concurrent starts serialize, and day/night scheduler changes no longer relight a sleeping deck.
+- Tray/Power: Restart failed logind/suspend monitoring, drop stale power-event intent when power management is disabled mid-cycle, and keep temporary dim policy across firmware wake.
+- Diagnostics/Support: Add `keyrgb --diagnostic-session` / `keyrgb-diagnostic-launch` with runtime logs, before/after snapshots, and journal slices. Desktop entries expose a **Diagnostic Session** action; docs and issue templates use this as the canonical report path.
+- Effects: Offer Breathing, Fire, Rain, and Random as software effects; firmware names stay as `hw:breathing` / `hw:rain` / `hw:random`. Old `breathing_sw` maps to software Breathing. Catalog names now come from `EFFECT_REGISTRATION` markers.
+- Core/Backends: Treat an ITE8291r3 USB scan exception as unavailable instead of a 60-confidence auto-select candidate. `KEYRGB_DISABLE_USB_SCAN=1` still reports importable-but-disabled.
+- Privileged helper: Ignore `KEYRGB_CPUFREQ_ROOT` / `KEYRGB_LEDS_ROOT` when running as root, and resolve `pkexec` / `sudo` / `pkcheck` from `/usr/bin` then `/bin` instead of `PATH`.
+- Installer: Validate `KEYRGB_REPO_OWNER` and `KEYRGB_REPO_NAME` on curl-bootstrap uninstall, matching `install.sh`.
+- Build/Quality: Finish the dead-code and dependency cleanup; CI and release install from `.[dev]` only.
+- Docs: Point living architecture notes at `keyrgb/` and `docs/1-buildpython/` / `docs/1-repo/`.
 
 ## 0.33.1 (2026-08-22)
 

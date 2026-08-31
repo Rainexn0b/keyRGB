@@ -139,4 +139,5 @@ def test_appimage_desktop_entry_includes_diagnostic_session_action() -> None:
     assert "[Desktop Action DiagnosticSession]" in desktop
     assert "Name=Diagnostic Session" in desktop
     assert "Exec=keyrgb --diagnostic-session" in desktop
-    assert "Terminal=true" in desktop
+    action_block = desktop.split("[Desktop Action DiagnosticSession]", 1)[1]
+    assert "Terminal=" not in action_block

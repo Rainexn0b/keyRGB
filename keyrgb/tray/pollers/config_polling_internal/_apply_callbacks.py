@@ -9,11 +9,7 @@ from __future__ import annotations
 from keyrgb.core.backends.policies.per_key_mode import per_key_mode_requires_frame_reassert
 from keyrgb.core.effects.perkey_animation import restore_hidden_per_key_rows_once
 from keyrgb.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
-from keyrgb.tray.idle_power_state import (
-    any_forced_off,
-    read_forced_off_flags,
-    read_idle_power_state_bool_field,
-)
+from keyrgb.tray.idle_power_state import any_forced_off, read_forced_off_flags, read_idle_power_state_bool_field
 from keyrgb.tray.protocols import ConfigPollingTrayProtocol
 
 from . import helpers as _helpers

@@ -82,6 +82,50 @@ def test_run_led_apply_ignores_recoverable_debug_logging_failures(monkeypatch: p
     assert sysfs_privileged.run_led_apply(led="rgb:kbd_backlight", brightness=25, rgb=None) is True
 
 
+def test_privileged_bin_prefers_usr_bin_and_ignores_path(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    usr_bin = tmp_path / "usr" / "bin"
+    alt_bin = tmp_path / "bin"
+    evil_bin = tmp_path / "evil"
+    usr_bin.mkdir(parents=True)
+    alt_bin.mkdir()
+    evil_bin.mkdir()
+    pkexec = usr_bin / "pkexec"
+    pkexec.write_text("#!/bin/sh\n", encoding="utf-8")
+    pkexec.chmod(0o755)
+    (evil_bin / "pkexec").write_text("#!/bin/sh\n", encoding="utf-8")
+    (evil_bin / "pkexec").chmod(0o755)
+
+    monkeypatch.setattr(sysfs_privileged, "_PRIVILEGED_BIN_DIRS", (usr_bin, alt_bin))
+    monkeypatch.setenv("PATH", str(evil_bin))
+
+    assert sysfs_privileged._privileged_bin("pkexec") == str(pkexec)
+    assert sysfs_privileged._privileged_bin("sudo") is None
+    assert sysfs_privileged._privileged_bin("bash") is None
+
+
+def test_run_led_apply_uses_pinned_pkexec_when_unprivileged(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[list[str]] = []
+
+    def fake_bin(name: str) -> str | None:
+        return "/usr/bin/pkexec" if name == "pkexec" else None
+
+    def fake_run(argv, **_kwargs):
+        calls.append(list(argv))
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(sysfs_privileged.os, "geteuid", lambda: 1000)
+    monkeypatch.setattr(sysfs_privileged, "_privileged_bin", fake_bin)
+    monkeypatch.setattr(sysfs_privileged.subprocess, "run", fake_run)
+
+    assert sysfs_privileged.run_led_apply(led="rgb:kbd_backlight", brightness=25, rgb=None) is True
+    assert calls == [
+        ["/usr/bin/pkexec", sysfs_privileged._power_helper(), "led-apply", "rgb:kbd_backlight", "--brightness", "25"]
+    ]
+
+
 def test_run_led_apply_propagates_unexpected_debug_logging_failures(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("KEYRGB_DEBUG", "1")
     monkeypatch.setattr(sysfs_privileged.os, "geteuid", lambda: 0)

@@ -38,9 +38,7 @@ def _select_session_launcher(launcher: str | None, source_root: Path | None) -> 
     return "source" if source_root is not None else "installed"
 
 
-def _diagnostic_child_command(
-    *, launcher: str, source_root: Path | None, appimage_active: bool
-) -> list[str]:
+def _diagnostic_child_command(*, launcher: str, source_root: Path | None, appimage_active: bool) -> list[str]:
     """Return the argv used to spawn the KeyRGB child for a diagnostic session.
 
     When running inside an AppImage (``APPIMAGE`` set) the child must use the
@@ -69,9 +67,7 @@ def _diagnostic_child_working_directory(
     return Path(command[0]).resolve().parent
 
 
-def _diagnostic_child_env_source_root(
-    *, launcher: str, source_root: Path | None, appimage_active: bool
-) -> Path | None:
+def _diagnostic_child_env_source_root(*, launcher: str, source_root: Path | None, appimage_active: bool) -> Path | None:
     # AppImage bundles its own package tree via PYTHONPATH; do not override it.
     if appimage_active:
         return None
@@ -110,9 +106,7 @@ def run_diagnostic_session(
     """
 
     appimage_active = bool(os.environ.get("APPIMAGE"))
-    session_root = (
-        _default_diagnostic_session_root() if output_dir_root is None else Path(output_dir_root).resolve()
-    )
+    session_root = _default_diagnostic_session_root() if output_dir_root is None else Path(output_dir_root).resolve()
     resolved_source_root = source_root.resolve() if source_root is not None else _runtime_capture.discover_source_root()
     effective_launcher = _select_session_launcher(launcher, resolved_source_root)
 
@@ -178,13 +172,10 @@ def run_diagnostic_session(
         # value) fails as a handled RuntimeLogCaptureError instead of an
         # AssertionError or silently falling through to the installed launcher.
         if effective_launcher not in RUNTIME_LAUNCHERS:
-            raise RuntimeLogCaptureError(
-                f"Unknown diagnostic session launcher: {effective_launcher!r}"
-            )
+            raise RuntimeLogCaptureError(f"Unknown diagnostic session launcher: {effective_launcher!r}")
         if effective_launcher == "source" and resolved_source_root is None:
             raise RuntimeLogCaptureError(
-                "No KeyRGB source checkout was detected. Run from the checkout or "
-                "select the installed launcher."
+                "No KeyRGB source checkout was detected. Run from the checkout or select the installed launcher."
             )
 
         command = _diagnostic_child_command(

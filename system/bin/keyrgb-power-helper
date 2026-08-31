@@ -14,16 +14,20 @@ MIN_EXTREME_SAVER_CAP_KHZ = 400_000
 MAX_EXTREME_SAVER_CAP_KHZ = 5_000_000
 
 
+def _sysfs_root_from_env(*, env_name: str, default: Path) -> Path:
+    # Unprivileged tests may retarget sysfs. Root/pkexec/sudo must not.
+    if os.geteuid() == 0:
+        return default
+    root = os.environ.get(env_name)
+    return Path(root) if root else default
+
+
 def _cpufreq_root() -> Path:
-    # Keep a test hook, but default to real sysfs.
-    root = os.environ.get("KEYRGB_CPUFREQ_ROOT")
-    return Path(root) if root else CPUFREQ_ROOT_DEFAULT
+    return _sysfs_root_from_env(env_name="KEYRGB_CPUFREQ_ROOT", default=CPUFREQ_ROOT_DEFAULT)
 
 
 def _leds_root() -> Path:
-    # Keep a test hook, but default to real sysfs.
-    root = os.environ.get("KEYRGB_LEDS_ROOT")
-    return Path(root) if root else LEDS_ROOT_DEFAULT
+    return _sysfs_root_from_env(env_name="KEYRGB_LEDS_ROOT", default=LEDS_ROOT_DEFAULT)
 
 
 def _read_int(path: Path) -> int | None:

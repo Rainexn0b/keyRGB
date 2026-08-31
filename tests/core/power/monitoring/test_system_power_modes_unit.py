@@ -456,7 +456,7 @@ def test_run_privileged_helper_uses_pkexec_disable_internal_agent_when_nonintera
 
     monkeypatch.setattr(system_modes.os, "geteuid", lambda: 1000)
     monkeypatch.setattr(system_modes.os, "getpid", lambda: 12345)
-    monkeypatch.setattr(system_apply.shutil, "which", fake_which)
+    monkeypatch.setattr(system_apply, "_privileged_bin", fake_which)
     monkeypatch.setattr(system_apply.subprocess, "run", fake_run)
 
     assert (
@@ -503,7 +503,7 @@ def test_run_privileged_helper_skips_pkexec_when_noninteractive_keyrgb_action_re
 
     monkeypatch.setattr(system_modes.os, "geteuid", lambda: 1000)
     monkeypatch.setattr(system_modes.os, "getpid", lambda: 12345)
-    monkeypatch.setattr(system_apply.shutil, "which", fake_which)
+    monkeypatch.setattr(system_apply, "_privileged_bin", fake_which)
     monkeypatch.setattr(system_apply.subprocess, "run", fake_run)
 
     assert (
@@ -552,7 +552,7 @@ def test_run_privileged_helper_falls_back_to_sudo_n_when_noninteractive_pkexec_f
 
     monkeypatch.setattr(system_modes.os, "geteuid", lambda: 1000)
     monkeypatch.setattr(system_modes.os, "getpid", lambda: 12345)
-    monkeypatch.setattr(system_apply.shutil, "which", fake_which)
+    monkeypatch.setattr(system_apply, "_privileged_bin", fake_which)
     monkeypatch.setattr(system_apply.subprocess, "run", fake_run)
 
     assert (
@@ -607,7 +607,7 @@ def test_run_privileged_helper_uses_sudo_noninteractive_flag_when_needed(
         return None
 
     monkeypatch.setattr(system_modes.os, "geteuid", lambda: 1000)
-    monkeypatch.setattr(system_apply.shutil, "which", fake_which)
+    monkeypatch.setattr(system_apply, "_privileged_bin", fake_which)
     monkeypatch.setattr(system_apply.subprocess, "run", fake_run)
 
     assert (
@@ -649,3 +649,27 @@ def test_set_mode_propagates_unexpected_runtime_errors(monkeypatch: pytest.Monke
         set_mode(PowerMode.BALANCED)
 
     assert helper_calls == []
+
+
+def test_privileged_bin_prefers_usr_bin_and_ignores_path(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    usr_bin = tmp_path / "usr" / "bin"
+    alt_bin = tmp_path / "bin"
+    evil_bin = tmp_path / "evil"
+    usr_bin.mkdir(parents=True)
+    alt_bin.mkdir()
+    evil_bin.mkdir()
+    pkexec = usr_bin / "pkexec"
+    pkexec.write_text("#!/bin/sh\n", encoding="utf-8")
+    pkexec.chmod(0o755)
+    (evil_bin / "pkexec").write_text("#!/bin/sh\n", encoding="utf-8")
+    (evil_bin / "pkexec").chmod(0o755)
+
+    monkeypatch.setattr(system_apply, "_PRIVILEGED_BIN_DIRS", (usr_bin, alt_bin))
+    monkeypatch.setenv("PATH", str(evil_bin))
+
+    assert system_apply._privileged_bin("pkexec") == str(pkexec)
+    assert system_apply._privileged_bin("sudo") is None
+    assert system_apply._privileged_bin("bash") is None

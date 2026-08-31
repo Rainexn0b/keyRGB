@@ -237,8 +237,7 @@ def run_monitor_loop(
                 return
             consecutive_failures += 1
             logger.exception(
-                "Power monitoring recovered from %s after recoverable error; "
-                "restarting in %.1fs (attempt %d)",
+                "Power monitoring recovered from %s after recoverable error; restarting in %.1fs (attempt %d)",
                 type(exc).__name__,
                 retry_delay_s,
                 consecutive_failures,
@@ -264,8 +263,7 @@ def run_monitor_loop(
             else:
                 consecutive_failures += 1
             logger.warning(
-                "dbus-monitor ended unexpectedly (EOF or process exit); "
-                "restarting in %.1fs (attempt %d)",
+                "dbus-monitor ended unexpectedly (EOF or process exit); restarting in %.1fs (attempt %d)",
                 retry_delay_s,
                 consecutive_failures,
             )

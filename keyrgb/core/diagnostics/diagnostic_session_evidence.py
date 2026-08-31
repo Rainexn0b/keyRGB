@@ -66,9 +66,7 @@ def _collect_journal_log(target_path: Path, *, since: str, cmd: Sequence[str]) -
 
     if proc.returncode != 0:
         with target_path.open("a", encoding="utf-8", errors="replace") as log_file:
-            log_file.write(
-                f"\n[journalctl exited with status {proc.returncode}; output may be partial]\n"
-            )
+            log_file.write(f"\n[journalctl exited with status {proc.returncode}; output may be partial]\n")
     return proc.returncode
 
 

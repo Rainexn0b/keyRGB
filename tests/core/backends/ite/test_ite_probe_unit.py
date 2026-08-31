@@ -52,7 +52,7 @@ def test_ite_probe_unavailable_when_no_matching_device(
     assert res.confidence == 0
 
 
-def test_ite_probe_low_confidence_when_usb_scan_runtime_fails(
+def test_ite_probe_unavailable_when_usb_scan_runtime_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
@@ -72,8 +72,8 @@ def test_ite_probe_low_confidence_when_usb_scan_runtime_fails(
     monkeypatch.setitem(sys.modules, "usb.core", FakeUsbCore)
 
     res = Ite8291r3Backend().probe()
-    assert res.available is True
-    assert res.confidence == 60
+    assert res.available is False
+    assert res.confidence == 0
     assert "usb scan unavailable" in (res.reason or "")
 
 

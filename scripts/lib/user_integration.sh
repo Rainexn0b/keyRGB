@@ -175,7 +175,6 @@ Actions=DiagnosticSession;
 [Desktop Action DiagnosticSession]
 Name=Diagnostic Session
 Exec=$keyrgb_exec --diagnostic-session
-Terminal=true
 EOF
 
   cat >"$autostart_file" <<EOF
