@@ -2,9 +2,9 @@
 
 **Started:** 2026-08-30  
 **Lane:** `P-power-management`  
-**Status:** software gate complete — live hardware matrix pending
-**Hardware validation gate:** open — every software workstream has a recorded
-disposition and all accepted corrections passed merged validation
+**Status:** follow-up correction validated in software — targeted live confirmation pending
+**Hardware validation gate:** open for a targeted KSW-9 rerun; the first live
+session validated suspend/resume but exposed one scheduler/controller-sleep race
 
 ## Purpose
 
@@ -85,15 +85,16 @@ session proves that suspend stays dark and resume restores exactly once.
 
 | ID | Concern | Priority | Effort | Status |
 |---|---|:---:|:---:|---|
-| KSW-0 | Forced-off transition can be mistaken for controller firmware wake | P0 | S | monitoring |
-| KSW-1 | Suspending an already controller-sleep-dark deck may wake it to perform a fade | P1 | S | monitoring |
+| KSW-0 | Forced-off transition can be mistaken for controller firmware wake | P0 | S | done |
+| KSW-1 | Suspending an already controller-sleep-dark deck may wake it to perform a fade | P1 | S | done |
 | KSW-2 | `dbus-monitor` exit or callback failure can permanently end suspend/resume monitoring | P1 | M | done |
 | KSW-3 | A non-reactive software effect may commit one final frame after mode-off is latched | P1 | S | done |
 | KSW-4 | Starting a new effect may not cancel an in-flight brightness fade | P2 | S | done |
 | KSW-5 | Concurrent direct `start_effect()` calls may leave two software workers alive | P2 | M | done |
 | KSW-6 | Disabling power management between suspend and resume may retain stale saved intent | P2 | S | done |
 | KSW-7 | Firmware wake during temporary dim policy may restore the wrong brightness policy | P2 | S | monitoring |
-| KSW-8 | Final merged software validation and live hardware matrix | P0 | M | blocked — live hardware |
+| KSW-8 | Final merged software validation and live hardware matrix | P0 | M | blocked — KSW-9 live confirmation |
+| KSW-9 | Scheduler config persistence can relight a controller-sleep-dark deck | P1 | S | monitoring |
 
 ---
 
@@ -357,6 +358,25 @@ makes event attribution clearer.
 - `diagnostics-after.json` still selects the expected backend and exposes the
   same device identity as `diagnostics-before.json`.
 
+## KSW-9 — Scheduler persistence versus controller-native sleep
+
+**Evidence.** The first KSW-8 live session showed a controller-native sleep at
+debug line 269246. Hours later, while `screen_off=True` and `session_idle=True`,
+the day scheduler persisted brightness 40. Config mtime handling then restarted
+the reactive effect at lines 353668–353670, relighting the deck for about 16
+seconds before idle policy turned it off at lines 353760–353782. Hardware polling
+subsequently labeled the non-zero read as firmware wake, but the initiating write
+was config apply rather than keyboard input.
+
+**Disposition.** Confirmed and corrected in config-apply ownership. While
+`controller_sleep_off` is active, config polling now accepts the new config as
+the latest intent but skips all brightness/color/effect hardware paths and emits
+`config:skipped_controller_sleep_off`. The next eligible firmware/evdev wake
+therefore uses the updated brightness without an off→on→off flash. Focused
+config, scheduler, and hardware-polling tests pass; keep `monitoring` until a
+day/night boundary or equivalent config persistence is observed while the deck
+is controller-sleep-dark.
+
 ## Candidate hardening outside the main inventory
 
 Do not widen the campaign automatically for these unless an investigation above
@@ -418,3 +438,28 @@ produces evidence:
 - The software exit gate is complete. KSW-8 remains blocked only on the physical
   live matrix, which must use
   `./keyrgb.sh --diagnostic-session --diagnostic-mode=full` from this checkout.
+
+### 2026-08-31 — first live matrix session and KSW-9
+
+- Reviewed the 21.5-hour session at
+  `~/.cache/keyrgb/diagnostic-sessions/20260830T101443.581937Z/`; the user reported
+  that all observed sleep/restore behavior matched expectations.
+- The log contains 11 controller-native sleeps, 10 keyboard-evdev rearm/restores,
+  two system suspend/resume cycles, and one scheduler-triggered false firmware
+  wake. Both suspends stayed dark until one restore; the already-native-sleep-dark
+  cycle used immediate off, while the on-state cycle used the configured fade.
+- Before/after diagnostics retained `ite8291r3_perkey`, USB `048d:600b`,
+  `bcdDevice 0x0003`, path `3-3`, read/write access, and identical capabilities.
+  No KeyRGB USB disconnect, polling error, monitor termination, traceback, or
+  backend fallback appeared. GPU assertions and PowerDevil DDC/I2C permission
+  noise in the journals are unrelated to KeyRGB.
+- The checkout was authoritative despite `launcher=appimage`: `keyrgb.sh` used
+  the installed desktop runtime with the checkout as working directory and on
+  `PYTHONPATH`; diagnostics reported source version 0.33.1 over dist 0.32.1.
+- KSW-0 and KSW-1 are done from live evidence. KSW-7 remains monitoring because
+  this session used dim-sync mode `off`, and manual-off/input-filter matrix cases
+  were not explicitly evidenced.
+- Confirmed KSW-9 from lines 353665–353782 and applied the config-ownership fix.
+  Primary validation passed: 141 focused tests, all 440 tray-poller tests,
+  targeted Ruff, `git diff --check`, Step 19, and BuildPython Step 2 with 3692
+  tests plus 1 skip.

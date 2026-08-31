@@ -9,7 +9,11 @@ from __future__ import annotations
 from keyrgb.core.backends.policies.per_key_mode import per_key_mode_requires_frame_reassert
 from keyrgb.core.effects.perkey_animation import restore_hidden_per_key_rows_once
 from keyrgb.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
-from keyrgb.tray.idle_power_state import any_forced_off, read_forced_off_flags
+from keyrgb.tray.idle_power_state import (
+    any_forced_off,
+    read_forced_off_flags,
+    read_idle_power_state_bool_field,
+)
 from keyrgb.tray.protocols import ConfigPollingTrayProtocol
 
 from . import helpers as _helpers
@@ -32,7 +36,75 @@ def _backend_requires_perkey_reassert(tray: ConfigPollingTrayProtocol) -> bool:
         return False
 
 
+def _controller_sleep_off_active(tray: ConfigPollingTrayProtocol) -> bool:
+    """Whether the ITE firmware's native input-timeout sleep owns the dark deck.
+
+    Read through the typed owner / legacy attr bridge so the check is safe for
+    both the real tray and duck-typed test fakes.
+    """
+
+    return read_idle_power_state_bool_field(
+        tray,
+        attr_name="_controller_sleep_off",
+        state_name="controller_sleep_off",
+        default=False,
+    )
+
+
+def _handle_controller_sleep_off(
+    tray: ConfigPollingTrayProtocol, last_applied, current, cause: str, state_for_log_fn
+) -> bool:
+    """Skip every hardware apply path while controller-native sleep owns the deck.
+
+    ``controller_sleep_off`` is a *distinct* skip condition from ordinary
+    forced-off: the tray is NOT off and no user/power/idle flag is set, yet the
+    deck is physically dark because the ITE firmware blanked it after its ~10
+    minute keyboard-input timeout. If config polling (scheduler persist + mtime
+    re-apply) reached the hardware here it would restart an effect and relight
+    the deck, fighting the firmware until the next native sleep.
+
+    We therefore block all hardware apply paths, but we still accept the current
+    config as ``last_applied`` so the new brightness intent is preserved for the
+    firmware/evdev wake relight (``start_current_effect`` reads
+    ``tray.config.brightness``, which already holds the reloaded value). A
+    distinct diagnostic event is emitted so this condition is never mislabeled as
+    ordinary forced-off. The existing forced-off path remains authoritative when
+    any forced-off flag is also set.
+    """
+
+    if not _controller_sleep_off_active(tray):
+        return False
+    if any_forced_off(tray):
+        # An ordinary forced-off condition takes precedence and is reported by
+        # the forced-off path; do not double-handle (and mislabel) it here.
+        return False
+
+    user_forced_off, power_forced_off, idle_forced_off = read_forced_off_flags(tray)
+    _helpers._log_detected_change(tray, last_applied, current, cause, state_for_log_fn)
+    _helpers._try_log_event(
+        tray,
+        "config",
+        "skipped_controller_sleep_off",
+        cause=str(cause or "unknown"),
+        controller_sleep_off=True,
+        is_off=bool(tray.is_off),
+        user_forced_off=user_forced_off,
+        power_forced_off=power_forced_off,
+        idle_forced_off=idle_forced_off,
+        brightness=int(current.brightness),
+    )
+    _helpers._call_tray_callback(
+        tray,
+        "_update_menu",
+        error_msg="Failed to update tray menu after controller-sleep config change: %s",
+    )
+    return True
+
+
 def _handle_forced_off(tray: ConfigPollingTrayProtocol, last_applied, current, cause: str, state_for_log_fn):
+    if _handle_controller_sleep_off(tray, last_applied, current, cause, state_for_log_fn):
+        return True
+
     if not tray.is_off:
         return False
 
