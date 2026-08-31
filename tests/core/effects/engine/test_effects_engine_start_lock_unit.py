@@ -170,7 +170,8 @@ def test_start_lock_is_distinct_from_keyboard_lock() -> None:
     """
 
     engine = EffectsEngine()
-    assert isinstance(engine._start_lock, Lock)
+    # threading.Lock is a factory on 3.10–3.12 and a type on 3.13+.
+    assert isinstance(engine._start_lock, type(Lock()))
     assert engine._start_lock is not engine.kb_lock
 
     engine.kb = NullKeyboard()
