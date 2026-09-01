@@ -15,6 +15,101 @@ def _mk_tray(*, effect: str, brightness: int = 50) -> MagicMock:
 
 
 class TestApplyBrightnessFromPowerPolicy:
+    def test_power_source_change_keeps_idle_off_while_updating_reactive_brightness_intent(self):
+        from keyrgb.tray.controllers.lighting_controller import apply_brightness_from_power_policy
+
+        mock_tray = _mk_tray(effect="reactive_ripple", brightness=10)
+        mock_tray.is_off = True
+        mock_tray._idle_forced_off = True
+        mock_tray.tray_idle_power_state.idle_forced_off = True
+        mock_tray.config.perkey_brightness = 10
+        mock_tray.config.reactive_brightness = 40
+
+        with patch("keyrgb.tray.controllers.lighting_controller.start_current_effect") as mock_start:
+            apply_brightness_from_power_policy(mock_tray, 40)
+
+        assert mock_tray.config.brightness == 40
+        assert mock_tray.config.perkey_brightness == 40
+        assert mock_tray.config.reactive_brightness == 40
+        assert mock_tray.engine.per_key_brightness == 40
+        mock_tray.engine.set_brightness.assert_called_once_with(
+            40,
+            apply_to_hardware=False,
+            fade=False,
+            fade_duration_s=0.25,
+        )
+        mock_start.assert_not_called()
+        assert mock_tray.is_off is True
+        assert mock_tray.tray_idle_power_state.last_power_source_transition_at > 0.0
+
+    def test_power_source_change_keeps_user_off_without_perkey_hardware_write(self):
+        from keyrgb.tray.controllers.lighting_controller import apply_brightness_from_power_policy
+
+        mock_tray = _mk_tray(effect="perkey", brightness=10)
+        mock_tray.is_off = True
+        mock_tray._user_forced_off = True
+        mock_tray.tray_idle_power_state.user_forced_off = True
+        mock_tray.config.perkey_brightness = 10
+
+        with patch("keyrgb.tray.controllers.lighting_controller.start_current_effect") as mock_start:
+            apply_brightness_from_power_policy(mock_tray, 40)
+
+        assert mock_tray.config.brightness == 40
+        assert mock_tray.config.perkey_brightness == 40
+        assert mock_tray.engine.per_key_brightness == 40
+        mock_tray.engine.set_brightness.assert_not_called()
+        mock_start.assert_not_called()
+        assert mock_tray.is_off is True
+        assert mock_tray.tray_idle_power_state.last_power_source_transition_at > 0.0
+
+    def test_power_source_change_keeps_idle_off_without_hardware_effect_restart(self):
+        from keyrgb.tray.controllers.lighting_controller import apply_brightness_from_power_policy
+
+        mock_tray = _mk_tray(effect="breathe", brightness=10)
+        mock_tray.is_off = True
+        mock_tray._idle_forced_off = True
+        mock_tray.tray_idle_power_state.idle_forced_off = True
+
+        with patch("keyrgb.tray.controllers.lighting_controller.start_current_effect") as mock_start:
+            apply_brightness_from_power_policy(mock_tray, 40)
+
+        assert mock_tray.config.brightness == 40
+        mock_tray.engine.set_brightness.assert_not_called()
+        mock_start.assert_not_called()
+        assert mock_tray.is_off is True
+        assert mock_tray.tray_idle_power_state.last_power_source_transition_at > 0.0
+
+    def test_idle_restore_observes_deferred_power_source_brightness(self):
+        from keyrgb.tray.controllers.lighting_controller import apply_brightness_from_power_policy
+        from keyrgb.tray.pollers.idle_power._actions import restore_from_idle
+
+        mock_tray = _mk_tray(effect="reactive_ripple", brightness=10)
+        mock_tray.is_off = True
+        mock_tray._idle_forced_off = True
+        mock_tray.tray_idle_power_state.idle_forced_off = True
+        mock_tray.config.perkey_brightness = 10
+        observed: dict[str, int] = {}
+
+        with patch("keyrgb.tray.controllers.lighting_controller.start_current_effect"):
+            apply_brightness_from_power_policy(mock_tray, 40)
+
+        def capture_restore(tray, **_kwargs) -> None:
+            observed["brightness"] = int(tray.config.brightness)
+            observed["perkey_brightness"] = int(tray.config.perkey_brightness)
+
+        with (
+            patch(
+                "keyrgb.tray.pollers.idle_power._transition_actions.start_current_effect_for_idle_restore",
+                side_effect=capture_restore,
+            ),
+            patch("keyrgb.tray.pollers.idle_power._transition_actions.refresh_ui_best_effort"),
+        ):
+            restore_from_idle(mock_tray)
+
+        assert observed == {"brightness": 40, "perkey_brightness": 40}
+        assert mock_tray.is_off is False
+        assert mock_tray.tray_idle_power_state.idle_forced_off is False
+
     def test_apply_brightness_from_power_policy_restarts_non_software_effect(self):
         from keyrgb.tray.controllers.lighting_controller import apply_brightness_from_power_policy
 

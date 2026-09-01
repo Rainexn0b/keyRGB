@@ -105,16 +105,26 @@ def activate_perkey_profile(tray: object, profile_name: str) -> None:
         apply_transition = _tray_callable(tray, "_apply_power_source_perkey_profile_transition")
 
         def _is_power_forced_off() -> bool:
+            # Unified runtime-suppression predicate: True when ANY forced-off owner
+            # (user, power/suspend/lid, or idle/screen-off) holds the deck dark.
+            # Passed to core as the historical ``is_power_forced_off_fn`` facade.
+            # Keep this core boundary independent of tray modules while honoring
+            # both the legacy attributes and the typed tray-state owner.
             try:
                 tray_vars = vars(tray)
             except TypeError:
                 tray_vars = {}
-            if "_power_forced_off" in tray_vars:
-                return bool(tray_vars["_power_forced_off"])
             owner = getattr(tray, "tray_idle_power_state", None)
-            if owner is None:
-                return False
-            return getattr(owner, "power_forced_off", False) is True
+            for attr_name, state_name in (
+                ("_user_forced_off", "user_forced_off"),
+                ("_power_forced_off", "power_forced_off"),
+                ("_idle_forced_off", "idle_forced_off"),
+            ):
+                if attr_name in tray_vars and bool(tray_vars[attr_name]):
+                    return True
+                if owner is not None and getattr(owner, state_name, False) is True:
+                    return True
+            return False
 
         def _store_secondary_lighting(payload) -> None:
             try:

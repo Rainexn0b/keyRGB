@@ -48,6 +48,14 @@ def activate_perkey_profile_runtime(
     Core owns config application order only. Runtime lighting and UI side effects
     are supplied by callers; this module does not resolve private tray methods or
     tray-owned attributes by name.
+
+    ``is_power_forced_off_fn`` is the unified runtime-suppression facade: it must
+    return True when *any* forced-off owner (user, power/suspend/lid, or
+    idle/screen-off) currently holds the deck dark. When it returns True the
+    persisted profile/config intent and the power-source transition marker are
+    still written, but runtime application is suppressed — ``set_is_off_fn(False)``
+    is not called, the in-place transition is not applied, and the effect is not
+    restarted. This preserves the dark-deck owner instead of racing it.
     """
 
     name = set_active_profile_fn(profile_name)
@@ -70,16 +78,19 @@ def activate_perkey_profile_runtime(
         if changed_at is not None:
             mark_power_source_transition_fn(name, changed_at)
 
-    power_forced_off = False
+    # Unified runtime-suppression predicate: True when any forced-off owner holds
+    # the deck dark (user, power/suspend/lid, or idle/screen-off). Historically
+    # named ``is_power_forced_off_fn``; kept as a supported facade.
+    runtime_suppressed = False
     if is_power_forced_off_fn is not None:
         try:
-            power_forced_off = bool(is_power_forced_off_fn())
+            runtime_suppressed = bool(is_power_forced_off_fn())
         except _RUNTIME_ACTIVATION_STATE_EXCEPTIONS:
-            power_forced_off = False
+            runtime_suppressed = False
 
     used_in_place_transition = False
     runtime_applied = False
-    if not power_forced_off:
+    if not runtime_suppressed:
         if set_is_off_fn is not None:
             set_is_off_fn(False)
         if apply_runtime_transition_fn is not None:

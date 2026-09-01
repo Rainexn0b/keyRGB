@@ -2,9 +2,9 @@
 
 **Started:** 2026-08-30  
 **Lane:** `P-power-management`  
-**Status:** follow-up correction validated live — remaining targeted matrix pending
-**Hardware validation gate:** KSW-9 is accepted; temporary-dim wake,
-input-filtering, and manual-off intent still need explicit live evidence
+**Status:** new power-source/idle ownership correction validated in software — targeted live confirmation pending
+**Hardware validation gate:** KSW-9 is accepted; KSW-10 plus temporary-dim
+wake, input-filtering, and manual-off intent still need explicit live evidence
 
 ## Purpose
 
@@ -93,8 +93,9 @@ session proves that suspend stays dark and resume restores exactly once.
 | KSW-5 | Concurrent direct `start_effect()` calls may leave two software workers alive | P2 | M | done |
 | KSW-6 | Disabling power management between suspend and resume may retain stale saved intent | P2 | S | done |
 | KSW-7 | Firmware wake during temporary dim policy may restore the wrong brightness policy | P2 | S | monitoring |
-| KSW-8 | Final merged software validation and live hardware matrix | P0 | M | blocked — targeted live matrix gaps |
+| KSW-8 | Final merged software validation and live hardware matrix | P0 | M | blocked — KSW-10 confirmation and targeted live matrix gaps |
 | KSW-9 | Scheduler config persistence can relight a controller-sleep-dark deck | P1 | S | done |
+| KSW-10 | Power-source profile activation can steal idle-off ownership and strand the deck dark | P0 | S | monitoring |
 
 ---
 
@@ -379,6 +380,37 @@ controller-sleep-dark: config apply emitted `config:skipped_controller_sleep_off
 at debug line 160247, made no relighting write, and the next keyboard event
 performed the sole restore at lines 173254–173257 using the updated policy.
 
+## KSW-10 — Power-source transition versus idle-off ownership
+
+**Evidence.** The live session at
+`~/.cache/keyrgb/diagnostic-sessions/20260901T095444.172575Z/` ended with a
+reproducible stuck-dark state after an AC unplug/replug transition. This was not
+a USB-device disconnect: before/after diagnostics retained USB `048d:600b` at
+path `3-3` with read/write access, and neither the KeyRGB log nor kernel journal
+reported USB removal, re-enumeration, or I/O failure.
+
+At debug line 307490 idle policy claimed the deck and faded it to explicit off
+at line 307511. A rapid power-source profile update then changed persisted
+intent while the idle owner was active. Config polling correctly skipped the
+resulting mtime apply at line 307590, but the profile runtime path had already
+cleared logical `is_off`, while the brightness policy had discarded the new AC
+brightness instead of retaining it as deferred intent. Hardware subsequently
+reported brightness register 60 with `is_off=True` from lines 307592 through the
+end of the session. Because logical and physical off ownership no longer agreed,
+the keyboard-input idle restore did not regain control.
+
+**Disposition.** Confirmed and corrected at the two power-source intent owners.
+Per-key profile activation now always persists the selected profile and marks
+the transition, but suppresses `is_off=False`, in-place hardware application,
+and effect restart while any user, power, or idle forced-off owner holds the
+deck dark. Power-source brightness now updates config and safe engine caches
+while similarly deferring hardware writes and effect restart. The next eligible
+idle restore therefore sees both the latest profile and brightness without
+losing dark-deck ownership. Focused regression coverage exercises reactive,
+per-key, and hardware-effect routes plus the later idle restore. Keep
+`monitoring` until a rapid AC unplug/replug while screen-idle-off is reproduced
+on hardware and one keyboard event restores the updated policy.
+
 ## Candidate hardening outside the main inventory
 
 Do not widen the campaign automatically for these unless an investigation above
@@ -489,3 +521,22 @@ produces evidence:
   KSW-7 temporary-dim wake route, touchpad/mouse and modifier-only filtering,
   and manual-off suspend/resume intent; both long sessions used dim-sync mode
   `off` and did not explicitly exercise the other two cases.
+
+### 2026-09-01 — power-source/idle ownership incident and KSW-10
+
+- Reviewed
+  `~/.cache/keyrgb/diagnostic-sessions/20260901T095444.172575Z/` after the
+  keyboard stayed dark following a power-cable unplug/replug. The ITE USB device
+  remained continuously selected and accessible; the incident was an AC/battery
+  policy race, not USB hotplug or a permissions failure.
+- Confirmed that power-source per-key profile activation ignored user/idle
+  forced-off ownership and could clear logical `is_off` without physically
+  restoring the deck. The adjacent brightness policy returned before persisting
+  the newest source-specific brightness, leaving stale intent after rapid source
+  changes.
+- Corrected both owners: profile and brightness intent persist while all
+  physical runtime writes remain deferred under any forced-off owner. A later
+  idle restore consumes the latest intent.
+- Primary validation passed: 27 focused tests, targeted Ruff, Step 19, and
+  BuildPython Step 2 with 3711 tests plus 1 skip. KSW-10 remains `monitoring`
+  pending a targeted live repetition.

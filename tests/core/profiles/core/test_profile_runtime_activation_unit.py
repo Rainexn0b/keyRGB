@@ -210,3 +210,52 @@ def test_core_activation_has_no_private_tray_method_contract() -> None:
     assert "_last_power_source_transition_at" not in source
     assert "_active_secondary_lighting" not in source
     assert "_resolve_tray_callback" not in source
+
+
+def test_activation_suppresses_runtime_while_any_forced_off_but_keeps_intent_and_marker() -> None:
+    """Regression: the unified forced-off facade must suppress hardware/effect
+    application yet still persist profile intent and the transition marker.
+
+    At this layer the suppressed owner is opaque (``is_power_forced_off_fn`` is a
+    single boolean predicate); the idle/user/power differentiation is proven at the
+    wiring layer. The core contract is: True => no is_off reset, no transition,
+    no effect, but config intent and transition marker still update.
+    """
+
+    config = SimpleNamespace()
+    apply_transition = MagicMock(return_value=True)
+    start_effect = MagicMock()
+    set_is_off = MagicMock()
+    mark_transition = MagicMock()
+    apply_profile_to_config = MagicMock()
+    secondary = {"version": 1, "areas": {"logo": {"enabled": True, "color": [1, 2, 3]}}}
+
+    result = activate_perkey_profile_runtime(
+        config,
+        "battery",
+        set_active_profile_fn=lambda name: name,
+        load_per_key_colors_fn=lambda _name: {(0, 0): (1, 2, 3)},
+        apply_profile_to_config_fn=apply_profile_to_config,
+        load_secondary_lighting_fn=lambda _name: secondary,
+        store_secondary_lighting_fn=MagicMock(),
+        is_power_forced_off_fn=lambda: True,
+        set_is_off_fn=set_is_off,
+        apply_runtime_transition_fn=apply_transition,
+        start_current_effect_fn=start_effect,
+        update_icon_fn=lambda: None,
+        update_menu_fn=lambda: None,
+        mark_power_source_transition_fn=mark_transition,
+        mark_power_source_transition=True,
+        monotonic_fn=lambda: 77.0,
+    )
+
+    # Persisted intent + secondary still written.
+    apply_profile_to_config.assert_called_once_with(config, {(0, 0): (1, 2, 3)}, secondary_lighting=secondary)
+    # Transition marker still recorded.
+    mark_transition.assert_called_once_with("battery", 77.0)
+    # Runtime application suppressed.
+    set_is_off.assert_not_called()
+    apply_transition.assert_not_called()
+    start_effect.assert_not_called()
+    assert result.runtime_applied is False
+    assert result.used_in_place_transition is False

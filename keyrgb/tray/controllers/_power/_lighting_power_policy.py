@@ -5,7 +5,7 @@ from collections.abc import Callable
 
 from keyrgb.tray.controllers._brightness_layer import apply_layered_brightness_update
 from keyrgb.tray.controllers._lighting_controller_helpers import _log_tray_exception
-from keyrgb.tray.idle_power_state import is_system_forced_off, is_user_forced_off, set_idle_power_state_field
+from keyrgb.tray.idle_power_state import any_forced_off, set_idle_power_state_field
 from keyrgb.tray.protocols import LightingTrayProtocol
 
 _BRIGHTNESS_COERCION_EXCEPTIONS = (TypeError, ValueError, OverflowError)
@@ -27,11 +27,7 @@ def apply_brightness_from_power_policy_impl(
     if brightness_int < 0:
         return
 
-    if is_user_forced_off(tray):
-        return
-
-    if is_system_forced_off(tray):
-        return
+    forced_off = any_forced_off(tray)
 
     try:
         apply_layered_brightness_update(
@@ -42,6 +38,7 @@ def apply_brightness_from_power_policy_impl(
             reactive_source_label="power policy",
             start_current_effect=start_current_effect,
             refresh_menu=False,
+            defer_hardware_apply=forced_off,
         )
         set_idle_power_state_field(
             tray,

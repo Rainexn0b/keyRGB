@@ -28,6 +28,7 @@ def apply_layered_brightness_update(
     reactive_source_label: str | None = None,
     start_current_effect: Callable[[LightingTrayProtocol], object],
     refresh_menu: bool = True,
+    defer_hardware_apply: bool = False,
 ) -> None:
     if base_brightness is None and reactive_brightness is None:
         return
@@ -58,6 +59,9 @@ def apply_layered_brightness_update(
             tray.config.brightness = int(base_brightness)
         if reactive_brightness is not None:
             tray.config.reactive_brightness = int(reactive_brightness)
+        # This synchronization updates only engine-side brightness caches; the
+        # helper always uses apply_to_hardware=False, so it is safe while a
+        # forced-off owner defers physical output.
         sync_reactive_effect_brightness_state(
             tray,
             source=str(reactive_source_label or source),
@@ -84,23 +88,25 @@ def apply_layered_brightness_update(
             tray.engine.per_key_brightness = brightness
         except _BRIGHTNESS_LAYER_RUNTIME_EXCEPTIONS as exc:
             _log_tray_exception(tray, f"Failed to sync {source} per-key brightness state: %s", exc)
-        tray.engine.set_brightness(
-            tray.config.brightness,
-            apply_to_hardware=True,
-            fade=fade_down,
-            fade_duration_s=fade_s,
-        )
-        tray.is_off = False
+        if not defer_hardware_apply:
+            tray.engine.set_brightness(
+                tray.config.brightness,
+                apply_to_hardware=True,
+                fade=fade_down,
+                fade_duration_s=fade_s,
+            )
+            tray.is_off = False
         tray._refresh_ui(refresh_menu=refresh_menu)
         return
 
     tray.config.brightness = brightness
-    tray.engine.set_brightness(
-        tray.config.brightness,
-        apply_to_hardware=not is_sw_effect,
-        fade=fade_down,
-        fade_duration_s=fade_s,
-    )
-    if not bool(getattr(tray, "is_off", False)) and not is_sw_effect:
+    if is_sw_effect or not defer_hardware_apply:
+        tray.engine.set_brightness(
+            tray.config.brightness,
+            apply_to_hardware=not is_sw_effect,
+            fade=fade_down,
+            fade_duration_s=fade_s,
+        )
+    if not defer_hardware_apply and not bool(getattr(tray, "is_off", False)) and not is_sw_effect:
         start_current_effect(tray)
     tray._refresh_ui(refresh_menu=refresh_menu)
