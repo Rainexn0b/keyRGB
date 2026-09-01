@@ -2,9 +2,9 @@
 
 **Started:** 2026-08-30  
 **Lane:** `P-power-management`  
-**Status:** follow-up correction validated in software — targeted live confirmation pending
-**Hardware validation gate:** open for a targeted KSW-9 rerun; the first live
-session validated suspend/resume but exposed one scheduler/controller-sleep race
+**Status:** follow-up correction validated live — remaining targeted matrix pending
+**Hardware validation gate:** KSW-9 is accepted; temporary-dim wake,
+input-filtering, and manual-off intent still need explicit live evidence
 
 ## Purpose
 
@@ -93,8 +93,8 @@ session proves that suspend stays dark and resume restores exactly once.
 | KSW-5 | Concurrent direct `start_effect()` calls may leave two software workers alive | P2 | M | done |
 | KSW-6 | Disabling power management between suspend and resume may retain stale saved intent | P2 | S | done |
 | KSW-7 | Firmware wake during temporary dim policy may restore the wrong brightness policy | P2 | S | monitoring |
-| KSW-8 | Final merged software validation and live hardware matrix | P0 | M | blocked — KSW-9 live confirmation |
-| KSW-9 | Scheduler config persistence can relight a controller-sleep-dark deck | P1 | S | monitoring |
+| KSW-8 | Final merged software validation and live hardware matrix | P0 | M | blocked — targeted live matrix gaps |
+| KSW-9 | Scheduler config persistence can relight a controller-sleep-dark deck | P1 | S | done |
 
 ---
 
@@ -368,14 +368,16 @@ seconds before idle policy turned it off at lines 353760–353782. Hardware poll
 subsequently labeled the non-zero read as firmware wake, but the initiating write
 was config apply rather than keyboard input.
 
-**Disposition.** Confirmed and corrected in config-apply ownership. While
+**Disposition.** Confirmed, corrected, and accepted live. While
 `controller_sleep_off` is active, config polling now accepts the new config as
 the latest intent but skips all brightness/color/effect hardware paths and emits
 `config:skipped_controller_sleep_off`. The next eligible firmware/evdev wake
 therefore uses the updated brightness without an off→on→off flash. Focused
-config, scheduler, and hardware-polling tests pass; keep `monitoring` until a
-day/night boundary or equivalent config persistence is observed while the deck
-is controller-sleep-dark.
+config, scheduler, and hardware-polling tests pass. The second live session
+captured the day scheduler changing brightness from 10 to 40 while the deck was
+controller-sleep-dark: config apply emitted `config:skipped_controller_sleep_off`
+at debug line 160247, made no relighting write, and the next keyboard event
+performed the sole restore at lines 173254–173257 using the updated policy.
 
 ## Candidate hardening outside the main inventory
 
@@ -463,3 +465,27 @@ produces evidence:
   Primary validation passed: 141 focused tests, all 440 tray-poller tests,
   targeted Ruff, `git diff --check`, Step 19, and BuildPython Step 2 with 3692
   tests plus 1 skip.
+
+### 2026-09-01 — second live matrix session and KSW-9 acceptance
+
+- Reviewed
+  `~/.cache/keyrgb/diagnostic-sessions/20260831T203427.834748Z/`. The session
+  contains six controller-native sleeps and six keyboard-evdev rearm/restores,
+  with no firmware-first or duplicate restore.
+- During controller sleep, the day scheduler changed configured brightness from
+  10 to 40 at debug lines 160243–160246. Config ownership emitted
+  `config:skipped_controller_sleep_off` at line 160247 and made no color,
+  brightness, or effect-start write. The next non-modifier keyboard event was
+  the only restore at lines 173254–173257 and used the updated day policy.
+- One suspend/resume and lid close/open sequence turned the deck off before
+  suspend and restored once. The red flatten write at line 184781 matched the
+  active full-coverage red per-key map, so it was not a hue flash or fallback to
+  stale uniform color.
+- Before/after diagnostics retained source version 0.34.0,
+  `ite8291r3_perkey`, USB `048d:600b`, `bcdDevice 0x0003`, path `3-3`, read/write
+  access, and identical capabilities. No KeyRGB USB error, traceback, monitor
+  termination, or backend fallback appeared.
+- KSW-9 is done. KSW-8 remains blocked only on explicit live evidence for the
+  KSW-7 temporary-dim wake route, touchpad/mouse and modifier-only filtering,
+  and manual-off suspend/resume intent; both long sessions used dim-sync mode
+  `off` and did not explicitly exercise the other two cases.
