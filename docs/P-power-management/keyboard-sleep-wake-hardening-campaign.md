@@ -2,9 +2,10 @@
 
 **Started:** 2026-08-30  
 **Lane:** `P-power-management`  
-**Status:** new power-source/idle ownership correction validated in software — targeted live confirmation pending
-**Hardware validation gate:** KSW-9 is accepted; KSW-10 plus temporary-dim
-wake, input-filtering, and manual-off intent still need explicit live evidence
+**Status:** post-controller-wake relapse correction validated in software — targeted live confirmation pending
+**Hardware validation gate:** KSW-9 is accepted; KSW-10/KSW-11 plus
+temporary-dim wake, input-filtering, and manual-off intent still need explicit
+live evidence
 
 ## Purpose
 
@@ -93,9 +94,10 @@ session proves that suspend stays dark and resume restores exactly once.
 | KSW-5 | Concurrent direct `start_effect()` calls may leave two software workers alive | P2 | M | done |
 | KSW-6 | Disabling power management between suspend and resume may retain stale saved intent | P2 | S | done |
 | KSW-7 | Firmware wake during temporary dim policy may restore the wrong brightness policy | P2 | S | monitoring |
-| KSW-8 | Final merged software validation and live hardware matrix | P0 | M | blocked — KSW-10 confirmation and targeted live matrix gaps |
+| KSW-8 | Final merged software validation and live hardware matrix | P0 | M | blocked — KSW-10/KSW-11 confirmation and targeted live matrix gaps |
 | KSW-9 | Scheduler config persistence can relight a controller-sleep-dark deck | P1 | S | done |
 | KSW-10 | Power-source profile activation can steal idle-off ownership and strand the deck dark | P0 | S | monitoring |
+| KSW-11 | A post-controller-wake zero can wait a full poll before recovery | P1 | S | monitoring |
 
 ---
 
@@ -411,6 +413,32 @@ per-key, and hardware-effect routes plus the later idle restore. Keep
 `monitoring` until a rapid AC unplug/replug while screen-idle-off is reproduced
 on hardware and one keyboard event restores the updated policy.
 
+## KSW-11 — Immediate recovery for post-controller-wake zero
+
+**Evidence.** The live session at
+`~/.cache/keyrgb/diagnostic-sessions/20260901T213056.742551Z/` captured a
+controller-sleep keyboard wake followed by the visible off-for-several-seconds
+symptom while typing. One keyboard event rearmed and restored the controller at
+debug lines 374650–374654, and reactive frames reached configured brightness 40
+while keyboard events continued. The first post-restore hardware poll then read
+brightness 0 with `is_off=False` at lines 375308–375310. Because tracked
+brightness was already 0 from controller sleep while tracked off state changed
+from true to false, the off-state bookkeeping branch returned before the normal
+stable-zero recovery branch. The next regular poll arrived about 2.01 seconds
+later and only then emitted `hardware:stable_zero_brightness_recover_render_heal`
+at line 375432. No idle, power, suspend, USB, or duplicate-restore event caused
+the dip.
+
+**Disposition.** Confirmed and corrected in hardware observation handling. A
+zero-brightness/not-off observation that clears the tracked off flag during the
+post-restore window now invokes the existing stable-zero recovery immediately,
+rather than waiting another full hardware-poll interval. The correction retains
+forced-off precedence, configured-zero intent, controller-sleep-respect policy,
+and the existing recovery cooldown/circuit breaker. Focused positive and
+negative tests cover recent restore, expired restore window, and zero configured
+intent. Keep `monitoring` until another native controller sleep and keyboard
+wake remains continuously lit under typing.
+
 ## Candidate hardening outside the main inventory
 
 Do not widen the campaign automatically for these unless an investigation above
@@ -540,3 +568,20 @@ produces evidence:
 - Primary validation passed: 27 focused tests, targeted Ruff, Step 19, and
   BuildPython Step 2 with 3711 tests plus 1 skip. KSW-10 remains `monitoring`
   pending a targeted live repetition.
+
+### 2026-09-02 — post-controller-wake relapse and KSW-11
+
+- Reviewed
+  `~/.cache/keyrgb/diagnostic-sessions/20260901T213056.742551Z/` after the deck
+  woke on keyboard input, went dark again while typing, and recovered several
+  seconds later. Backend/device identity and access remained stable, with no USB
+  disconnect, power-source transition, or KeyRGB I/O error around the event.
+- Confirmed a state-shape gap: the first post-restore poll had brightness
+  unchanged at tracked zero but an off flag changing from true to false. That
+  bookkeeping branch returned before stable-zero recovery, adding one full
+  two-second poll interval to the physical dark period.
+- The off-state-change path now performs the same immediate post-restore zero
+  recovery as the already-covered brightness-change path. KSW-11 remains
+  `monitoring` pending targeted live confirmation.
+- Primary validation passed: 124 focused hardware-poller tests, targeted Ruff,
+  Step 19, and BuildPython Step 2 with 3714 tests plus 1 skip.

@@ -234,6 +234,22 @@ def _apply_polled_hardware_state(
         if power_forced_off and current_off:
             return current_brightness, current_off
 
+        # A controller-sleep restore can clear the device's off flag while the
+        # brightness register remains at the previously tracked zero. In that
+        # case this off-state-change branch is the first post-restore evidence
+        # that the deck relapsed. Heal immediately instead of returning here and
+        # waiting a full hardware-poll interval before the stable-zero branch
+        # below gets a chance to run.
+        if (
+            current_brightness == 0
+            and not current_off
+            and recently_restored
+            and not (user_forced_off or power_forced_off or idle_forced_off)
+            and _configured_brightness_intent(tray) > 0
+            and _recover_stable_zero_brightness_best_effort(tray, current_brightness=current_brightness)
+        ):
+            return current_brightness, False
+
         if current_off:
             if _recover_recent_power_source_blank_best_effort(tray, current_brightness=current_brightness):
                 return current_brightness, False

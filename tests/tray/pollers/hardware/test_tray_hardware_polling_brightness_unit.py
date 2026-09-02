@@ -544,6 +544,106 @@ def test_stable_zero_recovers_on_first_zero_read_during_restore_window(monkeypat
     assert (last_brightness, last_off) == (0, False)
 
 
+def test_stable_zero_recovers_when_first_post_restore_poll_only_clears_off_state(monkeypatch) -> None:
+    """A restored controller can remain at tracked brightness zero while its
+    off flag clears. Do not return from off-state bookkeeping and wait another
+    full poll before healing that post-restore relapse."""
+
+    import time
+
+    from keyrgb.tray.idle_power_state import set_idle_power_state_field
+
+    tray = _DummyTray(brightness=25, is_off=False)
+    set_idle_power_state_field(
+        tray,
+        attr_name="_last_resume_at",
+        state_name="last_resume_at",
+        value=time.monotonic() - 2.0,
+    )
+
+    recovery_calls: list[int] = []
+
+    def _fake_recover(_tray, *, current_brightness: int) -> bool:
+        recovery_calls.append(int(current_brightness))
+        return True
+
+    monkeypatch.setattr(
+        "keyrgb.tray.pollers.hardware_polling._recover_stable_zero_brightness_best_effort",
+        _fake_recover,
+    )
+
+    last_brightness, last_off = _apply_polled_hardware_state(
+        tray,
+        current_brightness=0,
+        current_off=False,
+        last_brightness=0,
+        last_off_state=True,
+    )
+
+    assert recovery_calls == [0]
+    assert (last_brightness, last_off) == (0, False)
+
+
+def test_off_state_clear_zero_outside_restore_window_waits_for_stable_confirmation(monkeypatch) -> None:
+    tray = _DummyTray(brightness=25, is_off=True)
+    recovery_calls: list[int] = []
+
+    def _fake_recover(_tray, *, current_brightness: int) -> bool:
+        recovery_calls.append(int(current_brightness))
+        return True
+
+    monkeypatch.setattr(
+        "keyrgb.tray.pollers.hardware_polling._recover_stable_zero_brightness_best_effort",
+        _fake_recover,
+    )
+
+    result = _apply_polled_hardware_state(
+        tray,
+        current_brightness=0,
+        current_off=False,
+        last_brightness=0,
+        last_off_state=True,
+    )
+
+    assert recovery_calls == []
+    assert result == (0, False)
+
+
+def test_off_state_clear_zero_does_not_recover_without_brightness_intent(monkeypatch) -> None:
+    import time
+
+    from keyrgb.tray.idle_power_state import set_idle_power_state_field
+
+    tray = _DummyTray(brightness=0, is_off=True)
+    set_idle_power_state_field(
+        tray,
+        attr_name="_last_resume_at",
+        state_name="last_resume_at",
+        value=time.monotonic() - 2.0,
+    )
+    recovery_calls: list[int] = []
+
+    def _fake_recover(_tray, *, current_brightness: int) -> bool:
+        recovery_calls.append(int(current_brightness))
+        return True
+
+    monkeypatch.setattr(
+        "keyrgb.tray.pollers.hardware_polling._recover_stable_zero_brightness_best_effort",
+        _fake_recover,
+    )
+
+    result = _apply_polled_hardware_state(
+        tray,
+        current_brightness=0,
+        current_off=False,
+        last_brightness=0,
+        last_off_state=True,
+    )
+
+    assert recovery_calls == []
+    assert result == (0, False)
+
+
 def test_stable_zero_does_not_fast_recover_outside_restore_window(monkeypatch) -> None:
     """Without a recent restore, a fresh zero read should not recover on the
     first poll — it may be a genuine controller sleep that needs confirmation."""
