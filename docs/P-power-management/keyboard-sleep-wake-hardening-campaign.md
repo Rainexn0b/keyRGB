@@ -6,6 +6,10 @@
 **Hardware validation gate:** KSW-9 is accepted; KSW-10/KSW-11 plus
 temporary-dim wake, input-filtering, and manual-off intent still need explicit
 live evidence
+**Successor:** overlapping wake writers are now a refactor campaign in
+[sleep-wake-pipeline-campaign.md](sleep-wake-pipeline-campaign.md). Keep using
+this tracker for KSW-0..11 evidence. Do not stack another local brightness
+guard to paper over a second restore.
 
 ## Purpose
 

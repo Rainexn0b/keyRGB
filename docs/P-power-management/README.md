@@ -9,6 +9,9 @@ and related runtime behavior.
   recovery, and opt-in dark-until-keypress behavior
 - `keyboard-sleep-wake-hardening-campaign.md` — investigation/correction tracker
   for controller sleep, effect shutdown, and computer suspend/resume ordering
+- `sleep-wake-pipeline-campaign.md` — successor refactor that collapses overlapping
+  wake writers into one intent pipeline; `controller_sleep_respect` is a
+  first-class policy input
 - `power-mode-verification-refactor-plan.md` — power-mode verification refactor
 
 ## See also

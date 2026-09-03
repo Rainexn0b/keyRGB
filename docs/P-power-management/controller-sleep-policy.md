@@ -76,3 +76,11 @@ Useful runtime events are:
 While controller sleep is honored, a non-zero brightness register together
 with `is_off=True` is valid: an explicit corrective off command may preserve
 the register value while the deck remains physically dark.
+
+## Pipeline ownership
+
+Unifying the overlapping wake writers is tracked in
+[sleep-wake-pipeline-campaign.md](sleep-wake-pipeline-campaign.md). That
+campaign must keep this document's two user policies, key-only restore rule,
+and firmware-versus-evdev single-restore race. It must not replace them with a
+post-wake brightness clamp.
