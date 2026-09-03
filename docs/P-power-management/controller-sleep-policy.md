@@ -13,11 +13,13 @@ select behavior from a backend-name check.
 
 ### Observed timeout and why it can seem earlier
 
-The 2026-09-03 full diagnostic session on the reported `048d:600b` controller
-captured four native sleeps 605.0–607.4 seconds after the last keyboard event.
-That controller's measured firmware timeout is therefore approximately ten
-minutes. This is hardware evidence for that device, not a universal timeout
-guarantee for every controller.
+The first 2026-09-03 full diagnostic session on the reported `048d:600b`
+controller captured four native sleeps 605.0–607.4 seconds after the last
+keyboard event. A second session (`20260903T184044.723987Z`) captured three
+more at approximately 604.7, 605.0, and 605.2 seconds. That controller's
+measured firmware timeout is therefore approximately ten minutes. This is
+hardware evidence for that device, not a universal timeout guarantee for every
+controller.
 
 The firmware clock tracks keyboard activity independently of the desktop's
 screen-idle clock. Mouse or touchpad activity can keep KDE's ten-minute screen
@@ -25,6 +27,11 @@ timeout from advancing without resetting the keyboard controller. For example,
 eight minutes of mouse-only use after the last key can make the deck appear to
 sleep only two minutes after the user stops all activity, even though its own
 keyboard-inactivity timer ran for the full ten minutes.
+
+The second session also distinguishes the owner: each initial dark transition
+first appeared as a hardware read of `brightness=0` with `is_off=False` while
+screen idle was inactive. KeyRGB issued no off command at those transitions;
+the only explicit off commands were the later keyboard-wake re-arm operations.
 
 ## Automatic recovery (default)
 

@@ -30,7 +30,7 @@ changing visual policy.
 
 | ID | Concern | Evidence / debt | Status |
 |---|---|---|---|
-| OP-1 | Reactive restore frame and pulse ownership | Evidenced first-key scale discontinuity and duplicate damp seeding | software-complete; live retest pending |
+| OP-1 | Reactive restore frame and pulse ownership | Evidenced first-key scale discontinuity and duplicate damp seeding | live-accepted |
 | OP-2 | `start_current_effect` menu/power callers | Remaining SWP-4 intent-bypass seam; not triggered in baseline | software-complete; live retest pending |
 | OP-3 | Layered brightness scheduler/menu deferral | Scheduler drops deferred intent; menu omits unified off-family predicate | software-complete; live retest pending |
 | OP-4 | CPU power-mode apply/observation | Apply feedback now separates write success from heuristic observation; EPP failures and mismatches are diagnostic | software-complete; live retest pending |
@@ -93,7 +93,29 @@ compatibility case and is not folded into this rule.
   `git diff --check`, and Step 19 passed; BuildPython Step 2 passed with 3799
   tests and 1 skip.
 
-The remaining gate is the live hardware matrix, including the first-key wake
-handoff, one-restore ownership, temporary dim wake, key-event filtering,
-manual-off suspend/resume intent, AC unplug/replug while dark, and continuous
-lit typing.
+The remaining gate is the rest of the live hardware matrix: temporary dim wake,
+key-event filtering, manual-off suspend/resume intent, AC unplug/replug while
+dark, and continuous-lit typing.
+
+## 2026-09-03 live retest
+
+Session `~/.cache/keyrgb/diagnostic-sessions/20260903T184044.723987Z`
+partially accepts the live gate:
+
+- Three native sleeps were detected at monotonic times `580171.665`,
+  `585007.955`, and `590284.095`, approximately 604.7, 605.0, and 605.2
+  seconds after the last captured keyboard event.
+- Every initial transition was observed from hardware as `brightness=0` with
+  `is_off=False`; KeyRGB did not issue an off command. The only `kb.turn_off`
+  operations occurred later as part of the documented keyboard-wake re-arm.
+- Screen idle was false at each initial transition, excluding screen-idle
+  policy as the owner. The apparently variable delay after the user stops all
+  activity is explained by the firmware tracking keyboard inactivity while
+  mouse/touchpad activity independently resets desktop idle.
+- Each wake had one re-arm and one restore completion.
+- OP-1 is live-accepted: during first-key typing, the restore envelope continued
+  monotonically (for example `0.708 -> 0.729 -> 0.749`) rather than reversing
+  from `0.62 -> 1.0 -> 0.62`.
+
+The session did not exercise suspend/lid, temporary dim, AC unplug/replug while
+dark, or continuous-lit typing, so those live matrix rows remain open.
