@@ -2,7 +2,7 @@
 
 **Started:** 2026-09-03  
 **Baseline:** `~/.cache/keyrgb/diagnostic-sessions/20260903T092201.323445Z`  
-**Status:** OP-1..3 software-complete; OP-4 planned; live retest pending
+**Status:** Software-complete and merged-validated; live retest pending
 
 ## Purpose
 
@@ -33,7 +33,7 @@ changing visual policy.
 | OP-1 | Reactive restore frame and pulse ownership | Evidenced first-key scale discontinuity and duplicate damp seeding | software-complete; live retest pending |
 | OP-2 | `start_current_effect` menu/power callers | Remaining SWP-4 intent-bypass seam; not triggered in baseline | software-complete; live retest pending |
 | OP-3 | Layered brightness scheduler/menu deferral | Scheduler drops deferred intent; menu omits unified off-family predicate | software-complete; live retest pending |
-| OP-4 | CPU power-mode apply/observation | Main split landed; EPP failures remain silent and policy can retry heuristic mismatches | planned |
+| OP-4 | CPU power-mode apply/observation | Apply feedback now separates write success from heuristic observation; EPP failures and mismatches are diagnostic | software-complete; live retest pending |
 
 ## OP-1 acceptance
 
@@ -83,3 +83,17 @@ compatibility case and is not folded into this rule.
 - `docs/D-debugging/reactive-typing-flicker-postmortem-2026-04.md`
 - `docs/P-power-management/sleep-wake-pipeline-campaign.md`
 - `docs/P-power-management/power-mode-verification-refactor-plan.md`
+
+## Software validation ledger
+
+- OP-1: BuildPython Step 2 passed with 3767 tests and 1 skip.
+- OP-2: Step 19 passed; BuildPython Step 2 passed with 3781 tests and 1 skip.
+- OP-3: Step 19 passed; BuildPython Step 2 passed with 3788 tests and 1 skip.
+- OP-4: focused power/tray validation passed with 303 tests; targeted Ruff,
+  `git diff --check`, and Step 19 passed; BuildPython Step 2 passed with 3799
+  tests and 1 skip.
+
+The remaining gate is the live hardware matrix, including the first-key wake
+handoff, one-restore ownership, temporary dim wake, key-event filtering,
+manual-off suspend/resume intent, AC unplug/replug while dark, and continuous
+lit typing.

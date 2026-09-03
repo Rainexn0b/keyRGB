@@ -242,3 +242,15 @@ class PowerSourceLoopPolicy:
         self._last_on_ac = on_ac
 
         return PowerSourceLoopResult(skip=False, actions=tuple(actions))
+
+    def record_power_mode_apply_result(self, mode: PowerMode, applied: bool) -> None:
+        """Record apply-layer feedback without consulting heuristic observation.
+
+        A successful write satisfies the current desired mode even when the
+        next sysfs observation still reports a different heuristic mode.  A
+        failed write remains retryable under the normal retry delay.  Ignore
+        stale feedback from a mode that is no longer desired.
+        """
+        if self._last_desired_power_mode != mode.value:
+            return
+        self._power_mode_satisfied_for_desired = bool(applied)

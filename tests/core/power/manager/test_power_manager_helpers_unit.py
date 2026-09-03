@@ -249,6 +249,23 @@ def test_apply_power_source_actions_dispatches_power_mode_activation_and_logs_ru
     exc.assert_called_once_with("Power-source mode activation failed for %s", PowerMode.BALANCED.value)
 
 
+def test_apply_power_source_actions_reports_power_mode_apply_result() -> None:
+    from keyrgb.core.power.management._manager_helpers import apply_power_source_actions
+    from keyrgb.core.power.policies.power_source_loop_policy import ActivatePowerMode
+
+    record_result = MagicMock()
+    apply_power_source_actions(
+        kb_controller=MagicMock(),
+        actions=(ActivatePowerMode(PowerMode.PERFORMANCE),),
+        apply_brightness=MagicMock(),
+        activate_power_mode=MagicMock(return_value=True),
+        activate_perkey_profile=MagicMock(),
+        record_power_mode_apply_result=record_result,
+    )
+
+    record_result.assert_called_once_with(PowerMode.PERFORMANCE, True)
+
+
 def test_apply_power_source_actions_dispatches_profile_activation_and_logs_runtime_failures() -> None:
     from keyrgb.core.power.management._manager_helpers import apply_power_source_actions
     from keyrgb.core.power.policies.power_source_loop_policy import ActivatePerkeyProfile

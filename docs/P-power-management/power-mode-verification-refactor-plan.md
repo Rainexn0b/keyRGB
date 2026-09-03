@@ -125,8 +125,10 @@ def get_status() -> PowerModeStatus:
 
 In the apply layer, `_write_mode_epp_preferences` currently catches `OSError` and passes silently. Change it to:
 
-- Return a result object or boolean indicating whether the write succeeded.
-- The caller decides whether EPP failure is fatal (it usually isn't for Balanced/Performance, but it is worth logging).
+- Return a boolean indicating whether all writes succeeded and emit a
+  diagnostic for each failure. EPP remains non-fatal for overall apply
+  success. The privileged helper mirrors this contract on stderr, which the
+  parent process records.
 - This removes a hidden failure mode that currently makes debugging impossible.
 
 #### 5. Update the power-source loop
@@ -160,12 +162,19 @@ In `keyrgb/core/power/management/manager.py`:
 
 ## Definition Of Done
 
-- [ ] `set_mode` returns `True` when sysfs/helper writes succeed, even if `_infer_mode` would return a different mode.
-- [ ] `_infer_mode` recognizes `"balance_performance"` and mixed `{"performance", "balance_performance"}` EPP states as consistent with `PERFORMANCE`.
-- [ ] Apply logic and observation logic live in separate modules with no import cycle.
-- [ ] The power-source loop stops retrying on detection mismatches.
-- [ ] Tests cover the new contracts and the previously failing edge cases.
-- [ ] CHANGELOG.md notes the fix and the verification behavior change.
+- [x] `set_mode` returns `True` when sysfs/helper writes succeed, even if `_infer_mode` would return a different mode.
+- [x] `_infer_mode` recognizes `"balance_performance"` and mixed `{"performance", "balance_performance"}` EPP states as consistent with `PERFORMANCE`.
+- [x] Apply logic and observation logic live in separate modules with no import cycle.
+- [x] The power-source loop stops retrying on detection mismatches after a successful apply result.
+- [x] Tests cover the new contracts and the previously failing edge cases.
+- [x] CHANGELOG.md notes the fix and the verification behavior change.
+
+### OP-4 status
+
+OP-4 implementation is complete. Apply success is now fed back explicitly to
+the source loop, while observation disagreement and non-fatal EPP write
+failures remain diagnostic only in both direct and privileged-helper paths.
+Live hardware retest remains pending.
 
 ## Risk Assessment
 

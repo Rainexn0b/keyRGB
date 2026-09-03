@@ -12,6 +12,7 @@ from keyrgb.core.profile import profiles as perkey_profiles, runtime_activation 
 
 from ..policies import power_event_policy as _power_event_policy
 from ..policies.power_source_loop_policy import PowerSourceLoopPolicy
+from ..system import PowerMode
 from . import (
     _manager_battery_saver as _battery_saver,
     _manager_brightness_execution as _brightness_execution,
@@ -292,6 +293,15 @@ class PowerManager:
     # ---- battery saver (dim on AC unplug)
 
     def _run_battery_saver_iteration(self, policy, *, poll_interval_s: float) -> bool:
+        record_result = getattr(policy, "record_power_mode_apply_result", None)
+
+        def execute_plan(plan, *, poll_interval_s: float) -> bool:
+            return self._execute_battery_saver_iteration_plan(
+                plan,
+                poll_interval_s=poll_interval_s,
+                record_power_mode_apply_result_fn=record_result if callable(record_result) else None,
+            )
+
         def run_iteration_transition() -> bool:
             self._battery_iteration_context.defer_sleep = True
             try:
@@ -300,7 +310,7 @@ class PowerManager:
                     policy,
                     poll_interval_s=poll_interval_s,
                     classify_fn=self._classify_battery_saver_iteration,
-                    execute_plan_fn=self._execute_battery_saver_iteration_plan,
+                    execute_plan_fn=execute_plan,
                     sync_lid_fn=self._sync_lid_state_from_system,
                     keyboard_is_power_event_forced_off_fn=self._keyboard_is_power_event_forced_off,
                     sleep_fn=lambda _seconds: None,
@@ -332,20 +342,31 @@ class PowerManager:
             get_active_perkey_profile_fn=get_active_perkey_profile,
         )
 
-    def _execute_battery_saver_iteration_plan(self, plan, *, poll_interval_s: float) -> bool:
+    def _execute_battery_saver_iteration_plan(
+        self,
+        plan,
+        *,
+        poll_interval_s: float,
+        record_power_mode_apply_result_fn=None,
+    ) -> bool:
         if bool(getattr(plan, "should_sleep", False)) and bool(
             getattr(self._battery_iteration_context, "defer_sleep", False)
         ):
             return True
 
         def execute_plan() -> bool:
+            execute_kwargs = {
+                "poll_interval_s": poll_interval_s,
+                "apply_brightness_fn": self._apply_brightness_policy,
+                "activate_power_mode_fn": self._activate_power_source_mode,
+                "activate_perkey_profile_fn": self._activate_power_source_perkey_profile,
+            }
+            if callable(record_power_mode_apply_result_fn):
+                execute_kwargs["record_power_mode_apply_result_fn"] = record_power_mode_apply_result_fn
             return _battery_saver.execute_battery_saver_iteration_plan(
                 self,
                 plan,
-                poll_interval_s=poll_interval_s,
-                apply_brightness_fn=self._apply_brightness_policy,
-                activate_power_mode_fn=self._activate_power_source_mode,
-                activate_perkey_profile_fn=self._activate_power_source_perkey_profile,
+                **execute_kwargs,
             )
 
         if bool(getattr(plan, "should_sleep", False)):
@@ -377,13 +398,30 @@ class PowerManager:
     def _sync_config_brightness(self, brightness: int) -> int:
         return sync_config_brightness(self._config, brightness, logger=logger)
 
-    def _activate_power_source_mode(self, mode) -> None:
+    def _activate_power_source_mode(self, mode) -> bool:
         applied = _battery_saver.activate_power_source_mode(mode)
         if not applied:
-            return
-        self._refresh_system_power_view_best_effort()
+            return False
+        observed_status = self._refresh_system_power_view_best_effort()
+        if not isinstance(getattr(observed_status, "mode", None), PowerMode):
+            try:
+                observed_status = get_system_power_status()
+            except _POWER_MANAGER_RUNTIME_ERRORS:
+                logger.debug("System power mode observation failed after mode apply", exc_info=True)
+                observed_status = None
+        if (
+            bool(getattr(observed_status, "supported", False))
+            and isinstance(getattr(observed_status, "mode", None), PowerMode)
+            and observed_status.mode != mode
+        ):
+            logger.debug(
+                "Power-source mode apply succeeded but observation reports %s (desired %s)",
+                observed_status.mode.value,
+                getattr(mode, "value", mode),
+            )
+        return True
 
-    def _refresh_system_power_view_best_effort(self) -> None:
+    def _refresh_system_power_view_best_effort(self):
         """Keep the tray's power-mode view honest after an automatic apply.
 
         Refreshes the stored snapshot and requests one menu rebuild that the
@@ -392,11 +430,12 @@ class PowerManager:
         """
         refresh = getattr(self.kb_controller, "_refresh_system_power_view", None)
         if not callable(refresh):
-            return
+            return None
         try:
-            refresh()
+            return refresh()
         except (AttributeError, OSError, RuntimeError, TypeError, ValueError) as exc:
             logger.debug("System power view refresh failed after mode apply: %s", exc)
+            return None
 
     def _activate_power_source_perkey_profile(self, profile_name: str) -> None:
         available_profiles = {str(name) for name in list_perkey_profiles()}

@@ -201,6 +201,76 @@ def test_power_source_loop_policy_retries_power_mode_when_active_mode_stays_wron
     assert ActivatePowerMode(PowerMode.PERFORMANCE) in retried.actions
 
 
+def test_power_source_loop_policy_does_not_retry_successful_apply_when_observation_stays_wrong() -> None:
+    policy = PowerSourceLoopPolicy(debounce_seconds=0.0, power_mode_retry_seconds=10.0)
+
+    first = policy.update(_inputs(active_power_mode=PowerMode.BALANCED, ac_power_mode=PowerMode.PERFORMANCE))
+    policy.record_power_mode_apply_result(PowerMode.PERFORMANCE, True)
+    later = policy.update(
+        _inputs(now=30.0, active_power_mode=PowerMode.BALANCED, ac_power_mode=PowerMode.PERFORMANCE)
+    )
+
+    assert ActivatePowerMode(PowerMode.PERFORMANCE) in first.actions
+    assert not any(isinstance(action, ActivatePowerMode) for action in later.actions)
+
+
+def test_power_source_loop_policy_retries_failed_apply_after_delay() -> None:
+    policy = PowerSourceLoopPolicy(debounce_seconds=0.0, power_mode_retry_seconds=10.0)
+
+    first = policy.update(_inputs(active_power_mode=PowerMode.BALANCED, ac_power_mode=PowerMode.PERFORMANCE))
+    policy.record_power_mode_apply_result(PowerMode.PERFORMANCE, False)
+    too_soon = policy.update(
+        _inputs(now=5.0, active_power_mode=PowerMode.BALANCED, ac_power_mode=PowerMode.PERFORMANCE)
+    )
+    retried = policy.update(
+        _inputs(now=11.0, active_power_mode=PowerMode.BALANCED, ac_power_mode=PowerMode.PERFORMANCE)
+    )
+
+    assert ActivatePowerMode(PowerMode.PERFORMANCE) in first.actions
+    assert not any(isinstance(action, ActivatePowerMode) for action in too_soon.actions)
+    assert ActivatePowerMode(PowerMode.PERFORMANCE) in retried.actions
+
+
+def test_power_source_loop_policy_reapplies_satisfied_mode_after_source_change() -> None:
+    policy = PowerSourceLoopPolicy(debounce_seconds=0.0, power_mode_retry_seconds=10.0)
+
+    first = policy.update(_inputs(active_power_mode=PowerMode.BALANCED, ac_power_mode=PowerMode.PERFORMANCE))
+    policy.record_power_mode_apply_result(PowerMode.PERFORMANCE, True)
+    same_source = policy.update(
+        _inputs(now=1.0, active_power_mode=PowerMode.BALANCED, ac_power_mode=PowerMode.PERFORMANCE)
+    )
+    changed_source = policy.update(
+        _inputs(
+            on_ac=False,
+            now=2.0,
+            active_power_mode=PowerMode.BALANCED,
+            ac_power_mode=PowerMode.PERFORMANCE,
+            battery_power_mode=PowerMode.PERFORMANCE,
+        )
+    )
+
+    assert ActivatePowerMode(PowerMode.PERFORMANCE) in first.actions
+    assert not any(isinstance(action, ActivatePowerMode) for action in same_source.actions)
+    assert ActivatePowerMode(PowerMode.PERFORMANCE) in changed_source.actions
+
+
+def test_power_source_loop_policy_reapplies_after_configured_mode_changes() -> None:
+    policy = PowerSourceLoopPolicy(debounce_seconds=0.0)
+
+    first = policy.update(_inputs(active_power_mode=PowerMode.BALANCED, ac_power_mode=PowerMode.PERFORMANCE))
+    policy.record_power_mode_apply_result(PowerMode.PERFORMANCE, True)
+    changed = policy.update(
+        _inputs(
+            now=1.0,
+            active_power_mode=PowerMode.PERFORMANCE,
+            ac_power_mode=PowerMode.BALANCED,
+        )
+    )
+
+    assert ActivatePowerMode(PowerMode.PERFORMANCE) in first.actions
+    assert ActivatePowerMode(PowerMode.BALANCED) in changed.actions
+
+
 def test_power_source_loop_policy_preserves_manual_power_mode_after_desired_mode_was_observed() -> None:
     policy = PowerSourceLoopPolicy(debounce_seconds=0.0, power_mode_retry_seconds=10.0)
 

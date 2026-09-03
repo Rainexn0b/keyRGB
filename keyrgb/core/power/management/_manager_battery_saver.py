@@ -120,18 +120,22 @@ def execute_battery_saver_iteration_plan(
     apply_brightness_fn,
     activate_power_mode_fn,
     activate_perkey_profile_fn,
+    record_power_mode_apply_result_fn=None,
 ) -> bool:
     if plan.should_sleep:
         _manager_module().time.sleep(poll_interval_s)
         return True
 
-    _manager_module().apply_power_source_actions(
-        kb_controller=manager.kb_controller,
-        actions=plan.actions,
-        apply_brightness=apply_brightness_fn,
-        activate_power_mode=activate_power_mode_fn,
-        activate_perkey_profile=activate_perkey_profile_fn,
-    )
+    action_kwargs = {
+        "kb_controller": manager.kb_controller,
+        "actions": plan.actions,
+        "apply_brightness": apply_brightness_fn,
+        "activate_power_mode": activate_power_mode_fn,
+        "activate_perkey_profile": activate_perkey_profile_fn,
+    }
+    if record_power_mode_apply_result_fn is not None:
+        action_kwargs["record_power_mode_apply_result"] = record_power_mode_apply_result_fn
+    _manager_module().apply_power_source_actions(**action_kwargs)
     return False
 
 

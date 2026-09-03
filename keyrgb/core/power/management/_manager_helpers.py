@@ -161,8 +161,9 @@ def apply_power_source_actions(
     kb_controller: object,
     actions: Iterable[object],
     apply_brightness: Callable[[int], None],
-    activate_power_mode: Callable[[PowerMode], None],
+    activate_power_mode: Callable[[PowerMode], object],
     activate_perkey_profile: Callable[[str], None],
+    record_power_mode_apply_result: Callable[[PowerMode, bool], None] | None = None,
 ) -> None:
     for action in actions:
         if isinstance(action, TurnOffKeyboard):
@@ -172,10 +173,13 @@ def apply_power_source_actions(
         elif isinstance(action, ApplyBrightness):
             apply_brightness(int(action.brightness))
         elif isinstance(action, ActivatePowerMode):
+            applied = False
             try:
-                activate_power_mode(action.mode)
+                applied = bool(activate_power_mode(action.mode))
             except _CONTROLLER_ACTION_RUNTIME_ERRORS:
                 logger.exception("Power-source mode activation failed for %s", action.mode.value)
+            if record_power_mode_apply_result is not None:
+                record_power_mode_apply_result(action.mode, applied)
         elif isinstance(action, ActivatePerkeyProfile):
             try:
                 activate_perkey_profile(action.profile_name)

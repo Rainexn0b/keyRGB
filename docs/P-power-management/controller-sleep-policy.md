@@ -11,6 +11,21 @@ Sleep-state detection is backend-owned. The tray consumes the backend-declared
 sleep signature and applies one of the two user policies below; it does not
 select behavior from a backend-name check.
 
+### Observed timeout and why it can seem earlier
+
+The 2026-09-03 full diagnostic session on the reported `048d:600b` controller
+captured four native sleeps 605.0–607.4 seconds after the last keyboard event.
+That controller's measured firmware timeout is therefore approximately ten
+minutes. This is hardware evidence for that device, not a universal timeout
+guarantee for every controller.
+
+The firmware clock tracks keyboard activity independently of the desktop's
+screen-idle clock. Mouse or touchpad activity can keep KDE's ten-minute screen
+timeout from advancing without resetting the keyboard controller. For example,
+eight minutes of mouse-only use after the last key can make the deck appear to
+sleep only two minutes after the user stops all activity, even though its own
+keyboard-inactivity timer ran for the full ten minutes.
+
 ## Automatic recovery (default)
 
 When **Let the controller's own sleep timeout turn the keyboard off** is

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 from pathlib import Path
@@ -12,17 +13,24 @@ if TYPE_CHECKING:
 
 _PRIVILEGED_BIN_NAMES = frozenset({"pkexec", "sudo", "pkcheck"})
 _PRIVILEGED_BIN_DIRS = (Path("/usr/bin"), Path("/bin"))
+logger = logging.getLogger(__name__)
 
 
-def _write_mode_epp_preferences(mode: PowerMode, *, policies: list[Path]) -> None:
+def _write_mode_epp_preferences(mode: PowerMode, *, policies: list[Path]) -> bool:
+    succeeded = True
     for pol in policies:
         epp_choice = _modes._pick_epp_value(mode, available=_modes._available_epp_preferences(pol))
         if epp_choice is None or not _modes._has_epp(pol):
             continue
         try:
             _modes._write_epp(pol, epp_choice)
-        except OSError:
-            pass
+        except OSError as exc:
+            succeeded = False
+            # EPP is an optional policy signal.  Governor/frequency writes
+            # remain authoritative for apply success, but this failure must
+            # be visible when diagnosing a driver-specific policy mismatch.
+            logger.warning("Failed to write EPP preference for %s (%s): %s", pol, epp_choice, exc)
+    return succeeded
 
 
 def _apply_mode_sysfs(mode: PowerMode, *, root: Path, extreme_cap_khz: int) -> None:
@@ -134,6 +142,15 @@ def _pkexec_noninteractive_authorized(pkcheck: str) -> bool:
     return cp.returncode == 0
 
 
+def _helper_succeeded(cp: subprocess.CompletedProcess[str]) -> bool:
+    """Return helper success and surface non-fatal helper diagnostics."""
+
+    stderr = str(getattr(cp, "stderr", "") or "").strip()
+    if stderr:
+        logger.warning("Power helper diagnostic: %s", stderr)
+    return cp.returncode == 0
+
+
 def _run_privileged_helper(mode: PowerMode, *, extreme_cap_khz: int, allow_interactive: bool = True) -> bool:
     helper = os.environ.get("KEYRGB_POWER_HELPER", "/usr/local/bin/keyrgb-power-helper")
     argv = [
@@ -146,13 +163,13 @@ def _run_privileged_helper(mode: PowerMode, *, extreme_cap_khz: int, allow_inter
 
     if os.geteuid() == 0:
         cp = subprocess.run(argv, check=False, capture_output=True, text=True)
-        return cp.returncode == 0
+        return _helper_succeeded(cp)
 
     pkexec = _privileged_bin("pkexec")
     if pkexec:
         if allow_interactive:
             cp = subprocess.run([pkexec, *argv], check=False, capture_output=True, text=True)
-            return cp.returncode == 0
+            return _helper_succeeded(cp)
 
         pkcheck = _privileged_bin("pkcheck")
         if pkcheck and _pkexec_noninteractive_authorized(pkcheck):
@@ -162,14 +179,14 @@ def _run_privileged_helper(mode: PowerMode, *, extreme_cap_khz: int, allow_inter
                 capture_output=True,
                 text=True,
             )
-            if cp.returncode == 0:
+            if _helper_succeeded(cp):
                 return True
 
     sudo = _privileged_bin("sudo")
     if sudo:
         sudo_argv = [sudo, *argv] if allow_interactive else [sudo, "-n", *argv]
         cp = subprocess.run(sudo_argv, check=False, capture_output=True, text=True)
-        return cp.returncode == 0
+        return _helper_succeeded(cp)
 
     return False
 

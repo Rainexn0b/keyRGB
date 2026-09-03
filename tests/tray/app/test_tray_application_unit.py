@@ -672,17 +672,19 @@ def test_update_icon_and_menu_delegate_to_refresh_helpers(monkeypatch):
 def test_refresh_system_power_view_delegate_refreshes_snapshot_and_menu(monkeypatch):
     calls = []
     tray = SimpleNamespace(_update_menu=lambda: calls.append("menu"))
+    status = object()
 
     monkeypatch.setattr(
         app,
         "refresh_system_power_snapshot",
-        lambda _self: calls.append("snapshot"),
+        lambda _self: (calls.append("snapshot"), status)[1],
     )
 
-    app.KeyRGBTray._refresh_system_power_view(tray)
+    observed = app.KeyRGBTray._refresh_system_power_view(tray)
     # Snapshot must be stored before the menu rebuild is requested so the
     # rebuilt menu renders the fresh mode.
     assert calls == ["snapshot", "menu"]
+    assert observed is status
 
 
 def test_effect_and_power_wrappers_delegate(monkeypatch):

@@ -47,3 +47,23 @@ def test_power_helper_honors_sysfs_root_env_when_unprivileged(
 
     assert helper._cpufreq_root() == cpufreq
     assert helper._leds_root() == leds
+
+
+def test_power_helper_surfaces_nonfatal_epp_write_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    helper = _load_helper()
+    policy = tmp_path / "policy0"
+    policy.mkdir()
+    monkeypatch.setattr(helper, "_available_epp_preferences", lambda _policy: {"performance"})
+    monkeypatch.setattr(helper, "_has_epp", lambda _policy: True)
+    monkeypatch.setattr(
+        helper,
+        "_write",
+        lambda _path, _text: (_ for _ in ()).throw(OSError("read-only EPP")),
+    )
+
+    assert helper._write_mode_epp_preferences("performance", policies=[policy]) is False
+    assert "Non-fatal EPP write failed" in capsys.readouterr().err

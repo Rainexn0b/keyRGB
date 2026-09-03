@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import sys
 from pathlib import Path
 
 
@@ -188,15 +189,21 @@ def _pick_epp_value(mode: str, *, available: set[str]) -> str | None:
     return None
 
 
-def _write_mode_epp_preferences(mode: str, *, policies: list[Path]) -> None:
+def _write_mode_epp_preferences(mode: str, *, policies: list[Path]) -> bool:
+    succeeded = True
     for pol in policies:
         epp_choice = _pick_epp_value(mode, available=_available_epp_preferences(pol))
         if epp_choice is None or not _has_epp(pol):
             continue
         try:
             _write(_epp_path(pol), f"{epp_choice}\n")
-        except Exception:
-            pass
+        except OSError as exc:
+            succeeded = False
+            print(
+                f"Non-fatal EPP write failed for {pol} ({epp_choice}): {exc}",
+                file=sys.stderr,
+            )
+    return succeeded
 
 
 def _set_boost(enabled: bool) -> None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from types import SimpleNamespace
 from unittest.mock import MagicMock, call, patch
 
@@ -107,6 +108,28 @@ class TestPowerManagerBatterySaverLoop:
             activate_perkey_profile=pm._activate_power_source_perkey_profile,
         )
 
+    def test_execute_battery_saver_iteration_plan_wires_power_mode_apply_feedback(self):
+        from keyrgb.core.power.management import manager as manager_module
+        from keyrgb.core.power.management.manager import PowerManager
+        from keyrgb.core.power.policies.power_source_loop_policy import ActivatePowerMode
+        from keyrgb.core.power.system import PowerMode
+
+        pm = PowerManager(MagicMock(), config=MagicMock())
+        policy = MagicMock()
+        plan = SimpleNamespace(should_sleep=False, actions=(ActivatePowerMode(PowerMode.PERFORMANCE),))
+
+        with patch.object(manager_module, "apply_power_source_actions") as apply_actions:
+            assert (
+                pm._execute_battery_saver_iteration_plan(
+                    plan,
+                    poll_interval_s=2.0,
+                    record_power_mode_apply_result_fn=policy.record_power_mode_apply_result,
+                )
+                is False
+            )
+
+        assert apply_actions.call_args.kwargs["record_power_mode_apply_result"] is policy.record_power_mode_apply_result
+
     def test_run_battery_saver_iteration_delegates_classification_then_execution(self):
         from keyrgb.core.power.management.manager import PowerManager
 
@@ -124,8 +147,41 @@ class TestPowerManagerBatterySaverLoop:
         assert result is True
         assert coordinator.mock_calls == [
             call.classify(fake_policy),
-            call.execute(plan, poll_interval_s=2.0),
+            call.execute(
+                plan,
+                poll_interval_s=2.0,
+                record_power_mode_apply_result_fn=fake_policy.record_power_mode_apply_result,
+            ),
         ]
+
+    def test_run_battery_saver_iteration_preserves_apply_feedback_across_owner_thread(self):
+        from keyrgb.core.power.management import manager as manager_module
+        from keyrgb.core.power.management.manager import PowerManager
+        from keyrgb.core.power.policies.power_source_loop_policy import ActivatePowerMode
+        from keyrgb.core.power.system import PowerMode
+
+        pm = PowerManager(MagicMock(), config=MagicMock())
+        policy = MagicMock()
+        plan = SimpleNamespace(should_sleep=False, actions=(ActivatePowerMode(PowerMode.PERFORMANCE),))
+        pm._sync_lid_state_from_system = MagicMock()
+        pm._keyboard_is_power_event_forced_off = MagicMock(return_value=False)
+        pm._classify_battery_saver_iteration = MagicMock(return_value=plan)
+        pm._activate_power_source_mode = MagicMock(return_value=True)
+        caller_thread = threading.get_ident()
+
+        def run_on_owner_thread(_tray, action):
+            if threading.get_ident() != caller_thread:
+                return action()
+            result = []
+            worker = threading.Thread(target=lambda: result.append(action()))
+            worker.start()
+            worker.join()
+            return result[0]
+
+        with patch.object(manager_module, "_run_tray_transition_if_available", side_effect=run_on_owner_thread):
+            assert pm._run_battery_saver_iteration(policy, poll_interval_s=2.0) is False
+
+        policy.record_power_mode_apply_result.assert_called_once_with(PowerMode.PERFORMANCE, True)
 
     def test_run_battery_saver_iteration_pauses_source_actions_while_lid_closed(self):
         from keyrgb.core.power.management import manager as manager_module
@@ -241,7 +297,11 @@ class TestPowerManagerBatterySaverLoop:
 
         assert result is False
         pm._classify_battery_saver_iteration.assert_called_once_with(fake_policy)
-        pm._execute_battery_saver_iteration_plan.assert_called_once_with(plan, poll_interval_s=2.0)
+        pm._execute_battery_saver_iteration_plan.assert_called_once_with(
+            plan,
+            poll_interval_s=2.0,
+            record_power_mode_apply_result_fn=fake_policy.record_power_mode_apply_result,
+        )
 
     def test_activate_power_source_mode_uses_noninteractive_auth(self):
         from keyrgb.core.power.management import manager as manager_module
@@ -297,6 +357,30 @@ class TestPowerManagerBatterySaverLoop:
             pm._activate_power_source_mode(PowerMode.EXTREME_SAVER)
 
         mock_kb._refresh_system_power_view.assert_called_once_with()
+
+    def test_activate_power_source_mode_logs_observation_mismatch_without_failing_apply(self):
+        from keyrgb.core.power.management import manager as manager_module
+        from keyrgb.core.power.management.manager import PowerManager
+        from keyrgb.core.power.system import PowerMode
+
+        mock_kb = MagicMock()
+        mock_kb._refresh_system_power_view.return_value = SimpleNamespace(
+            supported=True,
+            mode=PowerMode.BALANCED,
+        )
+        pm = PowerManager(mock_kb, config=MagicMock())
+
+        with (
+            patch.object(manager_module, "set_system_power_mode", return_value=True),
+            patch.object(manager_module.logger, "debug") as debug,
+        ):
+            assert pm._activate_power_source_mode(PowerMode.PERFORMANCE) is True
+
+        debug.assert_called_once_with(
+            "Power-source mode apply succeeded but observation reports %s (desired %s)",
+            PowerMode.BALANCED.value,
+            PowerMode.PERFORMANCE.value,
+        )
 
     def test_battery_saver_loop_covers_common_branches_and_actions(self):
         from keyrgb.core.power.management.manager import PowerManager

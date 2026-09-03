@@ -63,7 +63,7 @@ class KeyRGBTrayDelegateMixin:
         if refresh_menu:
             self._update_menu()
 
-    def _refresh_system_power_view(self) -> None:
+    def _refresh_system_power_view(self) -> object | None:
         """Refresh the stored power-mode snapshot, then request a menu rebuild.
 
         Automatic AC/DC mode applies use this so the Power Mode menu shows the
@@ -72,11 +72,12 @@ class KeyRGBTrayDelegateMixin:
         mid-transition (KDE plasmashell QMenu host crash).
         """
 
-        def _refresh_view() -> None:
-            _application_module().refresh_system_power_snapshot(self)
+        def _refresh_view() -> object | None:
+            status = _application_module().refresh_system_power_snapshot(self)
             self._update_menu()
+            return status
 
-        run_tray_transition(self, _refresh_view)
+        return run_tray_transition(self, _refresh_view)
 
     def _start_current_effect(self, **kwargs) -> bool:
         return bool(run_tray_transition(self, lambda: _application_module().start_current_effect(self, **kwargs)))

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -282,6 +284,43 @@ def test_apply_mode_sysfs_rereads_epp_after_governor_change(monkeypatch: pytest.
 
     assert (policy / "scaling_governor").read_text(encoding="utf-8").strip() == "powersave"
     assert (policy / "energy_performance_preference").read_text(encoding="utf-8").strip() == "power"
+
+
+def test_set_mode_keeps_success_when_epp_write_fails_and_logs_diagnostic(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    root = tmp_path / "cpufreq"
+    policy = _make_policy(root, "policy0", max_khz=3_000_000, min_khz=600_000)
+    _add_epp_files(policy)
+
+    monkeypatch.setenv("KEYRGB_CPUFREQ_ROOT", str(root))
+    monkeypatch.setattr(system_modes, "_set_boost_enabled", lambda enabled: None)
+
+    def fail_epp(_policy: Path, _value: str) -> None:
+        raise OSError("EPP is not writable")
+
+    monkeypatch.setattr(system_modes, "_write_epp", fail_epp)
+
+    with caplog.at_level(logging.WARNING, logger=system_apply.__name__):
+        assert set_mode(PowerMode.PERFORMANCE) is True
+
+    assert "Failed to write EPP preference" in caplog.text
+    assert (policy / "scaling_governor").read_text(encoding="utf-8").strip() == "performance"
+
+
+def test_successful_privileged_helper_stderr_is_logged(caplog: pytest.LogCaptureFixture) -> None:
+    completed = subprocess.CompletedProcess(
+        args=["keyrgb-power-helper"],
+        returncode=0,
+        stdout="",
+        stderr="Non-fatal EPP write failed for policy0",
+    )
+
+    with caplog.at_level(logging.WARNING, logger=system_apply.__name__):
+        assert system_apply._helper_succeeded(completed) is True
+
+    assert "Power helper diagnostic" in caplog.text
+    assert "Non-fatal EPP write failed" in caplog.text
 
 
 def test_apply_mode_sysfs_enables_boost_before_restoring_performance_cap(

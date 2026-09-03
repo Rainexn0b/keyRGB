@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Effects/Idle: Make the reactive whole-frame wake envelope monotonic and
+  independent of first-pulse phase, and consume one pre-start restore seed so
+  typing cannot produce a `0.62 → 1.0 → 0.62` scale reversal.
+- Tray/Runtime: Route menu and power off/restore through the deck intent
+  pipeline, coalesce restores, and defer scheduler/menu brightness, speed, and
+  effect changes while an off-family owner keeps the keyboard dark.
+- Core/Power: Feed successful power-mode application back to the source policy
+  so heuristic observation mismatches do not retry every 30 seconds. Preserve
+  retries for real failures and surface non-fatal EPP failures from direct and
+  privileged-helper paths.
+
 ## 0.34.0 (2026-08-31)
 
 Sleep/wake software corrections for ITE firmware sleep and system suspend, plus diagnostic-session support and installer/privilege hygiene. Public entrypoints and on-disk config stay compatible.
