@@ -254,7 +254,7 @@ def test_active_power_source_base_brightness_uses_lower_value_at_night() -> None
     assert _active_power_source_base_brightness(state, on_ac=False) == 15
 
 
-def test_scheduler_loop_retries_same_key_after_power_forced_off_skip() -> None:
+def test_scheduler_loop_advances_same_key_after_power_forced_off_deferral() -> None:
     from keyrgb.tray.idle_power_state import set_idle_power_state_field
     from tests.tray.fakes import make_owner_backed_mock_tray
 
@@ -303,6 +303,9 @@ def test_scheduler_loop_retries_same_key_after_power_forced_off_skip() -> None:
             now_fn=lambda: datetime(2024, 1, 1, 22, 0, tzinfo=timezone.utc),
         )
 
+    # The scheduler records the intent while the power owner keeps the deck
+    # dark.  Advancing the key prevents a second physical apply when the flag
+    # clears; the legal restore path owns that hardware write.
     tray.engine.set_brightness.assert_called_once_with(
         20,
         apply_to_hardware=False,

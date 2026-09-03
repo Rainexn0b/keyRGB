@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from keyrgb.core.effects.catalog import resolve_effect_name_for_backend
 from keyrgb.core.utils import safe_attrs
 from keyrgb.tray.controllers import _lighting_controller_helpers as lighting_controller_helpers
 from keyrgb.tray.controllers._brightness_layer import apply_layered_brightness_update
@@ -37,11 +38,21 @@ def on_speed_clicked_impl(
 
     # Save globally and as a per-effect override so each effect remembers its speed.
     tray.config.speed = speed
+    from keyrgb.tray.deck_pipeline import hardware_apply_deferred
+
+    defer_hardware_apply = hardware_apply_deferred(tray)
     effect = lighting_controller_helpers.get_effect_name(tray)
+    if defer_hardware_apply:
+        # The engine may still describe the last physically running effect.
+        # Speed intent belongs to the normalized config effect while the deck
+        # is dark, not to that stale render cache.
+        effect = resolve_effect_name_for_backend(
+            safe_attrs.safe_str_attr(tray.config, "effect", default="none") or "none",
+            getattr(tray, "backend", None),
+        )
     if effect and effect not in {"none", "perkey"}:
         tray.config.set_effect_speed(effect, speed)
-
-    if not tray.is_off:
+    if not defer_hardware_apply:
         is_loop = lighting_controller_helpers.is_software_effect(
             effect
         ) or lighting_controller_helpers.is_reactive_effect(effect)
@@ -68,6 +79,8 @@ def on_brightness_clicked_impl(
     if brightness is None:
         return
 
+    from keyrgb.tray.deck_pipeline import hardware_apply_deferred
+
     apply_layered_brightness_update(
         tray,
         source="menu",
@@ -75,4 +88,5 @@ def on_brightness_clicked_impl(
         reactive_brightness=None,
         reactive_source_label="tray brightness",
         start_current_effect=start_current_effect,
+        defer_hardware_apply=hardware_apply_deferred(tray),
     )

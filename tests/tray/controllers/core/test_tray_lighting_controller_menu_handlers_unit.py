@@ -21,14 +21,32 @@ class TestOnSpeedClicked:
 
     def test_on_speed_clicked_skips_restart_if_off(self):
         from keyrgb.tray.controllers.lighting_controller import on_speed_clicked
+        from tests.tray.fakes import make_owner_backed_mock_tray
 
-        mock_tray = MagicMock()
+        mock_tray = make_owner_backed_mock_tray(is_off=True, user_forced_off=True)
         mock_tray.is_off = True
 
         with patch("keyrgb.tray.controllers.lighting_controller.start_current_effect") as mock_start:
             on_speed_clicked(mock_tray, "3")
 
         assert mock_tray.config.speed == 3
+        mock_start.assert_not_called()
+
+    def test_on_speed_clicked_persists_selected_config_effect_while_off_family(self):
+        from keyrgb.tray.controllers.lighting_controller import on_speed_clicked
+        from tests.tray.fakes import make_owner_backed_mock_tray
+
+        mock_tray = make_owner_backed_mock_tray(is_off=True, power_forced_off=True)
+        mock_tray.config.effect = "rainbow_wave"
+        mock_tray.engine.current_effect = "wave"
+        mock_tray.engine.speed = 0
+
+        with patch("keyrgb.tray.controllers.lighting_controller.start_current_effect") as mock_start:
+            on_speed_clicked(mock_tray, "8")
+
+        assert mock_tray.config.speed == 8
+        mock_tray.config.set_effect_speed.assert_called_once_with("rainbow_wave", 8)
+        assert mock_tray.engine.speed == 0
         mock_start.assert_not_called()
 
     def test_on_speed_clicked_ignores_invalid_input(self):
@@ -250,3 +268,20 @@ class TestOnBrightnessClicked:
 
         assert mock_tray._last_brightness == 100
         assert mock_tray.tray_idle_power_state.last_brightness == 100
+
+    def test_on_brightness_clicked_defers_hardware_for_off_family(self):
+        from keyrgb.tray.controllers.lighting_controller import on_brightness_clicked
+        from tests.tray.fakes import make_owner_backed_mock_tray
+
+        mock_tray = make_owner_backed_mock_tray(is_off=True, power_forced_off=True, last_brightness=50)
+        mock_tray.config.effect = "none"
+        mock_tray.config.brightness = 25
+
+        with patch("keyrgb.tray.controllers.lighting_controller.start_current_effect") as mock_start:
+            on_brightness_clicked(mock_tray, "15")
+
+        assert mock_tray.config.brightness == 75
+        assert mock_tray._last_brightness == 75
+        assert mock_tray.tray_idle_power_state.last_brightness == 75
+        mock_tray.engine.set_brightness.assert_not_called()
+        mock_start.assert_not_called()

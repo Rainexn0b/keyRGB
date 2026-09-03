@@ -91,6 +91,12 @@ off-family deferral (`hardware_apply_deferred`) classify intents; `next_state`
 in `keyrgb/tray/deck_state.py` decides; the pipeline is the low-frequency
 commit owner. Render frames stay outside the coordinator. See
 `docs/P-power-management/sleep-wake-pipeline-campaign.md`.
+- Scheduler and menu brightness use that same predicate: off-family changes
+  update persisted base/reactive layers and safe engine caches, but do not
+  relight or restart. Menu speed and effect selection likewise persist the
+  normalized intent (including capability fallbacks) until a legal restore.
+  This does not reinterpret a bare `is_off` flag; the existing narrow manual
+  restore compatibility path remains separate.
 - Menu rendering is read-only. It must not reload config, reconnect devices,
   query OS power sysfs, probe secondary backends, or persist fallback state.
   Power-mode and secondary-route labels come from

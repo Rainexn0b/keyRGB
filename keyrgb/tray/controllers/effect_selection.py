@@ -161,6 +161,73 @@ def _ensure_hardware_mode(tray) -> None:
     _set_attr_best_effort(tray.engine, "per_key_brightness", None)
 
 
+def _defer_effect_selection(
+    tray: _EffectSelectionTrayProtocol,
+    *,
+    effect_name: str,
+    per_key_supported: bool,
+    hw_effects_supported: bool,
+) -> bool:
+    """Persist an effect choice without touching the dark deck.
+
+    Effect selection is still normalized and capability-gated while an
+    off-family state owns the hardware.  Engine mode attributes are caches,
+    so updating them is safe; stopping the engine, starting an effect, and
+    writing the keyboard are not.
+    """
+
+    if effect_name in {"hw_uniform", "hardware_uniform"}:
+        _set_attr_best_effort(tray.config, "per_key_colors", {})
+        tray.config.effect = "none"
+        _ensure_hardware_mode(tray)
+        return True
+
+    if effect_name in {"none", "stop"}:
+        tray.config.effect = "none"
+        per_key = _config_per_key_colors_ref(tray.config)
+        if has_nonempty_per_key_base(per_key) and per_key_supported:
+            _ensure_software_mode(tray)
+        else:
+            _ensure_hardware_mode(tray)
+        return True
+
+    if effect_name == "perkey":
+        if not per_key_supported:
+            tray.config.effect = "none"
+            _ensure_hardware_mode(tray)
+            return True
+        colors = _load_per_key_colors_from_profile(tray.config)
+        if colors:
+            tray.config.per_key_colors = colors
+        _ensure_software_mode(tray)
+        # ``perkey`` is represented by the static per-key map and restored as
+        # the normal ``none`` effect by the existing startup path.
+        tray.config.effect = "none"
+        return True
+
+    base_effect_name = strip_effect_namespace(effect_name)
+    if is_backend_hardware_effect(effect_name, getattr(tray, "backend", None)):
+        if not hw_effects_supported:
+            tray.config.effect = "none"
+            _ensure_hardware_mode(tray)
+            return True
+        _set_attr_best_effort(tray.config, "per_key_colors", {})
+        _ensure_hardware_mode(tray)
+        tray.config.effect = effect_name if is_forced_hardware_effect(effect_name) else base_effect_name
+        return True
+
+    if base_effect_name in SW_EFFECTS and not is_forced_hardware_effect(effect_name):
+        _ensure_software_mode(tray)
+        tray.config.effect = base_effect_name
+        return True
+
+    # Unknown selections follow the existing fail-safe normalization, but do
+    # not issue the static hardware write until a legal restore.
+    tray.config.effect = "none"
+    _ensure_hardware_mode(tray)
+    return True
+
+
 def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> None:
     """Apply an effect selection coming from the tray menu.
 
@@ -183,6 +250,17 @@ def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> N
             effect_name = "none"
 
         base_effect_name = strip_effect_namespace(effect_name)
+
+        from keyrgb.tray.deck_pipeline import hardware_apply_deferred
+
+        if hardware_apply_deferred(tray):
+            _defer_effect_selection(
+                effect_tray,
+                effect_name=effect_name,
+                per_key_supported=per_key_supported,
+                hw_effects_supported=hw_effects_supported,
+            )
+            return
 
         # === FORCE MODE SWITCHES ===
 

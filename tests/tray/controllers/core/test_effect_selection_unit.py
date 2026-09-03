@@ -37,6 +37,39 @@ class TestApplyEffectSelection:
         assert mock_tray.config.effect == "none"
         assert mock_tray.is_off is False
 
+    @pytest.mark.parametrize(
+        ("effect_name", "expected_effect"),
+        [
+            ("reactive_fade", "reactive_fade"),
+            ("rainbow_wave", "rainbow_wave"),
+            ("wave", "wave"),
+            ("perkey", "none"),
+            ("none", "none"),
+        ],
+    )
+    def test_off_family_effect_selection_persists_without_runtime_writes(self, effect_name, expected_effect, monkeypatch):
+        """Dark-deck choices wait for the legal restore transition."""
+        from keyrgb.tray.controllers import effect_selection
+        from keyrgb.tray.controllers.effect_selection import apply_effect_selection
+        from tests.tray.fakes import make_owner_backed_mock_tray
+
+        mock_tray = make_owner_backed_mock_tray(is_off=True, power_forced_off=True)
+        mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
+        mock_tray.config.per_key_colors = {}
+        mock_tray.config.effect = "none"
+        backend = self._backend("wave")
+        mock_tray.backend = backend
+        if effect_name == "perkey":
+            monkeypatch.setattr(effect_selection, "_load_per_key_colors_from_profile", lambda _config: {(0, 0): (1, 2, 3)})
+
+        apply_effect_selection(mock_tray, effect_name=effect_name)
+
+        assert mock_tray.config.effect == expected_effect
+        mock_tray.engine.stop.assert_not_called()
+        mock_tray.engine.kb.set_color.assert_not_called()
+        mock_tray.engine.kb.set_key_colors.assert_not_called()
+        mock_tray._start_current_effect.assert_not_called()
+
     def test_stop_effect_behaves_like_none(self):
         """'stop' effect should behave the same as 'none'."""
         from keyrgb.tray.controllers.effect_selection import apply_effect_selection

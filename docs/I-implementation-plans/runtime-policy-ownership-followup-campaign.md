@@ -2,7 +2,7 @@
 
 **Started:** 2026-09-03  
 **Baseline:** `~/.cache/keyrgb/diagnostic-sessions/20260903T092201.323445Z`  
-**Status:** OP-1..2 software-complete; OP-3..4 planned; live retest pending
+**Status:** OP-1..3 software-complete; OP-4 planned; live retest pending
 
 ## Purpose
 
@@ -32,7 +32,7 @@ changing visual policy.
 |---|---|---|---|
 | OP-1 | Reactive restore frame and pulse ownership | Evidenced first-key scale discontinuity and duplicate damp seeding | software-complete; live retest pending |
 | OP-2 | `start_current_effect` menu/power callers | Remaining SWP-4 intent-bypass seam; not triggered in baseline | software-complete; live retest pending |
-| OP-3 | Layered brightness scheduler/menu deferral | Scheduler drops deferred intent; menu omits unified off-family predicate | planned |
+| OP-3 | Layered brightness scheduler/menu deferral | Scheduler drops deferred intent; menu omits unified off-family predicate | software-complete; live retest pending |
 | OP-4 | CPU power-mode apply/observation | Main split landed; EPP failures remain silent and policy can retry heuristic mismatches | planned |
 
 ## OP-1 acceptance
@@ -57,6 +57,17 @@ changing visual policy.
   off-family hardware-deferral rule.
 - Deferred scheduler/menu changes persist intent but do not relight the deck.
 - Runtime-coordinator revision ordering remains authoritative.
+
+### OP-3 implementation boundary
+
+`hardware_apply_deferred(tray)` is the sole off-family predicate for scheduler
+and menu brightness, speed, and effect-selection callbacks.  While it is true,
+those paths persist normalized config intent and only update safe software/engine
+caches; they do not stop or restart the effect or write the keyboard.  The
+scheduler still returns success for a deferred update, so its key advances and
+the legal restore transition remains the owner of the physical apply.  A bare
+`tray.is_off` without an off-family owner remains the narrow manual-restore
+compatibility case and is not folded into this rule.
 
 ## OP-4 acceptance
 
