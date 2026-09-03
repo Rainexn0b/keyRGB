@@ -2,7 +2,7 @@
 
 **Started:** 2026-09-03  
 **Lane:** `P-power-management`  
-**Status:** SWP-0 pure decision table landed — runtime still uses legacy flags
+**Status:** SWP-1 hardware poll cut over to DeckPipeline — idle/power still emit directly
 **Hardware validation gate:** inherit [KSW-8](keyboard-sleep-wake-hardening-campaign.md)
 plus one-restore-per-wake evidence after the pipeline cutover
 
@@ -200,7 +200,7 @@ KSW-1 already-dark suspend (no wake-capable fade).
 | ID | Concern | Priority | Effort | Status |
 |---|---|:---:|:---:|---|
 | SWP-0 | Pure `DeckState` / `SleepWakeDecision` with no behavior change | P0 | S | done |
-| SWP-1 | Hardware poll observe-only; one restore commit owns heal/wake/sleep | P0 | M | reported |
+| SWP-1 | Hardware poll observe-only; one restore commit owns heal/wake/sleep | P0 | M | done |
 | SWP-2 | Idle and power paths emit intents; unify post-resume suppression | P0 | M | reported |
 | SWP-3 | Defer scheduler, config, and power-source hardware applies while off-family | P1 | S | reported |
 | SWP-4 | Menu turn on/off cutover; `controller_sleep_respect` read once per decision | P1 | S | reported |
@@ -395,3 +395,16 @@ Runtime capture:
   restore while `RESTORING`.
 - Validation: 49 deck-state tests, 251 idle-power tests, Ruff, and
   BuildPython Step 2 with 3763 tests plus 1 skip.
+
+### 2026-09-03 — SWP-1 hardware poll observe-only
+
+- Added `keyrgb/tray/deck_pipeline.py` as the low-frequency commit owner.
+  Hardware polling classifies `FIRMWARE_WAKE`, `CONTROLLER_SLEEP`, and
+  `AUTO_HEAL` and commits through `next_state` plus existing recovery leaves.
+- Pruned direct `set_controller_sleep_off` / `engine.stop` / recover calls
+  from `_apply_polled_hardware_state()`. Monkeypatch seams on
+  `hardware_polling` recovery aliases still bind at call time.
+- `controller_sleep_respect` is snapshotted once per poll. Resume-guard
+  blocked latching still auto-heals static effects.
+- Validation: 175 hardware+deck-state tests, Ruff, and BuildPython Step 2
+  with 3765 tests plus 1 skip.

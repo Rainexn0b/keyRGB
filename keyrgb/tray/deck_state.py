@@ -236,6 +236,10 @@ def _plan_auto_heal(state: DeckState, *, respect: bool, guards: SleepWakeGuards)
     # respect is on so a just-lit deck does not go dark for a full poll.
     if guards.recently_restored:
         return _restoring(SleepWakeIntentKind.AUTO_HEAL)
+    # Resume-guard means a relight already owns the deck; firmware may still
+    # report zero. Recover instead of honoring that zero as a new native sleep.
+    if guards.resume_guard:
+        return _restoring(SleepWakeIntentKind.AUTO_HEAL)
     if respect:
         return _noop(state)
     if not guards.stable_zero_confirmed:

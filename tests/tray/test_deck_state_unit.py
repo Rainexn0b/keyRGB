@@ -115,6 +115,22 @@ def test_recently_restored_blocks_controller_sleep_latch() -> None:
     assert (state, commit, deferred, source) == (DeckState.LIT, False, False, None)
 
 
+def test_resume_guard_auto_heals_instead_of_honoring_sleep() -> None:
+    state, commit, deferred, source = _decide(
+        DeckState.LIT,
+        SleepWakeIntentKind.AUTO_HEAL,
+        respect=True,
+        stable_zero_confirmed=True,
+        resume_guard=True,
+    )
+    assert (state, commit, deferred, source) == (
+        DeckState.RESTORING,
+        True,
+        False,
+        RestoreSource.AUTO_HEAL,
+    )
+
+
 def test_resume_guard_blocks_controller_sleep_latch() -> None:
     state, commit, deferred, source = _decide(
         DeckState.DIM_TEMP,
@@ -371,3 +387,30 @@ def test_restore_failed_without_origin_stays_restoring() -> None:
 def test_manual_on_is_noop_while_already_lit(state: DeckState) -> None:
     plan_state, commit, deferred, source = _decide(state, SleepWakeIntentKind.MANUAL_ON)
     assert (plan_state, commit, deferred, source) == (state, False, False, None)
+
+
+def test_derive_deck_state_follows_forced_off_priority() -> None:
+    from types import SimpleNamespace
+
+    from keyrgb.tray.deck_pipeline import derive_deck_state
+    from tests.tray.fakes import attach_idle_power_owner, make_idle_power_owner
+
+    tray = SimpleNamespace()
+    attach_idle_power_owner(
+        tray,
+        make_idle_power_owner(user_forced_off=True, power_forced_off=True, idle_forced_off=True),
+    )
+    assert derive_deck_state(tray) is DeckState.USER_OFF
+
+    attach_idle_power_owner(tray, make_idle_power_owner(power_forced_off=True, idle_forced_off=True))
+    assert derive_deck_state(tray) is DeckState.POWER_OFF
+
+    attach_idle_power_owner(tray, make_idle_power_owner(idle_forced_off=True, dim_temp_active=True))
+    assert derive_deck_state(tray) is DeckState.IDLE_OFF
+
+    attach_idle_power_owner(tray, make_idle_power_owner(dim_temp_active=True, dim_temp_target_brightness=5))
+    assert derive_deck_state(tray) is DeckState.DIM_TEMP
+
+    sleep_tray = SimpleNamespace()
+    attach_idle_power_owner(sleep_tray, make_idle_power_owner(controller_sleep_off=True))
+    assert derive_deck_state(sleep_tray) is DeckState.CONTROLLER_SLEEP_DARK

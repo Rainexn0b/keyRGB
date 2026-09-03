@@ -8,6 +8,8 @@ from keyrgb.tray.controllers.runtime_coordination import (
     capture_transition_revision,
     run_tray_observation_if_current,
 )
+from keyrgb.tray.deck_pipeline import commit_sleep_wake_intent
+from keyrgb.tray.deck_state import SleepWakeGuards, SleepWakeIntent, SleepWakeIntentKind
 from keyrgb.tray.idle_power_state import (
     dim_temp_target_brightness,
     is_dim_temp_active,
@@ -40,7 +42,6 @@ _reset_stable_zero_recovery_attempt_count = _recovery.reset_stable_zero_recovery
 _set_pending_zero_confirm_at = _recovery.set_pending_zero_confirm_at
 _controller_sleep_off_active = _recovery.controller_sleep_off_active
 _controller_sleep_respect_enabled = _recovery.controller_sleep_respect_enabled
-_set_controller_sleep_off = _recovery.set_controller_sleep_off
 _controller_sleep_resume_guard_active = _recovery.controller_sleep_resume_guard_active
 _set_controller_sleep_resume_guard = _recovery.set_controller_sleep_resume_guard
 _stop_engine_for_controller_sleep_best_effort = _controller_sleep.stop_engine_for_controller_sleep_best_effort
@@ -67,6 +68,44 @@ _resolve_tray_callback = _recovery._resolve_tray_callback
 # ---------------------------------------------------------------------------
 
 
+def _commit_polled_intent(
+    tray: IdlePowerTrayProtocol,
+    intent: SleepWakeIntent,
+    *,
+    now: float,
+    current_brightness: int,
+    dim_temp_target: int | None,
+    recently_restored: bool,
+    respect: bool,
+    stable_zero_confirmed: bool = False,
+) -> bool:
+    """Commit a hardware-poll intent through the pipeline.
+
+    Recovery/stop/wake callables are resolved from this module at call time so
+    existing monkeypatch seams on ``hardware_polling`` keep working.
+    """
+
+    return commit_sleep_wake_intent(
+        tray,
+        intent,
+        now=now,
+        respect=respect,
+        guards=SleepWakeGuards(
+            recently_restored=bool(recently_restored),
+            resume_guard=_controller_sleep_resume_guard_active(tray),
+            stable_zero_confirmed=bool(stable_zero_confirmed),
+            dim_temp_still_active=is_dim_temp_active(tray),
+        ),
+        current_brightness=int(current_brightness),
+        dim_temp_target=dim_temp_target,
+        recover_stable_zero=_recover_stable_zero_brightness_best_effort,
+        recover_power_source=_recover_recent_power_source_blank_best_effort,
+        stop_engine=_stop_engine_for_controller_sleep_best_effort,
+        clear_post_stop=_clear_post_stop_controller_sleep_write_best_effort,
+        restart_firmware_wake=_restart_effect_after_controller_firmware_wake_best_effort,
+    )
+
+
 def _apply_polled_hardware_state(
     tray: IdlePowerTrayProtocol,
     *,
@@ -82,11 +121,17 @@ def _apply_polled_hardware_state(
     dim_temp_active = is_dim_temp_active(tray)
     dim_temp_target = dim_temp_target_brightness(tray)
     user_forced_off, power_forced_off, idle_forced_off = read_forced_off_flags(tray)
+    forced_off = bool(user_forced_off or power_forced_off or idle_forced_off)
 
     if raw_brightness is None:
         raw_brightness = current_brightness
 
     current_brightness = _normalize_brightness_to_config_scale(current_brightness)
+    now = time.monotonic()
+    last_resume_at = float(read_last_resume_at(tray) or 0.0)
+    recently_restored = last_resume_at > 0.0 and (now - last_resume_at) < POST_RESUME_IDLE_ACTION_SUPPRESSION_S
+    respect = _controller_sleep_respect_enabled(tray)
+    wake_dim_target = int(dim_temp_target) if dim_temp_active and dim_temp_target is not None else None
 
     # Controller native sleep honored as an off state: polls keep reading 0
     # while the deck is deliberately dark; stay quiet until input, a power
@@ -96,33 +141,15 @@ def _apply_polled_hardware_state(
     # brightness register while reporting is_off=True; that is still dark and
     # must not clear the honored-sleep flag.
     if _controller_sleep_off_active(tray):
-        if current_brightness > 0 and not current_off and not (user_forced_off or power_forced_off or idle_forced_off):
-            # The firmware's own first-keypress wake won the race with the
-            # idle-power evdev loop. Claim the transition before restarting so
-            # that loop will not run a second off->soft-on restore.
-            _set_controller_sleep_off(tray, False)
-            tray.is_off = False
-            # A proven-awake read also clears any relight-intent guard so a later
-            # genuine native sleep can latch again.
-            if _controller_sleep_resume_guard_active(tray):
-                _set_controller_sleep_resume_guard(tray, False)
-            # A temporary screen-dim brightness is a brightness policy, not an
-            # off owner: the firmware wake happened while that policy still owns
-            # the deck, so restore at the dim target rather than relighting to
-            # the full configured brightness and bypassing the temporary target.
-            # The idle/evdev path restores full brightness once the screen wakes.
-            wake_brightness_override = None
-            if dim_temp_active and dim_temp_target is not None:
-                wake_brightness_override = int(dim_temp_target)
-            restored = _restart_effect_after_controller_firmware_wake_best_effort(
+        if current_brightness > 0 and not current_off and not forced_off:
+            _commit_polled_intent(
                 tray,
-                now=time.monotonic(),
-                brightness_override=wake_brightness_override,
-            )
-            _log_polled_hardware_event(
-                tray,
-                "controller_sleep_firmware_wake",
-                effect_restored=bool(restored),
+                SleepWakeIntent(SleepWakeIntentKind.FIRMWARE_WAKE),
+                now=now,
+                current_brightness=current_brightness,
+                dim_temp_target=wake_dim_target,
+                recently_restored=recently_restored,
+                respect=respect,
             )
         else:
             # Forced-off policy wins over a stale/non-zero poll sampled during
@@ -156,12 +183,8 @@ def _apply_polled_hardware_state(
             return current_brightness, False
 
     zero_brightness_without_off_state = current_brightness == 0 and not bool(current_off)
-    if current_brightness == 0 and (bool(current_off) or user_forced_off or power_forced_off or idle_forced_off):
+    if current_brightness == 0 and (bool(current_off) or forced_off):
         current_off = True
-
-    now = time.monotonic()
-    last_resume_at = float(read_last_resume_at(tray) or 0.0)
-    recently_restored = last_resume_at > 0.0 and (now - last_resume_at) < POST_RESUME_IDLE_ACTION_SUPPRESSION_S
 
     if last_brightness is not None and current_brightness != last_brightness:
         _log_polled_hardware_event(
@@ -190,26 +213,23 @@ def _apply_polled_hardware_state(
         # transiently report 0 during mode transitions; persisting it resets the
         # user's configured brightness to 0 (and writes it to disk).
         if current_brightness == 0:
-            if _recover_recent_power_source_blank_best_effort(tray, current_brightness=current_brightness):
-                return current_brightness, False
-            if zero_brightness_without_off_state:
+            if zero_brightness_without_off_state and not forced_off:
                 # Fresh zero transition (likely ITE controller sleep): arm a
                 # fast confirmation poll so the stable-zero recovery fires in
-                # ~0.25 s instead of after a full 2 s poll cycle.  Skip when a
-                # forced-off state intentionally wants the deck dark.
-                if not (user_forced_off or power_forced_off or idle_forced_off):
-                    _set_pending_zero_confirm_at(tray, now)
-                # A zero right after restore is a transient glitch, not a
-                # stable sleep.  Recover on the first read instead of waiting
-                # for the confirmation poll — the 2 s cadence would otherwise
-                # leave the deck dark for seconds.
-                if (
-                    recently_restored
-                    and not (user_forced_off or power_forced_off or idle_forced_off)
-                    and _configured_brightness_intent(tray) > 0
-                    and _recover_stable_zero_brightness_best_effort(tray, current_brightness=current_brightness)
-                ):
-                    return current_brightness, False
+                # ~0.25 s instead of after a full 2 s poll cycle.
+                _set_pending_zero_confirm_at(tray, now)
+            if not forced_off and _configured_brightness_intent(tray) > 0 and _commit_polled_intent(
+                tray,
+                SleepWakeIntent(SleepWakeIntentKind.AUTO_HEAL),
+                now=now,
+                current_brightness=current_brightness,
+                dim_temp_target=wake_dim_target,
+                recently_restored=recently_restored,
+                respect=respect,
+                stable_zero_confirmed=False,
+            ):
+                return current_brightness, False
+            if zero_brightness_without_off_state:
                 return current_brightness, False
             tray.is_off = True
         else:
@@ -217,7 +237,7 @@ def _apply_polled_hardware_state(
             # Some backends report a different scale (e.g. 0..10), which would
             # overwrite the user's tray selection and leave no brightness radio
             # item selected after restart.
-            if last_brightness == 0 and not (user_forced_off or power_forced_off or idle_forced_off):
+            if last_brightness == 0 and not forced_off:
                 tray.is_off = False
 
         _refresh_ui_without_icon_animation(tray)
@@ -237,28 +257,43 @@ def _apply_polled_hardware_state(
         # A controller-sleep restore can clear the device's off flag while the
         # brightness register remains at the previously tracked zero. In that
         # case this off-state-change branch is the first post-restore evidence
-        # that the deck relapsed. Heal immediately instead of returning here and
-        # waiting a full hardware-poll interval before the stable-zero branch
-        # below gets a chance to run.
+        # that the deck relapsed. Heal immediately instead of waiting another
+        # full hardware-poll interval.
         if (
             current_brightness == 0
             and not current_off
             and recently_restored
-            and not (user_forced_off or power_forced_off or idle_forced_off)
+            and not forced_off
             and _configured_brightness_intent(tray) > 0
-            and _recover_stable_zero_brightness_best_effort(tray, current_brightness=current_brightness)
+            and _commit_polled_intent(
+                tray,
+                SleepWakeIntent(SleepWakeIntentKind.AUTO_HEAL),
+                now=now,
+                current_brightness=current_brightness,
+                dim_temp_target=wake_dim_target,
+                recently_restored=True,
+                respect=respect,
+            )
         ):
             return current_brightness, False
 
         if current_off:
-            if _recover_recent_power_source_blank_best_effort(tray, current_brightness=current_brightness):
+            if not forced_off and _commit_polled_intent(
+                tray,
+                SleepWakeIntent(SleepWakeIntentKind.AUTO_HEAL),
+                now=now,
+                current_brightness=current_brightness,
+                dim_temp_target=wake_dim_target,
+                recently_restored=recently_restored,
+                respect=respect,
+            ):
                 return current_brightness, False
             if _power_source_recovery_window_active(tray, now=time.monotonic()):
                 return current_brightness, False
             tray.is_off = True
         else:
             # Avoid overriding explicit forced-off states.
-            if not (user_forced_off or power_forced_off or idle_forced_off):
+            if not forced_off:
                 tray.is_off = False
         _refresh_ui_without_icon_animation(tray)
         return current_brightness, current_off
@@ -271,44 +306,38 @@ def _apply_polled_hardware_state(
         # The confirmation poll ran (fast or normal cadence); stop fast-polling
         # and let the recovery circuit breaker's cooldown govern any retries.
         _set_pending_zero_confirm_at(tray, 0.0)
-        if (
-            _controller_sleep_respect_enabled(tray)
-            and not (user_forced_off or power_forced_off or idle_forced_off)
+        can_own_sleep = (
+            respect
+            and not forced_off
             and _configured_brightness_intent(tray) > 0
             and not recently_restored
             and not _controller_sleep_resume_guard_active(tray)
+        )
+        if can_own_sleep and _commit_polled_intent(
+            tray,
+            SleepWakeIntent(SleepWakeIntentKind.CONTROLLER_SLEEP),
+            now=now,
+            current_brightness=current_brightness,
+            dim_temp_target=wake_dim_target,
+            recently_restored=False,
+            respect=True,
+            stable_zero_confirmed=True,
         ):
-            # Opt-in: honor the controller's native keyboard-input sleep as a
-            # valid off state instead of force re-lighting it. This contract
-            # applies even when a software/reactive effect was mid-render:
-            # recovering there defeats the explicit "let the controller sleep"
-            # setting and produces the visible off→on flicker it is meant to
-            # avoid.
-            # The idle runtime restores on validated keyboard activity; a
-            # firmware wake observed here is the fallback when hardware wins
-            # that race. Power restore and menu turn-on use their normal paths.
-            #
-            # Skip this stick-dark path for a short window after idle/power
-            # restore: a post-restore firmware transient zero must not undo the
-            # restore and leave the deck stuck until a manual tray toggle.
-            # The relight-intent guard extends that protection past the fixed
-            # timestamp window: the firmware may remain in native sleep (and
-            # keep reporting zero) long after resume, so we must not re-latch
-            # until a poll proves the deck is actually awake.
-            _set_controller_sleep_off(tray, True, now=now)
-            tray.is_off = True
-            # Stop any residual effect thread and mark mode-off for the next
-            # soft-on prime (enable_user_mode reassert).
-            if _stop_engine_for_controller_sleep_best_effort(tray):
-                _clear_post_stop_controller_sleep_write_best_effort(tray)
-            _log_polled_hardware_event(tray, "controller_sleep_off")
-            _refresh_ui_without_icon_animation(tray)
             return current_brightness, True
         # When the relight guard prevented controller-sleep latching above,
         # retain the normal stable-zero recovery attempt.  Static effects do
         # not have a render loop continuously reasserting brightness, so merely
         # keeping the logical state on would not necessarily wake the deck.
-        if _recover_stable_zero_brightness_best_effort(tray, current_brightness=current_brightness):
+        if _commit_polled_intent(
+            tray,
+            SleepWakeIntent(SleepWakeIntentKind.AUTO_HEAL),
+            now=now,
+            current_brightness=current_brightness,
+            dim_temp_target=wake_dim_target,
+            recently_restored=recently_restored,
+            respect=respect,
+            stable_zero_confirmed=True,
+        ):
             return current_brightness, False
 
     return current_brightness, current_off
