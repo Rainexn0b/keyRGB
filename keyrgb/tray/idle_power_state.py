@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from keyrgb.tray.deck_state import DeckState
+
 
 @dataclass
 class TrayIdlePowerState:
@@ -69,6 +71,12 @@ class TrayIdlePowerState:
     hardware_toggle_restore_software_target: str = "keyboard"
     hardware_toggle_restore_hardware_effect: str = "none"
     hardware_toggle_restore_hardware_color: object = None
+    # SWP-0 pipeline authority. Runtime still uses the forced-off /
+    # controller_sleep_off flags above until SWP-1 moves commits.
+    deck_state: DeckState = DeckState.LIT
+    deferred_brightness: int | None = None
+    deferred_perkey_profile: str | None = None
+    restoring_target: int | None = None
 
     def reset_dim_state(self) -> None:
         self.dim_temp_active = False

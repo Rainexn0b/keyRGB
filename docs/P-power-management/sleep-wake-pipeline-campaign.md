@@ -2,7 +2,7 @@
 
 **Started:** 2026-09-03  
 **Lane:** `P-power-management`  
-**Status:** planned — architecture frozen, no implementation started  
+**Status:** SWP-0 pure decision table landed — runtime still uses legacy flags
 **Hardware validation gate:** inherit [KSW-8](keyboard-sleep-wake-hardening-campaign.md)
 plus one-restore-per-wake evidence after the pipeline cutover
 
@@ -199,7 +199,7 @@ KSW-1 already-dark suspend (no wake-capable fade).
 
 | ID | Concern | Priority | Effort | Status |
 |---|---|:---:|:---:|---|
-| SWP-0 | Pure `DeckState` / `SleepWakeDecision` with no behavior change | P0 | S | reported |
+| SWP-0 | Pure `DeckState` / `SleepWakeDecision` with no behavior change | P0 | S | done |
 | SWP-1 | Hardware poll observe-only; one restore commit owns heal/wake/sleep | P0 | M | reported |
 | SWP-2 | Idle and power paths emit intents; unify post-resume suppression | P0 | M | reported |
 | SWP-3 | Defer scheduler, config, and power-source hardware applies while off-family | P1 | S | reported |
@@ -382,3 +382,16 @@ Runtime capture:
 - Confirmed overlapping wake writers and rejected clamp-to-lowest.
 - Froze `controller_sleep_respect` as a first-class pipeline policy input.
 - No code changes in this pass.
+
+### 2026-09-03 — SWP-0 pure decision table
+
+- Added `keyrgb/tray/deck_state.py` with `DeckState`, intents, guards, and
+  `next_state()`. Runtime pollers still do not call it.
+- Extended `TrayIdlePowerState` with `deck_state`, `deferred_brightness`,
+  `deferred_perkey_profile`, and `restoring_target`. Forced-off and
+  `controller_sleep_off` remain the live contract.
+- Table tests cover respect on/off, post-restore auto-heal, user/power/idle
+  precedence, dim-temp vs off, firmware/evdev coalescing, and no second
+  restore while `RESTORING`.
+- Validation: 49 deck-state tests, 251 idle-power tests, Ruff, and
+  BuildPython Step 2 with 3763 tests plus 1 skip.
