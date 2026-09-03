@@ -30,25 +30,51 @@ def _monotonic() -> float:
 
 
 def post_restore_frame_scale(engine: EffectsEngine) -> float:
-    """Whole-frame scale in [FRAME_MIN, 1] while restore damp remaining > 0."""
+    """Whole-frame scale in [FRAME_MIN, 1] while restore frame envelope is active.
 
-    damp, remaining_s = post_restore_visual_damp(engine)
-    if remaining_s <= 0.0 or float(damp) >= 0.999:
+    Independent of the pulse restore phase; monotonic from FRAME_MIN to 1.0
+    over the configured fade duration. Pulse damp may continue after this
+    envelope ends.
+    """
+
+    raw_started = _support.read_engine_attr(
+        engine,
+        "_reactive_restore_frame_started_at",
+        missing_default=None,
+        error_default=None,
+        logger=logger,
+    )
+    raw_duration = _support.read_engine_attr(
+        engine,
+        "_reactive_restore_frame_duration_s",
+        missing_default=None,
+        error_default=None,
+        logger=logger,
+    )
+    started_s = _support.coerce_float(raw_started, default=None) if raw_started is not None else None
+    duration_s = _support.coerce_float(raw_duration, default=None) if raw_duration is not None else None
+    if started_s is None or duration_s is None:
         return 1.0
-    min_pulse = float(POST_RESTORE_PULSE_VISUAL_MIN_FACTOR)
+    duration_f = max(0.0, float(duration_s))
+    if duration_f <= 0.0:
+        return 1.0
+    started_f = float(started_s)
+    elapsed = max(0.0, float(_monotonic()) - started_f)
+    if elapsed >= duration_f:
+        # Envelope completed; whole-frame returns to full. Lazy clear is not
+        # required for correctness but keeps state tidy for diagnostics.
+        return 1.0
+    progress = max(0.0, min(1.0, elapsed / duration_f))
     min_frame = float(POST_RESTORE_FRAME_MIN_FACTOR)
-    # Map pulse damp [min_pulse, 1] → frame [min_frame, 1].
-    t = (float(damp) - min_pulse) / max(1e-6, 1.0 - min_pulse)
-    t = max(0.0, min(1.0, t))
-    return min_frame + ((1.0 - min_frame) * t)
+    return min_frame + ((1.0 - min_frame) * progress)
 
 
 def post_restore_visual_damp(engine: EffectsEngine) -> tuple[float, float]:
     """Compute the visual damp factor and remaining seconds for post-restore.
 
     After an idle wake or temp-dim restore, hardware brightness ramps up from a
-    low value. Full-intensity reactive pulses (and, via frame scale, soft-on
-    matrix steps) would flash. This returns a damp factor (0..1) for the active
+    low value. Full-intensity reactive pulses would flash. This returns a damp
+    factor (0..1) for the active
     restore window seeded at idle restore (FIRST_PULSE_PENDING), extended on the
     first post-restore keypress (→ DAMPING). When inactive, damp is 1.0.
 

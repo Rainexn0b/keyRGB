@@ -5,6 +5,11 @@
 > See also: `docs/O-optimisations/reactive-typing-improvement-plan.md` (original ReactiveRenderState consolidation plan)
 > See also: `docs/D-debugging/reactive-typing-flicker-postmortem-2026-04.md`
 
+> 2026-09-03 follow-up: OP-1 in
+> `docs/I-implementation-plans/runtime-policy-ownership-followup-campaign.md`
+> separates the whole-frame restore envelope from pulse damp and removes the
+> post-start reseed that produced a first-key scale reversal.
+
 ---
 
 ## Summary of Findings

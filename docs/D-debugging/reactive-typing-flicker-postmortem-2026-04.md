@@ -334,6 +334,23 @@ restore) that happened to trigger the same visual symptom. This confirms
 lesson #2 from the original campaign: multiple code paths can restart the
 reactive effect, and each must seed restore damp independently.
 
+## 2026-09-03 addendum — first-key frame-scale reversal
+
+The full session `20260903T092201.323445Z` showed one restore invocation per
+controller wake, but exposed a render-time discontinuity inside that restore.
+Before the first reactive key the whole-frame scale was `0.620`; changing the
+restore phase to `DAMPING` made it jump to `1.000`. When the blocking effect
+start returned, a fresh post-start seed reset the phase and scale to `0.620`.
+
+The correction gives the whole-frame envelope its own fade-duration clock and
+makes it independent of pulse phase. It rises monotonically from its floor to
+`1.0` by fade completion. Idle restore now queues one seed before effect start
+and only consumes that original seed after start if `stop()` did not consume
+it; it never creates a fresh seed after the fade.
+
+This refines the earlier lesson: every restore path must enter the shared seed
+contract, but one restore must create exactly one seed.
+
 ## Related references
 
 - `docs/1-src/08-reactive-brightness-invariants.md`

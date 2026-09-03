@@ -31,17 +31,21 @@ class ReactiveRestoreSeed:
     disable_pulse_hw_lift_until: float
     restore_damp_until: float
     restore_phase: ReactiveRestorePhase = ReactiveRestorePhase.FIRST_PULSE_PENDING
+    restore_frame_started_at: float = 0.0
+    restore_frame_duration_s: float = 0.0
 
 
 def build_reactive_restore_seed(*, fade_in_duration_s: float, now: float | None = None) -> ReactiveRestoreSeed:
     """Build restore damp timers for idle full-off → on wake."""
 
     current = float(time.monotonic() if now is None else now)
-    fade_s = float(fade_in_duration_s)
+    fade_s = max(0.0, float(fade_in_duration_s))
     return ReactiveRestoreSeed(
         disable_pulse_hw_lift_until=current + max(2.0, fade_s + 0.75),
         restore_damp_until=current + max(4.0, fade_s + 2.75),
         restore_phase=ReactiveRestorePhase.FIRST_PULSE_PENDING,
+        restore_frame_started_at=current,
+        restore_frame_duration_s=fade_s,
     )
 
 
@@ -82,13 +86,15 @@ def apply_reactive_restore_seed(engine: object, seed: ReactiveRestoreSeed) -> bo
         state._reactive_disable_pulse_hw_lift_until = float(seed.disable_pulse_hw_lift_until)
         state._reactive_restore_damp_until = float(seed.restore_damp_until)
         state._reactive_restore_phase = seed.restore_phase
+        state._reactive_restore_frame_started_at = float(seed.restore_frame_started_at)
+        state._reactive_restore_frame_duration_s = float(seed.restore_frame_duration_s)
         return True
     except (AttributeError, TypeError, ValueError):
         return False
 
 
 def seed_reactive_restore_windows(engine: object, *, fade_in_duration_s: float, now: float | None = None) -> bool:
-    """Queue + apply restore damp (call before and after effect start on idle wake)."""
+    """Queue + apply one restore seed before an effect restart."""
 
     seed = build_reactive_restore_seed(fade_in_duration_s=fade_in_duration_s, now=now)
     queue_reactive_restore_seed(engine, seed)

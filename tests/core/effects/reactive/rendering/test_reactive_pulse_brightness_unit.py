@@ -95,6 +95,8 @@ def test_queued_restore_seed_survives_engine_state_reset() -> None:
     state = ensure_reactive_state(eng)
     assert state._reactive_restore_phase is ReactiveRestorePhase.FIRST_PULSE_PENDING
     assert state._reactive_restore_damp_until == pytest.approx(104.0)
+    assert state._reactive_restore_frame_started_at == pytest.approx(100.0)
+    assert state._reactive_restore_frame_duration_s == pytest.approx(0.42)
 
     # Simulate engine.stop() rebuild.
     eng._reactive_state = ReactiveRenderState()
@@ -103,6 +105,8 @@ def test_queued_restore_seed_survives_engine_state_reset() -> None:
     assert state._reactive_restore_phase is ReactiveRestorePhase.FIRST_PULSE_PENDING
     assert state._reactive_restore_damp_until == pytest.approx(104.0)
     assert state._reactive_disable_pulse_hw_lift_until == pytest.approx(102.0)
+    assert state._reactive_restore_frame_started_at == pytest.approx(100.0)
+    assert state._reactive_restore_frame_duration_s == pytest.approx(0.42)
     # Queue is single-shot.
     eng._reactive_state = ReactiveRenderState()
     assert apply_queued_reactive_restore_seed(eng) is False
@@ -110,6 +114,7 @@ def test_queued_restore_seed_survives_engine_state_reset() -> None:
 
 def test_post_restore_frame_scale_softens_soft_on_matrix_steps() -> None:
     """Whole-frame scale during restore damp covers pulse_mix=0 soft-on pops."""
+    from keyrgb.core.effects.reactive._reactive_restore_seed import seed_reactive_restore_windows
     from keyrgb.core.effects.reactive._render_brightness_support import (
         ReactiveRestorePhase,
         ensure_reactive_state,
@@ -119,28 +124,33 @@ def test_post_restore_frame_scale_softens_soft_on_matrix_steps() -> None:
     eng = _DummyEngine(brightness=20, reactive_brightness=50)
     eng.per_key_colors = {(0, 0): (0, 0, 0)}
     eng.per_key_brightness = 20
+    # Seed via the canonical helper so frame envelope is populated (fade 0.42).
+    seed_reactive_restore_windows(eng, fade_in_duration_s=0.42, now=100.0)
     state = ensure_reactive_state(eng)
-    state._reactive_restore_damp_until = 104.0
-    state._reactive_restore_phase = ReactiveRestorePhase.FIRST_PULSE_PENDING
+    assert state._reactive_restore_phase is ReactiveRestorePhase.FIRST_PULSE_PENDING
 
     import keyrgb.core.effects.reactive.render as render_module
 
     original_monotonic = render_module.time.monotonic
     render_module.time.monotonic = lambda: 100.0
     try:
-        # At damp floor 0.35 → frame floor 0.62
+        # At envelope start → frame floor 0.62, independent of pulse phase.
         assert _post_restore_frame_scale(eng) == pytest.approx(0.62)
         assert _resolve_transition_visual_scale(eng) == pytest.approx(0.62)
-        # Once typing begins (DAMPING), the whole-frame fold must stay out:
-        # the pulse damp mutes pulses on its own, and folding the frame would
-        # visibly dim the already steady deck on the first post-restore
-        # keypress (observed on hardware as a ~2s deck-wide dip to 62%).
+        # First key flips phase to DAMPING but frame envelope stays monotonic;
+        # whole-frame must NOT jump back to 1.0 (the OP-1 discontinuity).
         state._reactive_restore_phase = ReactiveRestorePhase.DAMPING
         assert _post_restore_frame_scale(eng) == pytest.approx(0.62)
+        assert _resolve_transition_visual_scale(eng) == pytest.approx(0.62)
+        # Outside restore window (envelope elapsed), full scale.
+        render_module.time.monotonic = lambda: 100.5
+        assert _post_restore_frame_scale(eng) == pytest.approx(1.0)
         assert _resolve_transition_visual_scale(eng) == pytest.approx(1.0)
-        # Outside restore window, full scale.
+        # Clearing frame envelope also yields full scale.
         state._reactive_restore_phase = ReactiveRestorePhase.NORMAL
         state._reactive_restore_damp_until = None
+        state._reactive_restore_frame_started_at = None
+        state._reactive_restore_frame_duration_s = None
         assert _post_restore_frame_scale(eng) == pytest.approx(1.0)
         assert _resolve_transition_visual_scale(eng) == pytest.approx(1.0)
     finally:
@@ -510,3 +520,139 @@ def test_resolve_brightness_logs_hw_lift_cooldown_reason_under_debug(monkeypatch
     assert messages
     assert "reason=cooldown" in messages[-1]
     assert "cooldown_remaining_s=2.50" in messages[-1]
+
+
+def test_post_restore_frame_scale_is_monotonic_and_phase_independent_across_fade() -> None:
+    """Whole-frame restore scale must be monotonic and reach 1.0 by fade duration.
+
+    Independent of FIRST_PULSE_PENDING→DAMPING flip; pulse damp may continue
+    after the frame envelope ends.
+    """
+    from keyrgb.core.effects.reactive._reactive_restore_seed import seed_reactive_restore_windows
+    from keyrgb.core.effects.reactive._render_brightness_support import (
+        ReactiveRestorePhase,
+        ensure_reactive_state,
+    )
+    from keyrgb.core.effects.reactive.render import _post_restore_frame_scale
+
+    eng = _DummyEngine(brightness=20, reactive_brightness=50)
+    eng.per_key_colors = {(0, 0): (0, 0, 0)}
+    eng.per_key_brightness = 20
+
+    import keyrgb.core.effects.reactive.render as render_module
+
+    seed_reactive_restore_windows(eng, fade_in_duration_s=0.42, now=100.0)
+    state = ensure_reactive_state(eng)
+    assert state._reactive_restore_phase is ReactiveRestorePhase.FIRST_PULSE_PENDING
+    assert state._reactive_restore_frame_duration_s == pytest.approx(0.42)
+
+    original = render_module.time.monotonic
+    try:
+        # At envelope start → FRAME_MIN
+        render_module.time.monotonic = lambda: 100.0
+        v0 = _post_restore_frame_scale(eng)
+        assert v0 == pytest.approx(0.62)
+        # Phase flip must not cause discontinuity.
+        state._reactive_restore_phase = ReactiveRestorePhase.DAMPING
+        assert _post_restore_frame_scale(eng) == pytest.approx(v0)
+        # Flip back also stable.
+        state._reactive_restore_phase = ReactiveRestorePhase.FIRST_PULSE_PENDING
+        assert _post_restore_frame_scale(eng) == pytest.approx(v0)
+
+        # Monotonic rise through fade duration.
+        render_module.time.monotonic = lambda: 100.21
+        v_mid = _post_restore_frame_scale(eng)
+        assert v_mid > v0
+        assert v_mid == pytest.approx(0.62 + (1.0 - 0.62) * (0.21 / 0.42))
+
+        render_module.time.monotonic = lambda: 100.42
+        assert _post_restore_frame_scale(eng) == pytest.approx(1.0)
+
+        # After envelope, still 1.0 even though pulse damp continues (until ~104).
+        render_module.time.monotonic = lambda: 101.0
+        assert _post_restore_frame_scale(eng) == pytest.approx(1.0)
+        assert state._reactive_restore_damp_until == pytest.approx(104.0)
+
+        # Strict monotonic sequence.
+        seq = []
+        for t in [100.0, 100.1, 100.2, 100.3, 100.42, 100.5]:
+            render_module.time.monotonic = lambda t=t: t  # type: ignore[misc]
+            seq.append(_post_restore_frame_scale(eng))
+        assert seq == sorted(seq)
+        assert seq[0] == pytest.approx(0.62)
+        assert seq[-1] == pytest.approx(1.0)
+    finally:
+        render_module.time.monotonic = original
+
+
+def test_start_current_effect_for_idle_restore_does_not_reset_damping_to_first_pulse_pending(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Seed queued before start must survive stop but post-start must not reseed DAMPING."""
+    from keyrgb.core.effects.reactive import effects
+    from keyrgb.core.effects.reactive._render_brightness_support import (
+        ReactiveRenderState,
+        ReactiveRestorePhase,
+        ensure_reactive_state,
+    )
+    from keyrgb.tray.pollers.idle_power._transition_actions import start_current_effect_for_idle_restore
+
+    # Shared monotonic clock so seed and frame envelope are deterministic.
+    class _Clock:
+        def __init__(self) -> None:
+            self.now = 100.0
+
+        def monotonic(self) -> float:
+            return self.now
+
+    clock = _Clock()
+    monkeypatch.setattr("keyrgb.tray.pollers.idle_power._transition_actions.time.monotonic", clock.monotonic)
+    monkeypatch.setattr("keyrgb.core.effects.reactive._reactive_restore_seed.time.monotonic", clock.monotonic)
+    monkeypatch.setattr("keyrgb.core.effects.reactive.render.time.monotonic", clock.monotonic)
+
+    # Minimal engine with real ReactiveRenderState semantics and queued-seed support.
+    eng = SimpleNamespace()
+    eng._reactive_state = ReactiveRenderState()
+
+    # Fake tray; start_current_effect simulates engine.stop() plus first-key DAMPING flip.
+    def _fake_start_current_effect(*_args, **_kwargs):
+        # Simulate engine.stop(): fresh state + apply queued seed.
+        eng._reactive_state = ReactiveRenderState()
+        from keyrgb.core.effects.reactive._reactive_restore_seed import apply_queued_reactive_restore_seed
+
+        apply_queued_reactive_restore_seed(eng)
+        # Now first reactive key arrives during the blocking fade: FIRST_PULSE_PENDING→DAMPING
+        state = ensure_reactive_state(eng)
+        assert state._reactive_restore_phase is ReactiveRestorePhase.FIRST_PULSE_PENDING
+        # Use the real first-pulse state transition while the start fade owns
+        # the caller. The original 4 s seed remains later than the 2 s pulse
+        # extension; only the phase changes to DAMPING.
+        effects._set_reactive_active_pulse_mix(eng, target=1.0)
+        # Advance clock to simulate blocking start returning later.
+        clock.now = 100.3
+        return True
+
+    tray = SimpleNamespace(
+        config=SimpleNamespace(effect="reactive_ripple", brightness=20),
+        engine=eng,
+        is_off=False,
+    )
+    tray._start_current_effect = _fake_start_current_effect  # type: ignore[attr-defined]
+    # Provide idle_power_state owner for loop-effect-ramp flag writes.
+    tray.tray_idle_power_state = SimpleNamespace(idle_restore_loop_effect_ramp=False)
+
+    start_current_effect_for_idle_restore(
+        tray,  # type: ignore[arg-type]
+        brightness_override=1,
+        fade_in=True,
+        fade_in_duration_s=0.42,
+    )
+
+    state = ensure_reactive_state(eng)
+    # Post-start must NOT have reset DAMPING to FIRST_PULSE_PENDING nor reseeded frame start.
+    assert state._reactive_restore_phase is ReactiveRestorePhase.DAMPING
+    assert state._reactive_restore_frame_started_at == pytest.approx(100.0)
+    assert state._reactive_restore_frame_duration_s == pytest.approx(0.42)
+    # The original deadline survives. A fresh post-start seed would move it to
+    # 104.3 and reset the phase to FIRST_PULSE_PENDING.
+    assert state._reactive_restore_damp_until == pytest.approx(104.0)

@@ -54,6 +54,14 @@ class ReactiveRenderState:
     _reactive_restore_phase: ReactiveRestorePhase = ReactiveRestorePhase.NORMAL
     _reactive_restore_damp_until: float | None = None
 
+    # --- Post-restore whole-frame envelope ---
+    # Independent of the pulse restore phase; covers soft-on full-deck matrix
+    # steps after controller-sleep wake. Monotonic from FRAME_MIN to 1.0 over
+    # the configured fade duration, independent of FIRST_PULSE_PENDING → DAMPING
+    # flips. Pulse damp may continue after this envelope ends.
+    _reactive_restore_frame_started_at: float | None = None
+    _reactive_restore_frame_duration_s: float | None = None
+
     # --- Uniform backend streak gate ---
     # Counts consecutive frames with active pulse on uniform-only backends.
     # Must reach UNIFORM_PULSE_HW_LIFT_STREAK_MIN (6) before a hardware

@@ -55,6 +55,14 @@ reset so the next render loop starts from a known dark state and reinitializes
 user mode cleanly. This prevents stale-brightness flashes during restart,
 restore, or wake flows.
 
+7. Whole-frame restore easing and pulse damp have separate lifetimes.
+
+The whole-frame envelope rises monotonically to full scale by the configured
+soft-on fade duration and does not depend on `FIRST_PULSE_PENDING` versus
+`DAMPING`. Pulse damp may remain active after that envelope ends. A queued
+pre-start restore seed is consumed across `stop()`; callers must not create a
+fresh post-start seed that resets the phase or restarts either timer.
+
 ## Test Strategy
 
 The current regression suite intentionally splits behavior by backend class:

@@ -103,8 +103,13 @@ def start_current_effect_for_idle_restore(
             except TypeError:
                 start_fn()
             if seed_reactive_restore_windows:
-                # Refresh timers after start (stop consumed the pre-start queue).
-                _seed_reactive_restore_windows(engine, fade_in_duration_s=fade_in_duration_s)
+                # Do not build a fresh post-start seed that would reset DAMPING
+                # to FIRST_PULSE_PENDING. Only re-apply the original queued seed
+                # if stop did not consume it.
+                try:
+                    _reactive_restore_seed.apply_queued_reactive_restore_seed(engine)
+                except (AttributeError, TypeError, ValueError):
+                    pass
             return
 
         from keyrgb.tray.controllers.lighting_controller import start_current_effect
@@ -116,7 +121,10 @@ def start_current_effect_for_idle_restore(
             fade_in_duration_s=fade_in_duration_s,
         )
         if seed_reactive_restore_windows:
-            _seed_reactive_restore_windows(engine, fade_in_duration_s=fade_in_duration_s)
+            try:
+                _reactive_restore_seed.apply_queued_reactive_restore_seed(engine)
+            except (AttributeError, TypeError, ValueError):
+                pass
     finally:
         if use_loop_effect_ramp:
             try:
