@@ -386,7 +386,7 @@ def test_controller_sleep_restore_on_new_evdev_input_edge(monkeypatch) -> None:
     loop_state.input_idle_tracker = SimpleNamespace(last_keyboard_activity_at=105.0)
     calls: list[object] = []
     tray.engine.turn_off = lambda: calls.append("turn_off")
-    monkeypatch.setattr(_runtime, "restore_from_idle", lambda t: calls.append(t))
+    monkeypatch.setattr("keyrgb.tray.pollers.idle_power._actions.restore_from_idle", lambda t: calls.append(t))
 
     _runtime._maybe_restore_from_controller_sleep(tray, loop_state=loop_state, session_idle=None)
 
@@ -403,7 +403,7 @@ def test_controller_sleep_restore_stays_armed_when_hardware_rearm_fails(monkeypa
         raise OSError("device unavailable")
 
     tray.engine.turn_off = fail_turn_off
-    monkeypatch.setattr(_runtime, "restore_from_idle", lambda t: calls.append(t))
+    monkeypatch.setattr("keyrgb.tray.pollers.idle_power._actions.restore_from_idle", lambda t: calls.append(t))
 
     _runtime._maybe_restore_from_controller_sleep(tray, loop_state=loop_state, session_idle=None)
 
@@ -462,7 +462,7 @@ def test_controller_sleep_polls_keyboard_tracker_alongside_wayland(monkeypatch) 
     loop_state = _runtime.IdlePollLoopState(prev_session_idle=True)
     tracker = SimpleNamespace(last_keyboard_activity_at=0.0)
     calls: list[object] = []
-    monkeypatch.setattr(_runtime, "restore_from_idle", lambda t: calls.append(t))
+    monkeypatch.setattr("keyrgb.tray.pollers.idle_power._actions.restore_from_idle", lambda t: calls.append(t))
 
     def read_input(_tracker) -> float:
         _tracker.last_keyboard_activity_at = 105.0

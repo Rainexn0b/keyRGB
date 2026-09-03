@@ -12,8 +12,8 @@ from typing import cast
 
 from keyrgb.core.profile import profiles as core_profiles, runtime_activation as profile_runtime_activation
 from keyrgb.tray.controllers.runtime_coordination import run_tray_transition
+from keyrgb.tray.deck_pipeline import hardware_apply_deferred
 from keyrgb.tray.idle_power_state import (
-    any_forced_off,
     set_idle_power_state_field,
 )
 
@@ -105,7 +105,7 @@ def activate_perkey_profile_on_tray(
         # Run-time suppression facade: suppress hardware/effect application while
         # ANY forced-off owner (user, power/suspend/lid, or idle/screen-off)
         # holds the deck dark, but still persist profile intent and marker.
-        is_power_forced_off_fn=lambda: any_forced_off(tray),
+        is_power_forced_off_fn=lambda: hardware_apply_deferred(tray),
         set_is_off_fn=_set_is_off,
         store_secondary_lighting_fn=lambda payload: _store_active_secondary_lighting(tray, payload),
         apply_runtime_transition_fn=((lambda: bool(apply_transition())) if apply_transition is not None else None),

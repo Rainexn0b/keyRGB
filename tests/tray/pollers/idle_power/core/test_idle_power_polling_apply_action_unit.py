@@ -338,7 +338,7 @@ def test_restore_does_not_restore_when_user_forced_off(
     set_idle_power_state_field(tray, attr_name="_user_forced_off", state_name="user_forced_off", value=True)
 
     restore = MagicMock()
-    monkeypatch.setattr(module, "_restore_from_idle", restore)
+    monkeypatch.setattr("keyrgb.tray.pollers.idle_power._actions.restore_from_idle", restore)
 
     _apply_idle_action(tray, action="restore", dim_temp_brightness=5)
 
@@ -368,24 +368,26 @@ def test_restore_does_not_restore_when_owner_user_forced_off_and_legacy_missing(
     )
 
     restore = MagicMock()
-    monkeypatch.setattr(module, "_restore_from_idle", restore)
+    monkeypatch.setattr("keyrgb.tray.pollers.idle_power._actions.restore_from_idle", restore)
 
     _apply_idle_action(tray, action="restore", dim_temp_brightness=5)
 
     restore.assert_not_called()
-    assert tray._user_forced_off is True
-    assert tray._power_forced_off is False
+    assert tray.tray_idle_power_state.user_forced_off is True
+    assert tray.tray_idle_power_state.power_forced_off is False
 
 
 def test_restore_does_restore_when_not_forced_off(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import keyrgb.tray.pollers.idle_power.polling as module
+    from keyrgb.tray.idle_power_state import set_idle_power_state_field
 
     tray = _mk_tray(effect="wave", brightness=25)
+    tray.is_off = True
+    set_idle_power_state_field(tray, attr_name="_idle_forced_off", state_name="idle_forced_off", value=True)
 
     restore = MagicMock()
-    monkeypatch.setattr(module, "_restore_from_idle", restore)
+    monkeypatch.setattr("keyrgb.tray.pollers.idle_power._actions.restore_from_idle", restore)
 
     _apply_idle_action(tray, action="restore", dim_temp_brightness=5)
 
@@ -415,8 +417,8 @@ def test_dim_to_temp_skips_when_owner_state_matches_and_legacy_values_are_invali
     _apply_idle_action(tray, action="dim_to_temp", dim_temp_brightness=7)
 
     tray.engine.set_brightness.assert_not_called()
-    assert tray._dim_temp_active is True
-    assert tray._dim_temp_target_brightness == 7
+    assert tray.tray_idle_power_state.dim_temp_active is True
+    assert tray.tray_idle_power_state.dim_temp_target_brightness == 7
 
 
 class _CountingLock(AbstractContextManager[None]):

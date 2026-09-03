@@ -8,8 +8,11 @@ device themselves.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING
+
+logger = logging.getLogger(__name__)
 
 from keyrgb.tray.deck_state import (
     DeckState,
@@ -63,6 +66,12 @@ def derive_deck_state(tray: IdlePowerTrayProtocol) -> DeckState:
     if is_dim_temp_active(tray):
         return DeckState.DIM_TEMP
     return DeckState.LIT
+
+
+def hardware_apply_deferred(tray: IdlePowerTrayProtocol) -> bool:
+    """True when config/scheduler/power-source must persist intent only."""
+
+    return is_off_family(derive_deck_state(tray))
 
 
 def respect_enabled(tray: IdlePowerTrayProtocol) -> bool:
@@ -131,6 +140,7 @@ def commit_sleep_wake_intent(
     guards: SleepWakeGuards | None = None,
     current_brightness: int = 0,
     dim_temp_target: int | None = None,
+    dim_temp_brightness: int | None = None,
     recover_stable_zero: RecoverFn | None = None,
     recover_power_source: RecoverFn | None = None,
     stop_engine: StopEngineFn | None = None,
@@ -172,6 +182,15 @@ def commit_sleep_wake_intent(
             current_brightness=current_brightness,
             recover_stable_zero=recover_stable_zero,
         )
+    if kind is SleepWakeIntentKind.KEYBOARD_WAKE:
+        return _commit_keyboard_wake(tray)
+    if kind in {
+        SleepWakeIntentKind.IDLE_TURN_OFF,
+        SleepWakeIntentKind.DIM_TO_TEMP,
+        SleepWakeIntentKind.RESTORE_BRIGHTNESS,
+        SleepWakeIntentKind.SCREEN_WAKE,
+    }:
+        return _commit_idle_action(tray, kind, dim_temp_brightness=dim_temp_brightness)
     return False
 
 
@@ -216,6 +235,58 @@ def _commit_firmware_wake(
     return True
 
 
+_IDLE_INTENT_ACTIONS = {
+    SleepWakeIntentKind.IDLE_TURN_OFF: "turn_off",
+    SleepWakeIntentKind.DIM_TO_TEMP: "dim_to_temp",
+    SleepWakeIntentKind.RESTORE_BRIGHTNESS: "restore_brightness",
+    SleepWakeIntentKind.SCREEN_WAKE: "restore",
+}
+
+
+def _commit_keyboard_wake(tray: IdlePowerTrayProtocol) -> bool:
+    from keyrgb.tray.pollers.idle_power._actions import restore_from_idle
+
+    try:
+        tray.engine.turn_off()
+    except (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError):
+        logger.warning("Controller-sleep hardware re-arm failed", exc_info=True)
+        return False
+    logger.info("EVENT idle_power:controller_sleep_rearm trigger=keyboard_evdev")
+    restore_from_idle(tray)
+    _store_deck_state(tray, _completed_lit_state(tray))
+    return True
+
+
+def _commit_idle_action(
+    tray: IdlePowerTrayProtocol,
+    kind: SleepWakeIntentKind,
+    *,
+    dim_temp_brightness: int | None,
+) -> bool:
+    from keyrgb.core.effects.catalog import REACTIVE_EFFECTS, SW_EFFECTS_SET
+    from keyrgb.tray.pollers.idle_power._actions import apply_idle_action, restore_from_idle
+
+    action = _IDLE_INTENT_ACTIONS.get(kind)
+    if action is None:
+        return False
+    reactive_effects_set, sw_effects_set = frozenset(REACTIVE_EFFECTS), SW_EFFECTS_SET
+    apply_idle_action(
+        tray,
+        action=action,
+        dim_temp_brightness=int(dim_temp_brightness or 0),
+        restore_from_idle_fn=restore_from_idle,
+        reactive_effects_set=reactive_effects_set,
+        sw_effects_set=sw_effects_set,
+    )
+    if kind is SleepWakeIntentKind.IDLE_TURN_OFF:
+        _store_deck_state(tray, DeckState.IDLE_OFF)
+    elif kind is SleepWakeIntentKind.DIM_TO_TEMP:
+        _store_deck_state(tray, DeckState.DIM_TEMP)
+    else:
+        _store_deck_state(tray, _completed_lit_state(tray))
+    return True
+
+
 def _commit_stable_zero_heal(
     tray: IdlePowerTrayProtocol,
     *,
@@ -234,6 +305,7 @@ __all__ = [
     "commit_sleep_wake_intent",
     "decide_sleep_wake",
     "derive_deck_state",
+    "hardware_apply_deferred",
     "is_off_family",
     "recently_restored_at",
     "respect_enabled",

@@ -237,23 +237,39 @@ def _restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
     return restore_from_idle(tray)
 
 
+def _idle_action_intent_kind(action: IdleAction):
+    from keyrgb.tray.deck_state import SleepWakeIntentKind
+
+    if action == "turn_off":
+        return SleepWakeIntentKind.IDLE_TURN_OFF
+    if action == "dim_to_temp":
+        return SleepWakeIntentKind.DIM_TO_TEMP
+    if action == "restore_brightness":
+        return SleepWakeIntentKind.RESTORE_BRIGHTNESS
+    if action == "restore":
+        return SleepWakeIntentKind.SCREEN_WAKE
+    return None
+
+
 def _apply_idle_action(
     tray: IdlePowerTrayProtocol,
     *,
     action: IdleAction,
     dim_temp_brightness: int,
 ) -> None:
-    from ._actions import apply_idle_action
+    from keyrgb.tray.deck_pipeline import commit_sleep_wake_intent
+    from keyrgb.tray.deck_state import SleepWakeIntent
+
+    kind = _idle_action_intent_kind(action)
+    if kind is None:
+        return
 
     def apply_transition() -> None:
-        reactive_effects_set, sw_effects_set = _effect_sets()
-        apply_idle_action(
+        commit_sleep_wake_intent(
             tray,
-            action=action,
+            SleepWakeIntent(kind),
+            now=time.monotonic(),
             dim_temp_brightness=int(dim_temp_brightness),
-            restore_from_idle_fn=_restore_from_idle,
-            reactive_effects_set=reactive_effects_set,
-            sw_effects_set=sw_effects_set,
         )
 
     run_tray_transition(tray, apply_transition)

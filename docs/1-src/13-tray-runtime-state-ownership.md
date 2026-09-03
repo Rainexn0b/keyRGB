@@ -84,6 +84,13 @@ prebootstrap and starts it before power workers and pollers.
   that menu during AC/DC or idle transitions can crash KDE plasmashell while
   the menu or its hover timer is active. User clicks and config-file edits
   still refresh the menu.
+
+Sleep/wake brightness intent is reconciled by `keyrgb/tray/deck_pipeline.py`
+inside those coordinator transitions. Hardware polling, idle restore, and
+off-family deferral (`hardware_apply_deferred`) classify intents; `next_state`
+in `keyrgb/tray/deck_state.py` decides; the pipeline is the low-frequency
+commit owner. Render frames stay outside the coordinator. See
+`docs/P-power-management/sleep-wake-pipeline-campaign.md`.
 - Menu rendering is read-only. It must not reload config, reconnect devices,
   query OS power sysfs, probe secondary backends, or persist fallback state.
   Power-mode and secondary-route labels come from

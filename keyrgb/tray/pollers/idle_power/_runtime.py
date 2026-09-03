@@ -21,7 +21,7 @@ from keyrgb.tray.idle_power_state import (
 )
 from keyrgb.tray.protocols import IdlePowerTrayProtocol
 
-from ._actions import restore_from_idle
+from ._actions import restore_from_idle  # noqa: F401 — re-export for test monkeypatches
 from ._constants import POST_POWER_SOURCE_CHANGE_IDLE_ACTION_SUPPRESSION_S
 from ._input_idle import InputIdleTracker
 from ._power_source_guard import (
@@ -173,10 +173,19 @@ def _maybe_restore_from_controller_sleep(
             default=False,
         ):
             return
-        if not _rearm_controller_sleep_restore(tray):
-            return
-        logger.info("EVENT idle_power:controller_sleep_restore trigger=keyboard_evdev")
-        restore_from_idle(tray)
+        import time
+
+        from keyrgb.tray.deck_pipeline import commit_sleep_wake_intent
+        from keyrgb.tray.deck_state import SleepWakeGuards, SleepWakeIntent, SleepWakeIntentKind
+
+        restored = commit_sleep_wake_intent(
+            tray,
+            SleepWakeIntent(SleepWakeIntentKind.KEYBOARD_WAKE),
+            now=time.monotonic(),
+            guards=SleepWakeGuards(keyboard_activity=True),
+        )
+        if restored:
+            logger.info("EVENT idle_power:controller_sleep_restore trigger=keyboard_evdev")
 
     run_tray_observation_if_current(tray, observation_revision, restore_transition)
 

@@ -2,7 +2,7 @@
 
 **Started:** 2026-09-03  
 **Lane:** `P-power-management`  
-**Status:** SWP-1 hardware poll cut over to DeckPipeline — idle/power still emit directly
+**Status:** SWP-1..3 cut over — menu still uses power-state impls; live matrix pending
 **Hardware validation gate:** inherit [KSW-8](keyboard-sleep-wake-hardening-campaign.md)
 plus one-restore-per-wake evidence after the pipeline cutover
 
@@ -201,11 +201,11 @@ KSW-1 already-dark suspend (no wake-capable fade).
 |---|---|:---:|:---:|---|
 | SWP-0 | Pure `DeckState` / `SleepWakeDecision` with no behavior change | P0 | S | done |
 | SWP-1 | Hardware poll observe-only; one restore commit owns heal/wake/sleep | P0 | M | done |
-| SWP-2 | Idle and power paths emit intents; unify post-resume suppression | P0 | M | reported |
-| SWP-3 | Defer scheduler, config, and power-source hardware applies while off-family | P1 | S | reported |
-| SWP-4 | Menu turn on/off cutover; `controller_sleep_respect` read once per decision | P1 | S | reported |
-| SWP-5 | Remove dual-write of legacy off flags once `DeckState` is sole owner | P2 | M | reported |
-| SWP-6 | Docs/architecture exit plus inherited KSW-8 live matrix | P0 | M | blocked — SWP-0..4 |
+| SWP-2 | Idle and power paths emit intents; unify post-resume suppression | P0 | M | done |
+| SWP-3 | Defer scheduler, config, and power-source hardware applies while off-family | P1 | S | done |
+| SWP-4 | Menu turn on/off cutover; `controller_sleep_respect` read once per decision | P1 | S | monitoring — respect snapshotted; menu impls kept because bare `is_off` is not a DeckState |
+| SWP-5 | Remove dual-write of legacy off flags once `DeckState` is sole owner | P2 | M | monitoring — `hardware_apply_deferred()` is the unified predicate; flags remain the compatibility seam |
+| SWP-6 | Docs/architecture exit plus inherited KSW-8 live matrix | P0 | M | blocked — live matrix |
 
 ---
 
@@ -408,3 +408,18 @@ Runtime capture:
   blocked latching still auto-heals static effects.
 - Validation: 175 hardware+deck-state tests, Ruff, and BuildPython Step 2
   with 3765 tests plus 1 skip.
+
+### 2026-09-03 — SWP-2 idle intents and SWP-3 deferred apply
+
+- Controller-sleep evdev restore and idle apply actions commit through
+  `DeckPipeline`. Firmware-wake and keyboard-wake now share `next_state`
+  coalescing (KEYBOARD_WAKE is a no-op once the deck is already LIT).
+- Config, scheduler, power-policy brightness, and per-key profile activation
+  defer hardware writes via `hardware_apply_deferred()` / `is_off_family`.
+- Menu `turn_on`/`power_restore` still use lighting-power impls: gating them
+  on `next_state(MANUAL_ON)` skipped restores when `tray.is_off` was set
+  without a forced-off flag.
+- Legacy forced-off flags remain the derive source until a later pass can
+  treat bare `is_off` as pipeline state without breaking Turn On.
+- Validation: idle/config/scheduler/profile/power tests plus BuildPython
+  Step 2 with 3765 tests plus 1 skip.

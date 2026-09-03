@@ -524,8 +524,7 @@ def test_apply_idle_action_restore_branch_gated_by_forced_off(monkeypatch) -> No
     called = {"n": 0}
 
     monkeypatch.setattr(
-        ipp,
-        "_restore_from_idle",
+        "keyrgb.tray.pollers.idle_power._actions.restore_from_idle",
         lambda _tray: called.__setitem__("n", called["n"] + 1),
     )
 
@@ -540,6 +539,7 @@ def test_apply_idle_action_restore_branch_gated_by_forced_off(monkeypatch) -> No
     tray3 = make_owner_backed_simple_tray(
         user_forced_off=False,
         power_forced_off=False,
+        idle_forced_off=True,
         config=SimpleNamespace(),
     )
     ipp._apply_idle_action(tray3, action="restore", dim_temp_brightness=5)

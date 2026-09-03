@@ -23,7 +23,6 @@ from keyrgb.tray.controllers.runtime_coordination import (
     run_tray_observation_if_current,
     run_tray_transition,
 )
-from keyrgb.tray.idle_power_state import is_system_forced_off, is_user_forced_off
 from keyrgb.tray.pollers import _lifecycle as polling_lifecycle
 
 if TYPE_CHECKING:
@@ -103,10 +102,9 @@ def _apply_time_scheduler_brightness_owned(
     if reactive_brightness_int is not None and reactive_brightness_int < 0:
         return False
 
-    if is_user_forced_off(tray):
-        return False
+    from keyrgb.tray.deck_pipeline import hardware_apply_deferred
 
-    if is_system_forced_off(tray):
+    if hardware_apply_deferred(tray):
         return False
 
     try:

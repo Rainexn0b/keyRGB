@@ -9,7 +9,7 @@ from __future__ import annotations
 from keyrgb.core.backends.policies.per_key_mode import per_key_mode_requires_frame_reassert
 from keyrgb.core.effects.perkey_animation import restore_hidden_per_key_rows_once
 from keyrgb.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
-from keyrgb.tray.idle_power_state import any_forced_off, read_forced_off_flags, read_idle_power_state_bool_field
+from keyrgb.tray.idle_power_state import any_forced_off, read_forced_off_flags
 from keyrgb.tray.protocols import ConfigPollingTrayProtocol
 
 from . import helpers as _helpers
@@ -30,21 +30,6 @@ def _backend_requires_perkey_reassert(tray: ConfigPollingTrayProtocol) -> bool:
         return bool(per_key_mode_requires_frame_reassert(kb))
     except _PERKEY_POLICY_READ_EXCEPTIONS:
         return False
-
-
-def _controller_sleep_off_active(tray: ConfigPollingTrayProtocol) -> bool:
-    """Whether the ITE firmware's native input-timeout sleep owns the dark deck.
-
-    Read through the typed owner / legacy attr bridge so the check is safe for
-    both the real tray and duck-typed test fakes.
-    """
-
-    return read_idle_power_state_bool_field(
-        tray,
-        attr_name="_controller_sleep_off",
-        state_name="controller_sleep_off",
-        default=False,
-    )
 
 
 def _handle_controller_sleep_off(
@@ -68,7 +53,10 @@ def _handle_controller_sleep_off(
     any forced-off flag is also set.
     """
 
-    if not _controller_sleep_off_active(tray):
+    from keyrgb.tray.deck_pipeline import derive_deck_state
+    from keyrgb.tray.deck_state import DeckState
+
+    if derive_deck_state(tray) is not DeckState.CONTROLLER_SLEEP_DARK:
         return False
     if any_forced_off(tray):
         # An ordinary forced-off condition takes precedence and is reported by
