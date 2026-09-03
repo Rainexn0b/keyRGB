@@ -2,7 +2,7 @@
 
 **Started:** 2026-09-03  
 **Lane:** `P-power-management`  
-**Status:** SWP-1..3 cut over — menu still uses power-state impls; live matrix pending
+**Status:** SWP-1..4 cut over — live matrix pending
 **Hardware validation gate:** inherit [KSW-8](keyboard-sleep-wake-hardening-campaign.md)
 plus one-restore-per-wake evidence after the pipeline cutover
 
@@ -203,7 +203,7 @@ KSW-1 already-dark suspend (no wake-capable fade).
 | SWP-1 | Hardware poll observe-only; one restore commit owns heal/wake/sleep | P0 | M | done |
 | SWP-2 | Idle and power paths emit intents; unify post-resume suppression | P0 | M | done |
 | SWP-3 | Defer scheduler, config, and power-source hardware applies while off-family | P1 | S | done |
-| SWP-4 | Menu turn on/off cutover; `controller_sleep_respect` read once per decision | P1 | S | monitoring — respect snapshotted; menu impls kept because bare `is_off` is not a DeckState |
+| SWP-4 | Menu turn on/off and power suspend/restore cutover; `controller_sleep_respect` read once per decision | P1 | S | done — `DeckPipeline` decides `MANUAL_ON`/`MANUAL_OFF`/`POWER_OFF`/`POWER_RESUME` before leaves; bare `is_off` with no forced-off flag uses a narrow `POWER_OFF` override for those intents only (`hardware_apply_deferred` stays false); `RESTORING` firewall coalesces duplicate wakes |
 | SWP-5 | Remove dual-write of legacy off flags once `DeckState` is sole owner | P2 | M | monitoring — `hardware_apply_deferred()` is the unified predicate; flags remain the compatibility seam |
 | SWP-6 | Docs/architecture exit plus inherited KSW-8 live matrix | P0 | M | blocked — live matrix |
 
@@ -423,3 +423,23 @@ Runtime capture:
   treat bare `is_off` as pipeline state without breaking Turn On.
 - Validation: idle/config/scheduler/profile/power tests plus BuildPython
   Step 2 with 3765 tests plus 1 skip.
+
+### 2026-09-03 — OP-2 menu/power is_off pipeline cutover (SWP-4 closure)
+
+- `keyrgb/tray/controllers/_power/_lighting_power_state.py` now decides
+  `MANUAL_ON`/`MANUAL_OFF`/`POWER_OFF`/`POWER_RESUME` via
+  `DeckPipeline.commit_lighting_power_intent` before the existing
+  device-writing leaves run.  Leaf flags, aux-target calls, fades, logs, and
+  UI refreshes are preserved inside the leaf.
+- Bare `tray.is_off=True` with no forced-off flag uses a narrow `POWER_OFF`
+  override only for `MANUAL_ON`/`POWER_RESUME` (`hardware_apply_deferred`
+  stays false for scheduler/config deferral).
+- A restoring leaf publishes `DeckState.RESTORING` before it blocks on its
+  fade, then `LIT`/`DIM_TEMP` on success or the origin on failure; a second
+  wake intent while `RESTORING` coalesces via
+  `next_state(RESTORING, wake) -> noop`.  Existing `user_forced_off`/
+  `idle_forced_off` power-restore guards remain authoritative and the
+  already-`controller_sleep_off` power-off stays immediate/no-fade.
+- Validation: `test_lighting_power_pipeline_op2` (one decision, bare-is_off,
+  RESTORING during start, duplicate coalesce, immediate fade), power/deck/
+  idle/hardware suites, Ruff.

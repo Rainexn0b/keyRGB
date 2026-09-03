@@ -2,7 +2,7 @@
 
 **Started:** 2026-09-03  
 **Baseline:** `~/.cache/keyrgb/diagnostic-sessions/20260903T092201.323445Z`  
-**Status:** OP-1 software-complete; OP-2..4 planned; live retest pending
+**Status:** OP-1..2 software-complete; OP-3..4 planned; live retest pending
 
 ## Purpose
 
@@ -31,7 +31,7 @@ changing visual policy.
 | ID | Concern | Evidence / debt | Status |
 |---|---|---|---|
 | OP-1 | Reactive restore frame and pulse ownership | Evidenced first-key scale discontinuity and duplicate damp seeding | software-complete; live retest pending |
-| OP-2 | `start_current_effect` menu/power callers | Remaining SWP-4 intent-bypass seam; not triggered in baseline | planned |
+| OP-2 | `start_current_effect` menu/power callers | Remaining SWP-4 intent-bypass seam; not triggered in baseline | software-complete; live retest pending |
 | OP-3 | Layered brightness scheduler/menu deferral | Scheduler drops deferred intent; menu omits unified off-family predicate | planned |
 | OP-4 | CPU power-mode apply/observation | Main split landed; EPP failures remain silent and policy can retry heuristic mismatches | planned |
 
