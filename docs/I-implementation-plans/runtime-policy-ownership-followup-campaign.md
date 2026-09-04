@@ -119,3 +119,29 @@ partially accepts the live gate:
 
 The session did not exercise suspend/lid, temporary dim, AC unplug/replug while
 dark, or continuous-lit typing, so those live matrix rows remain open.
+
+## 2026-09-04 failed suspend/lid restore
+
+Session `~/.cache/keyrgb/diagnostic-sessions/20260903T231854.539789Z`
+exercised the previously open controller-sleep-to-system-suspend path and found
+an overlapping-event race:
+
+- The controller entered native sleep at `t=596661.872`; KeyRGB detected
+  `brightness=0` with `is_off=False` and correctly retained controller-sleep
+  ownership.
+- At `t=623886.670`, the system-suspend route issued the expected explicit off.
+- Resume/open notifications then overlapped; the debug log contains back-to-back
+  sysfs and polling lid-open observations. The outcome matches the older restore
+  consuming saved lit intent before its generation/revision guard ran, followed
+  by a newer event superseding that plan but finding no remaining intent. No
+  restore was invoked, and hardware polls remained `brightness=0` with
+  `is_off=True`.
+
+The correction makes restore intent two-phase: policy evaluation marks it
+pending, and only a current restore action consumes it after execution. A stale
+resume therefore leaves the same intent available to the replacement lid-open
+event. A newer suspend still replaces a pending restore with current user
+intent, preserving manual-off precedence. Focused merged validation passed with
+355 power/tray tests, targeted Ruff and Step 19 passed, and BuildPython Step 2
+passed with 3803 tests and 1 skip. Another live suspend/lid retest is required
+before this matrix row can be accepted.

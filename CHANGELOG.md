@@ -12,6 +12,9 @@
   so heuristic observation mismatches do not retry every 30 seconds. Preserve
   retries for real failures and surface non-fatal EPP failures from direct and
   privileged-helper paths.
+- Core/Power: Keep saved lit intent retryable when overlapping resume and
+  lid-open events supersede a delayed restore, preventing both events from
+  completing without relighting the keyboard.
 
 ## 0.34.0 (2026-08-31)
 

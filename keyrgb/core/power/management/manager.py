@@ -495,6 +495,11 @@ class PowerManager:
                 plan,
                 log_message=log_message,
                 kb_method_name=kb_method_name,
+                record_restore_executed_fn=(
+                    self._event_policy.record_power_restore_executed
+                    if expected_action_type is RestoreFromEvent
+                    else None
+                ),
             ),
         )
 
@@ -509,9 +514,15 @@ class PowerManager:
         )
 
     def _evaluate_power_event_policy(self, *, enabled: bool, action_enabled: bool, policy_method):
-        is_off = self._get_keyboard_intent_state()
-        if is_off is None:
-            return None
+        if enabled:
+            is_off = self._get_keyboard_intent_state()
+            if is_off is None:
+                return None
+        else:
+            # Disabled events exist only to close a saved policy epoch. They
+            # must not depend on a hardware/config intent probe that is
+            # irrelevant to cleanup and may fail during resume.
+            is_off = False
 
         inputs = build_power_event_inputs(
             enabled=enabled,
@@ -524,8 +535,15 @@ class PowerManager:
             log_message="Power event policy evaluation failed",
         )
 
-    def _execute_power_event_plan(self, plan, *, log_message: str, kb_method_name: str) -> None:
-        execute_power_event_plan(
+    def _execute_power_event_plan(
+        self,
+        plan,
+        *,
+        log_message: str,
+        kb_method_name: str,
+        record_restore_executed_fn=None,
+    ) -> None:
+        executed = execute_power_event_plan(
             plan=plan,
             log_message=log_message,
             kb_method_name=kb_method_name,
@@ -534,6 +552,10 @@ class PowerManager:
             invoke_keyboard_method_fn=self._invoke_keyboard_method,
             should_invoke_fn=self._power_event_is_current,
         )
+        if executed and callable(record_restore_executed_fn):
+            record_restore_executed_fn()
+        elif bool(getattr(plan, "should_invoke", False)) and callable(record_restore_executed_fn):
+            logger.debug("Power restore plan superseded; retaining saved intent for a replacement event")
 
     def _begin_power_event(self) -> int:
         with self._power_event_generation_lock:

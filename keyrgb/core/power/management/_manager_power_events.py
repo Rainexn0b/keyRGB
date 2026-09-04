@@ -57,15 +57,16 @@ def orchestrate_power_event(
     evaluate_policy_fn,
     execute_plan_fn,
 ) -> None:
-    if not enabled:
-        return
-
     result = evaluate_policy_fn(
         enabled=enabled,
         action_enabled=action_enabled,
         policy_method=policy_method,
     )
     if result is None:
+        return
+    if not enabled:
+        # Disabled events still reach policy state cleanup, but never permit a
+        # malformed or future policy result to cross into hardware execution.
         return
 
     plan = build_power_event_execution_plan(
@@ -86,21 +87,22 @@ def execute_power_event_plan(
     sleep_fn: Callable[[float], None],
     invoke_keyboard_method_fn: Callable[[str], None],
     should_invoke_fn: Callable[[], bool] = lambda: True,
-) -> None:
+) -> bool:
     if not plan.should_invoke:
-        return
+        return False
 
     if plan.delay_s > 0:
         sleep_fn(plan.delay_s)
 
     if not should_invoke_fn():
-        return
+        return False
 
     if plan.should_log:
         log_info_fn(log_message)
 
     for _ in range(plan.action_count):
         invoke_keyboard_method_fn(kb_method_name)
+    return True
 
 
 def invoke_keyboard_method(

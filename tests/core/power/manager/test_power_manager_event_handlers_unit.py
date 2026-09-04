@@ -277,6 +277,64 @@ class TestPowerManagerEventHandlers:
         mock_kb.turn_off.assert_called_once_with()
         mock_kb.restore.assert_not_called()
 
+    def test_duplicate_lid_open_retries_restore_discarded_as_stale(self):
+        from keyrgb.core.power.management import manager as manager_module
+        from keyrgb.core.power.management.manager import PowerManager
+        from keyrgb.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
+
+        mock_kb = MagicMock()
+        coordinator = TrayRuntimeCoordinator()
+        mock_kb.run_runtime_transition = coordinator.run
+        mock_kb.turn_off = MagicMock(return_value=True)
+        mock_kb.restore = MagicMock(return_value=True)
+        pm = PowerManager(mock_kb, config=MagicMock())
+        pm._is_enabled = MagicMock(return_value=True)
+        pm._flag = MagicMock(return_value=True)
+        pm._get_keyboard_intent_state = MagicMock(return_value=False)
+        pm._lid_closed = True
+
+        # Save the original lit intent and perform the suspend-side off first.
+        pm._on_suspend()
+        mock_kb.turn_off.assert_called_once_with()
+
+        sleep_started = threading.Event()
+        release_resume = threading.Event()
+        replacement_received = threading.Event()
+        begin_power_event = pm._begin_power_event
+
+        def track_power_event_generation() -> int:
+            generation = begin_power_event()
+            if generation == 3:
+                replacement_received.set()
+            return generation
+
+        pm._begin_power_event = track_power_event_generation
+
+        def blocked_sleep(_seconds: float) -> None:
+            sleep_started.set()
+            release_resume.wait()
+
+        resume = threading.Thread(target=pm._on_resume)
+        lid_open = threading.Thread(target=pm._on_lid_open)
+        try:
+            with patch.object(manager_module.time, "sleep", side_effect=blocked_sleep):
+                resume.start()
+                assert sleep_started.wait(timeout=1.0)
+
+                lid_open.start()
+                assert replacement_received.wait(timeout=1.0)
+
+                release_resume.set()
+                resume.join(timeout=1.0)
+                lid_open.join(timeout=1.0)
+        finally:
+            release_resume.set()
+            assert coordinator.stop_and_drain(timeout_s=1.0) is True
+
+        assert not resume.is_alive()
+        assert not lid_open.is_alive()
+        mock_kb.restore.assert_called_once_with()
+
     @patch("keyrgb.core.power.management.manager.PowerEventPolicy")
     def test_delayed_resume_is_discarded_after_newer_manual_transition(self, mock_policy_cls):
         from keyrgb.core.power.management.manager import PowerManager, RestoreFromEvent

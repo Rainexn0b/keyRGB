@@ -102,6 +102,50 @@ class TestPowerManagerEventIntegrationFullPath:
         # Policy eval was called
         assert mock_policy_instance.handle_power_restore_event.call_count == 1
 
+    def test_disabled_resume_clears_saved_intent_without_restoring_later(self):
+        mock_kb = MagicMock()
+        mock_kb.turn_off = MagicMock()
+        mock_kb.restore = MagicMock()
+        pm = PowerManager(mock_kb, config=MagicMock())
+        pm._get_keyboard_intent_state = MagicMock(side_effect=[False, True, True])
+
+        pm._handle_power_event(
+            enabled=True,
+            action_enabled=True,
+            log_message="cycle one suspend",
+            policy_method=pm._event_policy.handle_power_off_event,
+            expected_action_type=TurnOffFromEvent,
+            kb_method_name="turn_off",
+        )
+        pm._handle_power_event(
+            enabled=False,
+            action_enabled=True,
+            log_message="disabled resume",
+            policy_method=pm._event_policy.handle_power_restore_event,
+            expected_action_type=RestoreFromEvent,
+            kb_method_name="restore",
+        )
+        pm._handle_power_event(
+            enabled=True,
+            action_enabled=True,
+            log_message="cycle two suspend",
+            policy_method=pm._event_policy.handle_power_off_event,
+            expected_action_type=TurnOffFromEvent,
+            kb_method_name="turn_off",
+        )
+        pm._handle_power_event(
+            enabled=True,
+            action_enabled=True,
+            log_message="cycle two resume",
+            policy_method=pm._event_policy.handle_power_restore_event,
+            expected_action_type=RestoreFromEvent,
+            kb_method_name="restore",
+        )
+
+        assert mock_kb.turn_off.call_count == 2
+        mock_kb.restore.assert_not_called()
+        assert pm._get_keyboard_intent_state.call_count == 3
+
 
 class TestPowerManagerPolicyEvaluationBoundaryErrorRecovery:
     """Policy evaluation boundary: catch and log errors, continue gracefully."""
@@ -303,11 +347,12 @@ class TestPowerManagerDisabledConfigGating:
     """Disabled config: flow short-circuits early, no side effects."""
 
     @patch("keyrgb.core.power.management.manager.PowerEventPolicy")
-    def test_handle_power_event_early_exit_when_enabled_is_false(self, mock_policy_cls):
-        """When enabled=False, orchestrate should return early (no policy call)."""
+    def test_handle_power_event_disabled_still_allows_policy_state_cleanup(self, mock_policy_cls):
+        """Disabled events reach policy cleanup but cannot touch hardware."""
         mock_kb = MagicMock()
 
         mock_policy_instance = MagicMock()
+        mock_policy_instance.handle_power_off_event.return_value = PowerEventResult(actions=(TurnOffFromEvent(),))
         mock_policy_cls.return_value = mock_policy_instance
 
         pm = PowerManager(mock_kb)
@@ -322,8 +367,8 @@ class TestPowerManagerDisabledConfigGating:
             kb_method_name="turn_off",
         )
 
-        # Policy was NOT called
-        mock_policy_instance.handle_power_off_event.assert_not_called()
+        inputs = mock_policy_instance.handle_power_off_event.call_args.args[0]
+        assert inputs.enabled is False
         # No keyboard action
         mock_kb.turn_off.assert_not_called()
 

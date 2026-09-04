@@ -96,7 +96,7 @@ def test_execute_power_event_plan_logs_sleeps_once_and_invokes_per_action_count(
     sleep = MagicMock()
     invoke = MagicMock()
 
-    execute_power_event_plan(
+    executed = execute_power_event_plan(
         plan=PowerEventExecutionPlan(action_count=2, should_log=True, delay_s=0.25),
         log_message="hello",
         kb_method_name="turn_off",
@@ -109,6 +109,7 @@ def test_execute_power_event_plan_logs_sleeps_once_and_invokes_per_action_count(
     sleep.assert_called_once_with(0.25)
     assert invoke.call_count == 2
     invoke.assert_called_with("turn_off")
+    assert executed is True
 
 
 def test_execute_power_event_plan_noop_plan_skips_side_effects() -> None:
@@ -116,7 +117,7 @@ def test_execute_power_event_plan_noop_plan_skips_side_effects() -> None:
     sleep = MagicMock()
     invoke = MagicMock()
 
-    execute_power_event_plan(
+    executed = execute_power_event_plan(
         plan=PowerEventExecutionPlan(action_count=0, should_log=False, delay_s=1.0),
         log_message="ignored",
         kb_method_name="restore",
@@ -128,6 +129,7 @@ def test_execute_power_event_plan_noop_plan_skips_side_effects() -> None:
     log_info.assert_not_called()
     sleep.assert_not_called()
     invoke.assert_not_called()
+    assert executed is False
 
 
 def test_invoke_keyboard_method_runs_callable_method_inside_runtime_boundary() -> None:

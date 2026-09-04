@@ -16,6 +16,7 @@ def test_event_policy_turns_off_and_restores_when_was_on() -> None:
 
     restore_res = policy.handle_power_restore_event(PowerEventInputs(enabled=True, action_enabled=True, is_off=False))
     assert restore_res.actions == (RestoreKeyboard(),)
+    policy.record_power_restore_executed()
 
 
 def test_event_policy_does_not_restore_if_already_off() -> None:
@@ -124,10 +125,39 @@ def test_overlapping_lid_and_suspend_saves_once_restores_once() -> None:
     # Resume from suspend restores once.
     resume = policy.handle_power_restore_event(PowerEventInputs(enabled=True, action_enabled=True, is_off=False))
     assert resume.actions == (RestoreKeyboard(),)
+    policy.record_power_restore_executed()
 
     # Lid open after the resume: intent already consumed, no second restore.
     lid_open = policy.handle_power_restore_event(PowerEventInputs(enabled=True, action_enabled=True, is_off=False))
     assert lid_open.actions == ()
+
+
+def test_restore_intent_survives_a_stale_unexecuted_restore_plan() -> None:
+    policy = PowerEventPolicy()
+    inputs = PowerEventInputs(enabled=True, action_enabled=True, is_off=False)
+
+    policy.handle_power_off_event(inputs)
+    delayed_resume = policy.handle_power_restore_event(inputs)
+    replacement_lid_open = policy.handle_power_restore_event(inputs)
+
+    assert delayed_resume.actions == (RestoreKeyboard(),)
+    assert replacement_lid_open.actions == (RestoreKeyboard(),)
+
+    policy.record_power_restore_executed()
+    duplicate_lid_open = policy.handle_power_restore_event(inputs)
+    assert duplicate_lid_open.actions == ()
+
+
+def test_new_suspend_replaces_a_pending_restore_with_current_intent() -> None:
+    policy = PowerEventPolicy()
+    on = PowerEventInputs(enabled=True, action_enabled=True, is_off=False)
+    intentionally_off = PowerEventInputs(enabled=True, action_enabled=True, is_off=True)
+
+    policy.handle_power_off_event(on)
+    assert policy.handle_power_restore_event(on).actions == (RestoreKeyboard(),)
+
+    policy.handle_power_off_event(intentionally_off)
+    assert policy.handle_power_restore_event(intentionally_off).actions == ()
 
 
 def test_per_action_disabled_still_records_state_when_global_enabled() -> None:
