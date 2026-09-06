@@ -9,21 +9,18 @@ from keyrgb.core.backends.base import supports_per_key_output
 from keyrgb.core.effects.matrix_layout import geometry_for_engine
 from keyrgb.core.effects.perkey_animation import build_full_color_grid
 
-from . import _render_brightness_support as _brightness_support
 from ._constants import MAX_BRIGHTNESS_STEP_PER_FRAME
 from ._render_brightness import (
     resolve_brightness as _resolve_brightness_impl,
     resolve_reactive_transition_brightness as _resolve_reactive_transition_brightness_impl,
     resolve_reactive_transition_visual_scale as _resolve_reactive_transition_visual_scale_impl,
 )
-from ._render_brightness_debug import log_pulse_visual_scale_change
 from ._render_brightness_support import (  # noqa: F401 - preserved facade for external/test imports
     ReactiveRestorePhase as _ReactiveRestorePhase,
     restore_phase_or_default as _restore_phase_or_default,
 )
 from ._render_post_restore import (
     post_restore_frame_scale as _post_restore_frame_scale,
-    post_restore_visual_damp as _post_restore_visual_damp,
 )
 from ._render_runtime import render_per_key_frame, render_uniform_frame
 
@@ -140,241 +137,6 @@ def backdrop_brightness_scale_factor(engine: EffectsEngine, *, effect_brightness
     return float(base) / float(hw)
 
 
-def pulse_brightness_scale_factor(engine: EffectsEngine) -> float:
-    """Compute scaling factor to keep pulses at their target brightness.
-
-    This is expressed relative to the resolved hardware brightness used for
-    rendering. Uniform-only backends may transiently raise the hardware
-    brightness to make bright pulses possible over a dim backdrop; per-key
-    backends keep hardware brightness fixed and rely on per-key color contrast.
-    For per-key hardware the reactive slider should therefore control the pulse
-    color intensity directly across the full 0..50 range. Any extra suppression
-    must stay scoped to explicit post-restore recovery windows (any steady
-    brightness) so normal typing outside those windows keeps the configured
-    reactive level.
-    """
-
-    base, eff, hw = _resolve_brightness(engine)
-    visual_mode = reactive_visual_mode(engine, default="vivid")
-
-    if has_per_key(engine):
-        pulse_scale = _apply_reactive_pulse_visual_curve(
-            float(max(0, min(50, int(eff)))) / 50.0,
-            visual_mode=visual_mode,
-        )
-        target_hw = _steady_target_hw_brightness(engine, base=base)
-        visual_hw = min(int(hw), int(target_hw))
-        if visual_hw <= 0:
-            log_pulse_visual_scale_change(
-                engine,
-                logger=logger,
-                base=base,
-                eff=eff,
-                hw=hw,
-                target_hw=target_hw,
-                visual_hw=visual_hw,
-                pulse_scale=0.0,
-                contrast_ratio=0.0,
-                contrast_compression=0.0,
-                very_dim_curve=False,
-                post_restore_holdoff_remaining_s=0.0,
-                post_restore_damp=1.0,
-            )
-            return 0.0
-
-        # Post-restore damp must apply at any steady brightness (not only the
-        # very-dim curve). Nesting damp under visual_hw < 10 left normal bases
-        # (e.g. 20) undamped on typing-wake after long idle off — deck-wide flash.
-        post_restore_damp, post_restore_holdoff_remaining_s = _post_restore_visual_damp(engine)
-        very_dim_curve = visual_hw < 10
-        release_scale = _post_fade_reactive_release_scale(
-            engine,
-            post_restore_damp=post_restore_damp,
-            visual_mode=visual_mode,
-        )
-
-        if eff <= visual_hw:
-            final_scale = (
-                float(pulse_scale) * float(post_restore_damp)
-                if release_scale is None
-                else release_scale
-            )
-            log_pulse_visual_scale_change(
-                engine,
-                logger=logger,
-                base=base,
-                eff=eff,
-                hw=hw,
-                target_hw=target_hw,
-                visual_hw=visual_hw,
-                pulse_scale=final_scale,
-                contrast_ratio=1.0,
-                contrast_compression=1.0,
-                very_dim_curve=very_dim_curve,
-                post_restore_holdoff_remaining_s=post_restore_holdoff_remaining_s,
-                post_restore_damp=post_restore_damp,
-            )
-            return final_scale
-
-        baseline_scale = float(visual_hw) / 50.0
-        contrast_ratio = float(visual_hw) / float(eff)
-        contrast_compression = 1.0
-        # damp=1.0 outside restore windows => final_scale == pulse_scale.
-        if pulse_scale > baseline_scale:
-            final_scale = baseline_scale + ((pulse_scale - baseline_scale) * float(post_restore_damp))
-        else:
-            final_scale = float(pulse_scale) * float(post_restore_damp)
-        if release_scale is not None:
-            final_scale = release_scale
-        log_pulse_visual_scale_change(
-            engine,
-            logger=logger,
-            base=base,
-            eff=eff,
-            hw=hw,
-            target_hw=target_hw,
-            visual_hw=visual_hw,
-            pulse_scale=final_scale,
-            contrast_ratio=contrast_ratio,
-            contrast_compression=contrast_compression,
-            very_dim_curve=very_dim_curve,
-            post_restore_holdoff_remaining_s=post_restore_holdoff_remaining_s,
-            post_restore_damp=post_restore_damp,
-        )
-        return final_scale
-
-    if hw <= 0:
-        return 0.0
-
-    if eff >= hw:
-        return 1.0
-
-    return _apply_reactive_pulse_visual_curve(float(eff) / float(hw), visual_mode=visual_mode)
-
-
-def _post_fade_reactive_release_scale(
-    engine: EffectsEngine,
-    *,
-    post_restore_damp: float,
-    visual_mode: str,
-) -> float | None:
-    """Blend across the idle-restore effect release without a baseline jump."""
-
-    state = _brightness_support.read_engine_attr(
-        engine,
-        "_reactive_state",
-        missing_default=None,
-        error_default=None,
-        logger=logger,
-    )
-    if state is None:
-        return None
-
-    reactive_lock = getattr(engine, "reactive_lock", None)
-    if reactive_lock is not None:
-        transition_from, transition_to, started_at, duration_s = _brightness_support.read_transition_atomic(
-            state,
-            reactive_lock,
-        )
-    else:
-        transition_from = _brightness_support.read_engine_attr(
-            engine,
-            "_reactive_transition_from_brightness",
-            missing_default=None,
-            error_default=None,
-            logger=logger,
-        )
-        transition_to = _brightness_support.read_engine_attr(
-            engine,
-            "_reactive_transition_to_brightness",
-            missing_default=None,
-            error_default=None,
-            logger=logger,
-        )
-        started_at = _brightness_support.read_engine_attr(
-            engine,
-            "_reactive_transition_started_at",
-            missing_default=None,
-            error_default=None,
-            logger=logger,
-        )
-        duration_s = _brightness_support.read_engine_attr(
-            engine,
-            "_reactive_transition_duration_s",
-            missing_default=None,
-            error_default=None,
-            logger=logger,
-        )
-    transition_from = _brightness_support.coerce_brightness(transition_from, default=None)
-    transition_to = _brightness_support.coerce_brightness(transition_to, default=None)
-    if transition_from is None or transition_to is None or transition_to <= transition_from:
-        return None
-    started = _brightness_support.coerce_float(started_at, default=None)
-    duration = _brightness_support.coerce_float(duration_s, default=None)
-    if started is None or duration is None or duration <= 0.0:
-        return None
-
-    raw_global = _brightness_support.read_engine_attr(
-        engine,
-        "brightness",
-        missing_default=None,
-        error_default=None,
-        logger=logger,
-    )
-    global_hw = _brightness_support.coerce_brightness(raw_global, default=None)
-    if global_hw != transition_from:
-        return None
-
-    release_progress = max(0.0, min(1.0, (float(time.monotonic()) - started) / duration))
-    raw_effect_target = _brightness_support.read_engine_attr(
-        engine,
-        "reactive_brightness",
-        missing_default=global_hw,
-        error_default=global_hw,
-        logger=logger,
-    )
-    effect_target = _brightness_support.coerce_brightness(raw_effect_target, default=global_hw)
-    if effect_target is None:
-        effect_target = global_hw
-    base_target = 0
-    per_key_colors = _brightness_support.read_engine_attr(
-        engine,
-        "per_key_colors",
-        missing_default=None,
-        error_default=None,
-        logger=logger,
-    )
-    if per_key_colors:
-        raw_base_target = _brightness_support.read_engine_attr(
-            engine,
-            "per_key_brightness",
-            missing_default=0,
-            error_default=0,
-            logger=logger,
-        )
-        base_target = _brightness_support.coerce_brightness(raw_base_target, default=0) or 0
-
-    start_effect = min(effect_target, transition_from)
-    target_visual_hw = max(global_hw, base_target)
-    start_pulse_scale = _apply_reactive_pulse_visual_curve(
-        float(start_effect) / 50.0,
-        visual_mode=visual_mode,
-    )
-    target_pulse_scale = _apply_reactive_pulse_visual_curve(
-        float(effect_target) / 50.0,
-        visual_mode=visual_mode,
-    )
-    start_scale = float(start_pulse_scale) * float(post_restore_damp)
-    if effect_target <= target_visual_hw:
-        target_scale = float(target_pulse_scale) * float(post_restore_damp)
-    else:
-        baseline_scale = float(target_visual_hw) / 50.0
-        target_scale = baseline_scale + (
-            (target_pulse_scale - baseline_scale) * float(post_restore_damp)
-        )
-    return start_scale + ((target_scale - start_scale) * release_progress)
-
-
 def apply_backdrop_brightness_scale(color_map: dict[Key, Color], *, factor: float) -> dict[Key, Color]:
     """Return a scaled copy of a per-key base map."""
 
@@ -384,16 +146,6 @@ def apply_backdrop_brightness_scale(color_map: dict[Key, Color], *, factor: floa
     if f <= 0.0:
         return {k: (0, 0, 0) for k in color_map}
     return {k: scale(rgb, f) for k, rgb in color_map.items()}
-
-
-def _steady_target_hw_brightness(engine: EffectsEngine, *, base: int) -> int:
-    raw_global_hw = _engine_attr_or_default(engine, "brightness", default=25)
-    try:
-        global_hw = int(raw_global_hw or 0)  # type: ignore[call-overload]
-    except _INT_COERCION_ERRORS:
-        global_hw = 25
-    global_hw = max(0, min(50, global_hw))
-    return max(int(base), global_hw)
 
 
 def frame_dt_s() -> float:
@@ -464,3 +216,9 @@ def render(engine: EffectsEngine, *, color_map: dict[Key, Color]) -> None:
         color_map=color_map,
         resolve_brightness=_resolve_brightness,
     )
+
+
+from ._render_pulse_scale import (  # noqa: F401 - preserved facade for external/test imports
+    _post_fade_reactive_release_scale,
+    pulse_brightness_scale_factor,
+)

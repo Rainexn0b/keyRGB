@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -9,8 +8,15 @@ from enum import Enum
 from operator import attrgetter
 from typing import Protocol, cast
 
+from ._render_coerce import (  # noqa: F401 - preserved facade for external/test imports
+    _INT_COERCION_ERRORS,
+    coerce_brightness,
+    coerce_float,
+    coerce_int,
+    debug_brightness_enabled,
+)
+
 _LOGGER = logging.getLogger(__name__)
-_INT_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
 _ENGINE_RECOVERABLE_RUNTIME_ERRORS = (LookupError, OSError, RuntimeError)
 _ENGINE_PROGRAMMING_ERRORS = (TypeError, ValueError)
 _ENGINE_ATTR_RUNTIME_ERRORS = _ENGINE_RECOVERABLE_RUNTIME_ERRORS + _ENGINE_PROGRAMMING_ERRORS
@@ -245,31 +251,6 @@ def device_attr_or_none(device: object | None, name: str) -> object | None:
         return attrgetter(name)(device)
     except AttributeError:
         return None
-
-
-def coerce_int(value: object, *, default: int | None) -> int | None:
-    try:
-        return int(value)  # type: ignore[call-overload]
-    except _INT_COERCION_ERRORS:
-        return default
-
-
-def coerce_float(value: object, *, default: float | None) -> float | None:
-    try:
-        return float(value)  # type: ignore[arg-type]
-    except _INT_COERCION_ERRORS:
-        return default
-
-
-def coerce_brightness(value: object, *, default: int | None) -> int | None:
-    coerced = coerce_int(value, default=default)
-    if coerced is None:
-        return None
-    return max(0, min(50, coerced))
-
-
-def debug_brightness_enabled() -> bool:
-    return os.environ.get("KEYRGB_DEBUG_BRIGHTNESS") == "1"
 
 
 def pulse_hw_lift_temporarily_disabled(engine: object, *, logger: logging.Logger) -> bool:

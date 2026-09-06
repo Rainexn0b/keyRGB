@@ -27,14 +27,7 @@ def apply_brightness_step_guard(
     guard_active = abs(delta) > max_step_per_frame
     if guard_active and not force_guard and dim_temp_active and delta < 0:
         guard_active = False
-    if (
-        guard_active
-        and not force_guard
-        and (not per_key_hw)
-        and delta < 0
-        and prev_i > idle_hw
-        and eff > idle_hw
-    ):
+    if guard_active and not force_guard and (not per_key_hw) and delta < 0 and prev_i > idle_hw and eff > idle_hw:
         guard_active = False
 
     if not guard_active:
