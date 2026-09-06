@@ -7,7 +7,11 @@ from pathlib import Path
 import pytest
 
 from buildpython.steps import step_architecture_validation
-from buildpython.steps.architecture_validation import load_architecture_rules, scan_architecture
+from buildpython.steps.architecture_validation import (
+    ArchitectureScanResult,
+    load_architecture_rules,
+    scan_architecture,
+)
 
 
 def _call_rule_payload(
@@ -272,7 +276,7 @@ def _scan_forbid_all_call_rule(tmp_path, source: str):
     return scan_architecture(root, load_architecture_rules(config_path))
 
 
-def _scan_configured_secondary_device_rule(tmp_path, source: str, *, relative_path: str) -> object:
+def _scan_configured_secondary_device_rule(tmp_path, source: str, *, relative_path: str) -> ArchitectureScanResult:
     root = tmp_path / "repo"
     target = root / relative_path
     target.parent.mkdir(parents=True)

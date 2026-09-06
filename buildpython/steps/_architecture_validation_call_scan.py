@@ -62,10 +62,10 @@ def _scan_python_calls(text: str) -> tuple[_ScannedCall, ...]:
 
             if not isinstance(node.func, ast.Attribute):
                 return None
-            receiver = _dotted_name(node.func.value)
-            if receiver is None:
+            receiver_name = _dotted_name(node.func.value)
+            if receiver_name is None:
                 return None
-            return self._canonical_dotted_name(receiver), node.func.attr
+            return self._canonical_dotted_name(receiver_name), node.func.attr
 
         def visit_Call(self, node: ast.Call) -> None:
             canonical_call = self._canonical_call(node)
@@ -122,7 +122,7 @@ def _scan_python_calls(text: str) -> tuple[_ScannedCall, ...]:
             self.visit(node.value)
             self._bind_target(node.target)
 
-        def visit_For(self, node: ast.For) -> None:
+        def visit_For(self, node: ast.For | ast.AsyncFor) -> None:
             self.visit(node.iter)
             self._bind_target(node.target)
             for statement in node.body:
