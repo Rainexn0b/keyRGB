@@ -13,6 +13,8 @@ JSON must be detached from collector internals.
 1. **No live `Config`.** Secondary-device diagnostics load settings through
    `load_config_settings()` into `ReadonlyDiagnosticsConfig`. That view never
    saves, coerces-to-disk, or shares identity with the tray/GUI config object.
+   Enforced by architecture rule `diagnostics-no-live-config` in
+   `buildpython/config/architecture_rules.json`.
 2. **Deep-frozen snapshots.** `Diagnostics` and secondary-device snapshots freeze
    nested mappings and sequences. Callers cannot mutate the snapshot, and later
    mutation of the collector's input dicts does not change it.

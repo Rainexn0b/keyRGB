@@ -290,6 +290,26 @@ def _scan_configured_secondary_device_rule(tmp_path, source: str, *, relative_pa
     return scan_architecture(root, rules)
 
 
+def _scan_configured_rule(
+    tmp_path,
+    source: str,
+    *,
+    rule_id: str,
+    relative_path: str,
+) -> ArchitectureScanResult:
+    root = tmp_path / "repo"
+    target = root / relative_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(source, encoding="utf-8")
+    config_root = Path(__file__).resolve().parents[2]
+    rules = [
+        rule
+        for rule in load_architecture_rules(config_root / "buildpython/config/architecture_rules.json")
+        if rule.rule_id == rule_id
+    ]
+    return scan_architecture(root, rules)
+
+
 def test_load_architecture_rules_parses_flags_and_corpus(tmp_path) -> None:
     config_path = tmp_path / "architecture_rules.json"
     config_path.write_text(
@@ -812,6 +832,110 @@ def test_configured_secondary_device_rule_uses_only_its_corpus(tmp_path) -> None
         ("keyrgb/tray/controllers/example_auxiliary.py", "call:self.tray.engine.stop"),
         ("keyrgb/tray/controllers/example_secondary.py", "call:tray.engine.turn_off"),
     ]
+
+
+@pytest.mark.parametrize(
+    ("source", "finding_token"),
+    [
+        (
+            "from keyrgb.core.power.system import get_status\n",
+            "import:keyrgb.core.power.system.get_status",
+        ),
+        (
+            "from keyrgb.core.secondary_device_runtime import iter_effective_secondary_routes\n",
+            "import:keyrgb.core.secondary_device_runtime.iter_effective_secondary_routes",
+        ),
+        (
+            "import keyrgb.core.power.system as power_system\npower_system.get_status()\n",
+            "call:keyrgb.core.power.system.get_status",
+        ),
+        (
+            "import keyrgb.core.secondary_device_runtime as runtime\nruntime.iter_effective_secondary_routes()\n",
+            "call:keyrgb.core.secondary_device_runtime.iter_effective_secondary_routes",
+        ),
+        (
+            "tray.backend.probe()\n",
+            "call:tray.backend.probe",
+        ),
+        (
+            "backend.is_available()\n",
+            "call:backend.is_available",
+        ),
+        (
+            "engine._ensure_device_available()\n",
+            "attribute:_ensure_device_available",
+        ),
+    ],
+)
+def test_configured_tray_ui_view_boundary_forbids_live_observation(tmp_path, source: str, finding_token: str) -> None:
+    result = _scan_configured_rule(
+        tmp_path,
+        source,
+        rule_id="tray-ui-no-live-observation",
+        relative_path="keyrgb/tray/ui/menu.py",
+    )
+
+    assert len(result.findings) == 1
+    assert result.findings[0].rule_id == "tray-ui-no-live-observation"
+    assert result.findings[0].regex == finding_token
+
+
+def test_configured_tray_ui_view_boundary_allows_snapshot_reads(tmp_path) -> None:
+    result = _scan_configured_rule(
+        tmp_path,
+        """from keyrgb.core.power.system import PowerMode, set_mode
+from keyrgb.tray.controllers.view_snapshots import (
+    read_effective_secondary_routes,
+    read_system_power_status,
+)
+
+def render(tray):
+    status = read_system_power_status(tray)
+    routes = read_effective_secondary_routes(tray)
+    available = tray.engine.device_available
+    probe = tray.backend_probe.identifiers
+    set_mode(PowerMode.BALANCED)
+    return status, routes, available, probe
+""",
+        rule_id="tray-ui-no-live-observation",
+        relative_path="keyrgb/tray/ui/menu_sections.py",
+    )
+
+    assert result.findings == ()
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from keyrgb.core.config.config import Config\n",
+        "from keyrgb.core.config import Config\n",
+    ],
+)
+def test_configured_diagnostics_rule_forbids_live_config(tmp_path, source: str) -> None:
+    result = _scan_configured_rule(
+        tmp_path,
+        source,
+        rule_id="diagnostics-no-live-config",
+        relative_path="keyrgb/core/diagnostics/secondary_devices.py",
+    )
+
+    assert result.findings
+    assert {finding.rule_id for finding in result.findings} == {"diagnostics-no-live-config"}
+
+
+def test_configured_diagnostics_rule_allows_readonly_settings_load(tmp_path) -> None:
+    result = _scan_configured_rule(
+        tmp_path,
+        """from keyrgb.core.config._settings_view import ConfigSettingsView
+from keyrgb.core.config.defaults import DEFAULTS
+from keyrgb.core.config.file_storage import load_config_settings
+from keyrgb.core.config.paths import config_file_path
+""",
+        rule_id="diagnostics-no-live-config",
+        relative_path="keyrgb/core/diagnostics/secondary_devices.py",
+    )
+
+    assert result.findings == ()
 
 
 @pytest.mark.parametrize("method", ["turn_off", "start_effect"])

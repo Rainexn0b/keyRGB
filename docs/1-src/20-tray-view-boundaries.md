@@ -25,6 +25,9 @@ fields such as `backend_probe.identifiers`, `device_discovery`, and
 - backend `probe()` / `is_available()`
 - engine `_ensure_device_available()`
 
+Enforced by architecture rule `tray-ui-no-live-observation` in
+`buildpython/config/architecture_rules.json`.
+
 Checked radio state is captured from the snapshot at build time. Applying a
 system power mode is a runtime transition: it may observe OS state, store a
 fresh snapshot, then request one coalesced menu rebuild that the runtime

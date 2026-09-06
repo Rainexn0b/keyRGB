@@ -98,6 +98,26 @@
       ]
     },
     {
+      "id": "diagnostics-no-live-config",
+      "description": "Diagnostics collection must not import or construct the live mutable Config object.",
+      "severity": "error",
+      "corpus": {
+        "include": [
+          "keyrgb/core/diagnostics/**/*.py"
+        ]
+      },
+      "imports": [
+        {
+          "module": "keyrgb.core.config.config",
+          "message": "Diagnostics must not import the live Config module; load settings through load_config_settings() into a readonly view."
+        },
+        {
+          "module": "keyrgb.core.config.Config",
+          "message": "Diagnostics must not import live Config; load settings through load_config_settings() into a readonly view."
+        }
+      ]
+    },
+    {
       "id": "gui-no-tray-runtime-dependency",
       "description": "GUI modules should not couple directly to tray runtime modules.",
       "severity": "error",
@@ -214,6 +234,71 @@
         {
           "name": "_system_power_last_ok",
           "message": "Tray UI should not mutate private tray runtime state directly; use an app-owned state or service boundary."
+        }
+      ]
+    },
+    {
+      "id": "tray-ui-no-live-observation",
+      "description": "Tray menu construction must render tray-owned presentation snapshots. It must not query OS power sysfs, probe secondary-route availability, or acquire hardware.",
+      "severity": "error",
+      "corpus": {
+        "include": [
+          "keyrgb/tray/ui/**/*.py"
+        ]
+      },
+      "imports": [
+        {
+          "module": "keyrgb.core.power.system.get_status",
+          "message": "Tray UI must not query OS power status; read tray.system_power_status via view_snapshots."
+        },
+        {
+          "module": "keyrgb.core.secondary_device_runtime.iter_effective_secondary_routes",
+          "message": "Tray UI must not probe secondary-route availability; read tray.effective_secondary_routes via view_snapshots."
+        }
+      ],
+      "attributes": [
+        {
+          "name": "_ensure_device_available",
+          "message": "Tray UI must not acquire hardware through engine._ensure_device_available(); read engine.device_available."
+        }
+      ],
+      "calls": [
+        {
+          "receivers": [
+            "keyrgb.core.power.system"
+          ],
+          "methods": [
+            "get_status"
+          ],
+          "allowed_files": [],
+          "forbid_all": true,
+          "message": "Tray UI must not call get_status(); read the tray-owned system_power_status snapshot."
+        },
+        {
+          "receivers": [
+            "keyrgb.core.secondary_device_runtime"
+          ],
+          "methods": [
+            "iter_effective_secondary_routes"
+          ],
+          "allowed_files": [],
+          "forbid_all": true,
+          "message": "Tray UI must not call iter_effective_secondary_routes(); read the tray-owned effective_secondary_routes snapshot."
+        },
+        {
+          "receivers": [
+            "backend"
+          ],
+          "receiver_suffixes": [
+            ".backend"
+          ],
+          "methods": [
+            "probe",
+            "is_available"
+          ],
+          "allowed_files": [],
+          "forbid_all": true,
+          "message": "Tray UI must not probe backends; render tray.backend_probe and engine.device_available."
         }
       ]
     },
