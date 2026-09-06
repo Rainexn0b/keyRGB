@@ -71,10 +71,10 @@
   },
   "file_size_analysis": {
     "counts": {
-      "large_files": 4,
-      "long_import_blocks": 16,
+      "large_files": 0,
+      "long_import_blocks": 15,
       "flat_directories": 0,
-      "delegation_candidates": 1,
+      "delegation_candidates": 0,
       "middleman_modules": 2,
       "unreferenced_files": 0
     }
