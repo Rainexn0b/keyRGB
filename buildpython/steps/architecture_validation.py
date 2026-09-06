@@ -67,6 +67,7 @@ class ArchitectureCallRule:
     skip_if_keywords: tuple[ArchitectureKeywordExemption, ...]
     message: str
     lock_message: str
+    forbid_all: bool = False
 
 
 @dataclass(frozen=True)
@@ -243,6 +244,8 @@ def load_architecture_rules(config_path: Path) -> list[ArchitectureRule]:
         calls: list[ArchitectureCallRule] = []
         raw_calls = raw_rule.get("calls", raw_rule.get("call_rules", [])) or []
         for raw_call in raw_calls:
+            if not isinstance(raw_call, dict):
+                raise ValueError(f"architecture rule {rule_id!r} has an invalid call entry")  # noqa: TRY004
             receivers = tuple(str(item).strip() for item in (raw_call.get("receivers", []) or []) if str(item).strip())
             receiver_suffixes = tuple(
                 str(item).strip() for item in (raw_call.get("receiver_suffixes", []) or []) if str(item).strip()
@@ -265,12 +268,14 @@ def load_architecture_rules(config_path: Path) -> list[ArchitectureRule]:
                 skip_if_keywords.append(ArchitectureKeywordExemption(name=name, equals=equals))
             message = str(raw_call.get("message", "")).strip()
             lock_message = str(raw_call.get("lock_message", "")).strip()
+            forbid_all = raw_call.get("forbid_all", False)
             if (
                 (not receivers and not receiver_suffixes)
                 or not methods
-                or not allowed_files
+                or (not allowed_files and forbid_all is not True)
                 or not message
                 or (required_locks and not lock_message)
+                or type(forbid_all) is not bool
             ):
                 raise ValueError(f"architecture rule {rule_id!r} has an invalid call entry")
             calls.append(
@@ -283,6 +288,7 @@ def load_architecture_rules(config_path: Path) -> list[ArchitectureRule]:
                     skip_if_keywords=tuple(skip_if_keywords),
                     message=message,
                     lock_message=lock_message,
+                    forbid_all=forbid_all,
                 )
             )
 
@@ -572,7 +578,7 @@ def scan_architecture(root: Path, rules: Iterable[ArchitectureRule]) -> Architec
                     ):
                         continue
 
-                    if not _path_matches_any(rel, call_rule.allowed_files):
+                    if call_rule.forbid_all or not _path_matches_any(rel, call_rule.allowed_files):
                         message = call_rule.message
                     elif call_rule.required_locks and not any(
                         lock in call_rule.required_locks for lock in scanned_call.lexical_locks

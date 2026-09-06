@@ -1,6 +1,49 @@
 {
   "rules": [
     {
+      "id": "secondary-device-no-primary-keyboard-mutations",
+      "description": "Secondary and auxiliary tray modules must not mutate the primary keyboard through tray engine receivers.",
+      "severity": "error",
+      "corpus": {
+        "include": [
+          "keyrgb/tray/**/*secondary*.py",
+          "keyrgb/tray/controllers/_software_target_auxiliary.py"
+        ]
+      },
+      "calls": [
+        {
+          "receivers": [
+            "tray.engine.kb"
+          ],
+          "methods": [
+            "set_brightness",
+            "set_color",
+            "set_key_colors",
+            "enable_user_mode",
+            "turn_off",
+            "set_effect"
+          ],
+          "allowed_files": [],
+          "forbid_all": true,
+          "message": "Secondary-device modules must not mutate the primary keyboard through tray.engine.kb."
+        },
+        {
+          "receivers": [
+            "tray.engine"
+          ],
+          "methods": [
+            "set_brightness",
+            "turn_off",
+            "start_effect",
+            "stop"
+          ],
+          "allowed_files": [],
+          "forbid_all": true,
+          "message": "Secondary-device modules must not mutate the primary keyboard through tray.engine."
+        }
+      ]
+    },
+    {
       "id": "hardware-observation-no-desired-state-assignments",
       "description": "Hardware observation modules must not directly mutate desired config or forced-off policy.",
       "severity": "error",

@@ -87,6 +87,7 @@ def architecture_validation_runner() -> RunResult:
                         "receiver_suffixes": list(item.receiver_suffixes),
                         "methods": list(item.methods),
                         "allowed_files": list(item.allowed_files),
+                        "forbid_all": item.forbid_all,
                         "required_locks": list(item.required_locks),
                         "skip_if_keywords": [
                             {"name": exemption.name, "equals": exemption.equals} for exemption in item.skip_if_keywords

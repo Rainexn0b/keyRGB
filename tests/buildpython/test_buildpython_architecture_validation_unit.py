@@ -233,6 +233,38 @@ def _scan_poller_engine_call(
     return scan_architecture(root, load_architecture_rules(config_path))
 
 
+def _forbid_all_call_rule_payload(*, forbid_all: object = True, allowed_files: list[str] | None = None) -> dict:
+    payload = _call_rule_payload(allowed_files=["keyrgb/core/effects/fades.py"])
+    call = payload["rules"][0]["calls"][0]
+    call["allowed_files"] = [] if allowed_files is None else allowed_files
+    call["forbid_all"] = forbid_all
+    return payload
+
+
+def _scan_forbid_all_call_rule(tmp_path, source: str):
+    root = tmp_path / "repo"
+    target = root / "keyrgb/runtime.py"
+    target.parent.mkdir(parents=True)
+    target.write_text(source, encoding="utf-8")
+    config_path = tmp_path / "architecture_rules.json"
+    config_path.write_text(json.dumps(_forbid_all_call_rule_payload()), encoding="utf-8")
+    return scan_architecture(root, load_architecture_rules(config_path))
+
+
+def _scan_configured_secondary_device_rule(tmp_path, source: str, *, relative_path: str) -> object:
+    root = tmp_path / "repo"
+    target = root / relative_path
+    target.parent.mkdir(parents=True)
+    target.write_text(source, encoding="utf-8")
+    config_root = Path(__file__).resolve().parents[2]
+    rules = [
+        rule
+        for rule in load_architecture_rules(config_root / "buildpython/config/architecture_rules.json")
+        if rule.rule_id == "secondary-device-no-primary-keyboard-mutations"
+    ]
+    return scan_architecture(root, rules)
+
+
 def test_load_architecture_rules_parses_flags_and_corpus(tmp_path) -> None:
     config_path = tmp_path / "architecture_rules.json"
     config_path.write_text(
@@ -611,6 +643,114 @@ def test_load_architecture_rules_parses_optional_locks_and_keyword_exemptions(tm
     assert [(item.name, item.equals) for item in call_rule.skip_if_keywords] == [("apply_to_hardware", False)]
 
 
+def test_load_architecture_rules_parses_forbid_all_calls_with_empty_allowlist(tmp_path) -> None:
+    config_path = tmp_path / "architecture_rules.json"
+    config_path.write_text(json.dumps(_forbid_all_call_rule_payload()), encoding="utf-8")
+
+    call_rule = load_architecture_rules(config_path)[0].calls[0]
+
+    assert call_rule.allowed_files == ()
+    assert call_rule.forbid_all is True
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda payload: payload["rules"][0]["calls"][0].update(forbid_all="yes"),
+        lambda payload: payload["rules"][0]["calls"][0].update(forbid_all=False, allowed_files=[]),
+    ],
+)
+def test_load_architecture_rules_rejects_malformed_forbid_all_call(tmp_path, mutate) -> None:
+    payload = _forbid_all_call_rule_payload()
+    mutate(payload)
+    config_path = tmp_path / "architecture_rules.json"
+    config_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="invalid call entry"):
+        load_architecture_rules(config_path)
+
+
+def test_scan_architecture_forbid_all_reports_every_matching_call(tmp_path) -> None:
+    result = _scan_forbid_all_call_rule(
+        tmp_path,
+        """engine.kb.set_brightness(5)
+engine.kb.set_color((1, 2, 3), brightness=5)
+""",
+    )
+
+    assert [finding.regex for finding in result.findings] == [
+        "call:engine.kb.set_brightness",
+        "call:engine.kb.set_color",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("receiver", "method"),
+    [
+        ("tray.engine.kb", "set_brightness"),
+        ("tray.engine.kb", "set_color"),
+        ("tray.engine.kb", "set_key_colors"),
+        ("tray.engine.kb", "enable_user_mode"),
+        ("tray.engine.kb", "turn_off"),
+        ("tray.engine.kb", "set_effect"),
+        ("tray.engine", "set_brightness"),
+        ("tray.engine", "turn_off"),
+        ("tray.engine", "start_effect"),
+        ("tray.engine", "stop"),
+    ],
+)
+def test_configured_secondary_device_rule_forbids_each_primary_receiver_category(
+    tmp_path, receiver: str, method: str
+) -> None:
+    result = _scan_configured_secondary_device_rule(
+        tmp_path,
+        f"{receiver}.{method}()\n",
+        relative_path="keyrgb/tray/controllers/example_secondary.py",
+    )
+
+    assert len(result.findings) == 1
+    assert result.findings[0].rule_id == "secondary-device-no-primary-keyboard-mutations"
+    assert result.findings[0].regex == f"call:{receiver}.{method}"
+
+
+def test_configured_secondary_device_rule_allows_secondary_receivers(tmp_path) -> None:
+    result = _scan_configured_secondary_device_rule(
+        tmp_path,
+        """target.device.set_color((1, 2, 3), brightness=5)
+selected.device.turn_off()
+secondary.engine.turn_off()
+engine.set_brightness(5)
+""",
+        relative_path="keyrgb/tray/controllers/example_secondary.py",
+    )
+
+    assert result.findings == ()
+
+
+def test_configured_secondary_device_rule_uses_only_its_corpus(tmp_path) -> None:
+    root = tmp_path / "repo"
+    matching = root / "keyrgb/tray/controllers/example_secondary.py"
+    explicit = root / "keyrgb/tray/controllers/_software_target_auxiliary.py"
+    unrelated = root / "keyrgb/tray/controllers/ordinary.py"
+    matching.parent.mkdir(parents=True)
+    matching.write_text("tray.engine.turn_off()\n", encoding="utf-8")
+    explicit.write_text("tray.engine.kb.turn_off()\n", encoding="utf-8")
+    unrelated.write_text("tray.engine.turn_off()\n", encoding="utf-8")
+    config_root = Path(__file__).resolve().parents[2]
+
+    rules = [
+        rule
+        for rule in load_architecture_rules(config_root / "buildpython/config/architecture_rules.json")
+        if rule.rule_id == "secondary-device-no-primary-keyboard-mutations"
+    ]
+    result = scan_architecture(root, rules)
+
+    assert [(finding.path, finding.regex) for finding in result.findings] == [
+        ("keyrgb/tray/controllers/_software_target_auxiliary.py", "call:tray.engine.kb.turn_off"),
+        ("keyrgb/tray/controllers/example_secondary.py", "call:tray.engine.turn_off"),
+    ]
+
+
 @pytest.mark.parametrize("method", ["turn_off", "start_effect"])
 def test_poller_engine_mutations_are_forbidden_outside_commit_leaves(tmp_path, method: str) -> None:
     result = _scan_poller_engine_call(tmp_path, f"tray.engine.{method}()\n")
@@ -718,6 +858,31 @@ def test_architecture_validation_runner_serializes_forbidden_under_lock_rules_an
     assert forbidden[3]["required_locks"] == ["kb_lock", "self.kb_lock"]
     assert report["findings"][0]["regex"] == "forbidden-under-lock:subprocess.run"
     assert report["findings"][0]["lock"] == "self.kb_lock"
+
+
+def test_architecture_validation_runner_serializes_forbid_all_call_rules_and_findings(monkeypatch, tmp_path) -> None:
+    config_path = tmp_path / "architecture_rules.json"
+    config_path.write_text(json.dumps(_forbid_all_call_rule_payload()), encoding="utf-8")
+    (tmp_path / "keyrgb").mkdir()
+    (tmp_path / "keyrgb/runtime.py").write_text("engine.kb.set_color((1, 2, 3), brightness=5)\n", encoding="utf-8")
+    (tmp_path / "buildpython/config").mkdir(parents=True)
+    (tmp_path / "buildpython/config/architecture_rules.json").write_text(
+        config_path.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    monkeypatch.setattr(step_architecture_validation, "repo_root", lambda: tmp_path)
+    monkeypatch.setattr(step_architecture_validation, "buildlog_dir", lambda: tmp_path / "buildlog")
+
+    result = step_architecture_validation.architecture_validation_runner()
+
+    assert result.exit_code == 1
+    report = json.loads((tmp_path / "buildlog/architecture-validation.json").read_text(encoding="utf-8"))
+    assert report["rules"][0]["calls"][0]["allowed_files"] == []
+    assert report["rules"][0]["calls"][0]["forbid_all"] is True
+    assert report["findings"][0]["regex"] == "call:engine.kb.set_color"
+    assert "engine.kb.set_color" in (tmp_path / "buildlog/architecture-validation.csv").read_text(encoding="utf-8")
+    assert "unapproved primary lighting owner" in (tmp_path / "buildlog/architecture-validation.md").read_text(
+        encoding="utf-8"
+    )
 
 
 def test_current_repo_has_no_architecture_findings() -> None:
