@@ -2,18 +2,20 @@
   "rules": [
     {
       "id": "secondary-device-no-primary-keyboard-mutations",
-      "description": "Secondary and auxiliary tray modules must not mutate the primary keyboard through tray engine receivers.",
+      "description": "Secondary and auxiliary tray modules must not mutate the primary keyboard through the configured tray-engine receiver spellings. Generic engine and secondary-target receivers remain allowed; dynamic object aliases are not inferred.",
       "severity": "error",
       "corpus": {
         "include": [
           "keyrgb/tray/**/*secondary*.py",
+          "keyrgb/tray/**/*auxiliary*.py",
           "keyrgb/tray/controllers/_software_target_auxiliary.py"
         ]
       },
       "calls": [
         {
           "receivers": [
-            "tray.engine.kb"
+            "tray.engine.kb",
+            "self.tray.engine.kb"
           ],
           "methods": [
             "set_brightness",
@@ -29,7 +31,8 @@
         },
         {
           "receivers": [
-            "tray.engine"
+            "tray.engine",
+            "self.tray.engine"
           ],
           "methods": [
             "set_brightness",
@@ -334,6 +337,23 @@
             }
           ],
           "message": "Pollers must not apply primary brightness directly; route the mutation through the deck pipeline or an approved commit leaf."
+        },
+        {
+          "receivers": [
+            "engine"
+          ],
+          "receiver_suffixes": [
+            ".engine"
+          ],
+          "methods": [
+            "stop"
+          ],
+          "allowed_files": [
+            "keyrgb/tray/pollers/config_polling_internal/_apply_callbacks.py",
+            "keyrgb/tray/pollers/idle_power/_action_execution.py",
+            "keyrgb/tray/pollers/hardware/_controller_sleep.py"
+          ],
+          "message": "Pollers must not stop the primary engine directly; route the mutation through the deck pipeline or an approved commit leaf."
         }
       ]
     },

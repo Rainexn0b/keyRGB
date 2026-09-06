@@ -41,6 +41,12 @@ When their steps run, debt-focused checks write structured reports under the sam
 - `coverage-summary.{json,csv,md}`
 - `exception-transparency.{json,csv,md}`
 
+Architecture validation uses lexical AST evidence. It canonicalizes ordinary
+`time` and `subprocess` import aliases, but does not infer dynamic object
+aliases. The secondary-device rule checks its configured primary receiver
+spellings (including `tray.engine` and `self.tray.engine`); generic
+`engine` and secondary-target receivers remain outside that rule.
+
 Coverage also maintains internal capture and export artifacts used by the coverage summary step.
 
 ## Step log format

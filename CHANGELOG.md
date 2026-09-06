@@ -30,6 +30,10 @@
   _brightness_fade_lock` order for nested runtime lock acquisitions.
 - Build/Architecture: Reject configured blocking calls while the primary
   keyboard lock is held, including sleeps, process launches, and waits.
+- Build/Architecture: Keep poller `engine.stop()` ownership explicit, validate
+  architecture keyword exemptions, cover auxiliary tray modules and exact
+  tray-engine receivers, and canonicalize ordinary time/subprocess import
+  aliases without inferring dynamic object aliases.
 
 ## 0.34.0 (2026-08-31)
 

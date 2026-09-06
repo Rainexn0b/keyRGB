@@ -258,7 +258,12 @@ def load_architecture_rules(config_path: Path) -> list[ArchitectureRule]:
                 str(item).strip() for item in (raw_call.get("required_locks", []) or []) if str(item).strip()
             )
             skip_if_keywords: list[ArchitectureKeywordExemption] = []
-            for raw_exemption in raw_call.get("skip_if_keywords", []) or []:
+            raw_exemptions = raw_call.get("skip_if_keywords", []) or []
+            if not isinstance(raw_exemptions, list):
+                raise ValueError(f"architecture rule {rule_id!r} has invalid keyword exemptions")  # noqa: TRY004
+            for raw_exemption in raw_exemptions:
+                if not isinstance(raw_exemption, dict):
+                    raise ValueError(f"architecture rule {rule_id!r} has an invalid keyword exemption")  # noqa: TRY004
                 name = str(raw_exemption.get("name", "")).strip()
                 if not name or "equals" not in raw_exemption:
                     raise ValueError(f"architecture rule {rule_id!r} has an invalid keyword exemption")
@@ -739,11 +744,4 @@ def _lock_level(
     lock_order: ArchitectureLockOrderRule,
     levels: dict[str, int],
 ) -> int | None:
-    direct_level = levels.get(lock_name)
-    if direct_level is not None:
-        return direct_level
-    terminal_name = lock_name.rsplit(".", 1)[-1]
-    for level, lock in enumerate(lock_order.locks):
-        if terminal_name == lock.name:
-            return level
-    return None
+    return levels.get(lock_name)

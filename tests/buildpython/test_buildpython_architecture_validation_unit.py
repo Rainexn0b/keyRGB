@@ -109,25 +109,25 @@ def _forbidden_under_lock_payload() -> dict:
                     {
                         "receivers": ["time"],
                         "methods": ["sleep"],
-                        "required_locks": ["kb_lock", "self.kb_lock"],
+                        "required_locks": ["kb_lock", "self.kb_lock", "engine.kb_lock", "tray.engine.kb_lock"],
                         "message": "sleep under keyboard lock",
                     },
                     {
                         "receiver_suffixes": [".process"],
                         "methods": ["run"],
-                        "required_locks": ["kb_lock", "self.kb_lock"],
+                        "required_locks": ["kb_lock", "self.kb_lock", "engine.kb_lock", "tray.engine.kb_lock"],
                         "message": "process run under keyboard lock",
                     },
                     {
                         "methods": ["join", "wait", "communicate"],
                         "match_any_receiver": True,
-                        "required_locks": ["kb_lock", "self.kb_lock"],
+                        "required_locks": ["kb_lock", "self.kb_lock", "engine.kb_lock", "tray.engine.kb_lock"],
                         "message": "blocking method under keyboard lock",
                     },
                     {
                         "receivers": ["subprocess"],
                         "methods": ["run", "call", "check_call", "check_output", "Popen"],
-                        "required_locks": ["kb_lock", "self.kb_lock"],
+                        "required_locks": ["kb_lock", "self.kb_lock", "engine.kb_lock", "tray.engine.kb_lock"],
                         "message": "subprocess under keyboard lock",
                     },
                 ],
@@ -157,11 +157,21 @@ def _lock_order_payload() -> dict:
                 "lock_orders": [
                     {
                         "locks": [
-                            {"name": "_start_lock", "aliases": ["self._start_lock"]},
-                            {"name": "kb_lock", "aliases": ["self.kb_lock"]},
+                            {
+                                "name": "_start_lock",
+                                "aliases": ["self._start_lock", "engine._start_lock", "tray.engine._start_lock"],
+                            },
+                            {
+                                "name": "kb_lock",
+                                "aliases": ["self.kb_lock", "engine.kb_lock", "tray.engine.kb_lock"],
+                            },
                             {
                                 "name": "_brightness_fade_lock",
-                                "aliases": ["self._brightness_fade_lock"],
+                                "aliases": [
+                                    "self._brightness_fade_lock",
+                                    "engine._brightness_fade_lock",
+                                    "tray.engine._brightness_fade_lock",
+                                ],
                             },
                         ],
                         "message": "Runtime locks are out of order",
@@ -211,6 +221,17 @@ def _poller_engine_call_rule_payload() -> dict:
                         ],
                         "skip_if_keywords": [{"name": "apply_to_hardware", "equals": False}],
                         "message": "poller primary brightness mutation",
+                    },
+                    {
+                        "receivers": ["engine"],
+                        "receiver_suffixes": [".engine"],
+                        "methods": ["stop"],
+                        "allowed_files": [
+                            "keyrgb/tray/pollers/config_polling_internal/_apply_callbacks.py",
+                            "keyrgb/tray/pollers/idle_power/_action_execution.py",
+                            "keyrgb/tray/pollers/hardware/_controller_sleep.py",
+                        ],
+                        "message": "poller primary engine stop",
                     },
                 ],
             }
@@ -511,6 +532,12 @@ def test_scan_lock_order_ignores_unrelated_locks(tmp_path) -> None:
     assert result.findings == ()
 
 
+def test_scan_lock_order_does_not_match_unconfigured_terminal_lock_names(tmp_path) -> None:
+    result = _scan_lock_order(tmp_path, "with other.kb_lock:\n    with self._start_lock:\n        pass\n")
+
+    assert result.findings == ()
+
+
 def test_scan_lock_order_supports_async_with(tmp_path) -> None:
     result = _scan_lock_order(
         tmp_path,
@@ -598,7 +625,7 @@ def test_architecture_validation_runner_serializes_lock_orders_and_findings(monk
     report = json.loads((tmp_path / "buildlog/architecture-validation.json").read_text(encoding="utf-8"))
     assert report["rules"][0]["lock_orders"][0]["locks"][0] == {
         "name": "_start_lock",
-        "aliases": ["self._start_lock"],
+        "aliases": ["self._start_lock", "engine._start_lock", "tray.engine._start_lock"],
     }
     assert report["findings"][0]["lock"] == "_start_lock"
     assert report["findings"][0]["outer_locks"] == ["engine.kb_lock"]
@@ -641,6 +668,31 @@ def test_load_architecture_rules_parses_optional_locks_and_keyword_exemptions(tm
 
     assert call_rule.required_locks == ()
     assert [(item.name, item.equals) for item in call_rule.skip_if_keywords] == [("apply_to_hardware", False)]
+
+
+@pytest.mark.parametrize("malformed", ["not a dict", 1, []])
+def test_load_architecture_rules_rejects_non_dict_keyword_exemptions(tmp_path, malformed) -> None:
+    payload = _poller_engine_call_rule_payload()
+    payload["rules"][0]["calls"][1]["skip_if_keywords"] = [malformed]
+    config_path = tmp_path / "architecture_rules.json"
+    config_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="invalid keyword exemption"):
+        load_architecture_rules(config_path)
+
+
+def test_architecture_validation_runner_returns_failed_result_for_malformed_keyword_exemption(monkeypatch, tmp_path) -> None:
+    payload = _poller_engine_call_rule_payload()
+    payload["rules"][0]["calls"][1]["skip_if_keywords"] = ["not a dict"]
+    (tmp_path / "buildpython/config").mkdir(parents=True)
+    (tmp_path / "buildpython/config/architecture_rules.json").write_text(json.dumps(payload), encoding="utf-8")
+    monkeypatch.setattr(step_architecture_validation, "repo_root", lambda: tmp_path)
+    monkeypatch.setattr(step_architecture_validation, "buildlog_dir", lambda: tmp_path / "buildlog")
+
+    result = step_architecture_validation.architecture_validation_runner()
+
+    assert result.exit_code == 1
+    assert "invalid keyword exemption" in result.stderr
 
 
 def test_load_architecture_rules_parses_forbid_all_calls_with_empty_allowlist(tmp_path) -> None:
@@ -697,6 +749,8 @@ engine.kb.set_color((1, 2, 3), brightness=5)
         ("tray.engine", "turn_off"),
         ("tray.engine", "start_effect"),
         ("tray.engine", "stop"),
+        ("self.tray.engine.kb", "turn_off"),
+        ("self.tray.engine", "stop"),
     ],
 )
 def test_configured_secondary_device_rule_forbids_each_primary_receiver_category(
@@ -731,10 +785,12 @@ def test_configured_secondary_device_rule_uses_only_its_corpus(tmp_path) -> None
     root = tmp_path / "repo"
     matching = root / "keyrgb/tray/controllers/example_secondary.py"
     explicit = root / "keyrgb/tray/controllers/_software_target_auxiliary.py"
+    auxiliary = root / "keyrgb/tray/controllers/example_auxiliary.py"
     unrelated = root / "keyrgb/tray/controllers/ordinary.py"
     matching.parent.mkdir(parents=True)
     matching.write_text("tray.engine.turn_off()\n", encoding="utf-8")
     explicit.write_text("tray.engine.kb.turn_off()\n", encoding="utf-8")
+    auxiliary.write_text("self.tray.engine.stop()\n", encoding="utf-8")
     unrelated.write_text("tray.engine.turn_off()\n", encoding="utf-8")
     config_root = Path(__file__).resolve().parents[2]
 
@@ -747,6 +803,7 @@ def test_configured_secondary_device_rule_uses_only_its_corpus(tmp_path) -> None
 
     assert [(finding.path, finding.regex) for finding in result.findings] == [
         ("keyrgb/tray/controllers/_software_target_auxiliary.py", "call:tray.engine.kb.turn_off"),
+        ("keyrgb/tray/controllers/example_auxiliary.py", "call:self.tray.engine.stop"),
         ("keyrgb/tray/controllers/example_secondary.py", "call:tray.engine.turn_off"),
     ]
 
@@ -760,6 +817,13 @@ def test_poller_engine_mutations_are_forbidden_outside_commit_leaves(tmp_path, m
     assert result.findings[0].regex == f"call:tray.engine.{method}"
 
 
+def test_poller_engine_stop_is_forbidden_outside_commit_leaves(tmp_path) -> None:
+    result = _scan_poller_engine_call(tmp_path, "tray.engine.stop()\n")
+
+    assert len(result.findings) == 1
+    assert result.findings[0].message == "poller primary engine stop"
+
+
 @pytest.mark.parametrize(
     "relative_path",
     [
@@ -769,6 +833,20 @@ def test_poller_engine_mutations_are_forbidden_outside_commit_leaves(tmp_path, m
 )
 def test_poller_turn_off_commit_leaves_are_allowed(tmp_path, relative_path: str) -> None:
     result = _scan_poller_engine_call(tmp_path, "tray.engine.turn_off()\n", relative_path=relative_path)
+
+    assert result.findings == ()
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "keyrgb/tray/pollers/config_polling_internal/_apply_callbacks.py",
+        "keyrgb/tray/pollers/idle_power/_action_execution.py",
+        "keyrgb/tray/pollers/hardware/_controller_sleep.py",
+    ],
+)
+def test_poller_stop_commit_leaves_are_allowed(tmp_path, relative_path: str) -> None:
+    result = _scan_poller_engine_call(tmp_path, "tray.engine.stop()\n", relative_path=relative_path)
 
     assert result.findings == ()
 
@@ -855,7 +933,12 @@ def test_architecture_validation_runner_serializes_forbidden_under_lock_rules_an
     report = json.loads((tmp_path / "buildlog/architecture-validation.json").read_text(encoding="utf-8"))
     forbidden = report["rules"][0]["forbidden_under_locks"]
     assert forbidden[2]["match_any_receiver"] is True
-    assert forbidden[3]["required_locks"] == ["kb_lock", "self.kb_lock"]
+    assert forbidden[3]["required_locks"] == [
+        "kb_lock",
+        "self.kb_lock",
+        "engine.kb_lock",
+        "tray.engine.kb_lock",
+    ]
     assert report["findings"][0]["regex"] == "forbidden-under-lock:subprocess.run"
     assert report["findings"][0]["lock"] == "self.kb_lock"
 
@@ -1063,6 +1146,43 @@ def test_forbidden_under_lock_reports_blocking_call(tmp_path, source: str, metho
     assert len(result.findings) == 1
     assert result.findings[0].regex == f"forbidden-under-lock:{method}"
     assert result.findings[0].lock in {"kb_lock", "self.kb_lock"}
+
+
+@pytest.mark.parametrize("lock", ["kb_lock", "self.kb_lock", "engine.kb_lock", "tray.engine.kb_lock"])
+@pytest.mark.parametrize(
+    ("imports", "call", "method"),
+    [
+        ("from time import sleep", "sleep(1)", "time.sleep"),
+        ("from time import sleep as pause", "pause(1)", "time.sleep"),
+        ("import time as clock", "clock.sleep(1)", "time.sleep"),
+        ("from subprocess import run", "run([])", "subprocess.run"),
+        ("from subprocess import run as launch", "launch([])", "subprocess.run"),
+        ("import subprocess as commands", "commands.run([])", "subprocess.run"),
+        ("from subprocess import Popen", "Popen([])", "subprocess.Popen"),
+        ("from subprocess import Popen as launch", "launch([])", "subprocess.Popen"),
+        ("import subprocess as commands", "commands.Popen([])", "subprocess.Popen"),
+    ],
+)
+def test_forbidden_under_lock_canonicalizes_imported_and_module_aliases(
+    tmp_path, lock: str, imports: str, call: str, method: str
+) -> None:
+    result = _scan_forbidden_under_lock(tmp_path, f"{imports}\nwith {lock}:\n    {call}\n")
+
+    assert len(result.findings) == 1
+    assert result.findings[0].regex == f"forbidden-under-lock:{method}"
+    assert result.findings[0].lock == lock
+
+
+def test_forbidden_under_lock_does_not_treat_shadowed_callback_as_subprocess_run(tmp_path) -> None:
+    result = _scan_forbidden_under_lock(
+        tmp_path,
+        "from subprocess import run\n"
+        "def invoke(run):\n"
+        "    with kb_lock:\n"
+        "        run([])\n",
+    )
+
+    assert result.findings == ()
 
 
 def test_forbidden_under_lock_supports_suffix_and_match_any_receivers(tmp_path) -> None:
