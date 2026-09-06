@@ -7,23 +7,22 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from keyrgb.core.brightness_layers import (
-    SchedulerBrightnessState,
-    compose_power_source_brightness_overrides,
-    is_scheduler_night,
-    parse_scheduler_time,
-    resolve_scheduler_brightness_state,
-)
+from keyrgb.core import brightness_layers as _layers
 from keyrgb.core.power.monitoring.power_supply_sysfs import read_on_ac_power
+from keyrgb.tray.controllers import runtime_coordination as _coord
 from keyrgb.tray.controllers._brightness_layer import apply_layered_brightness_update
 from keyrgb.tray.controllers._lighting_controller_helpers import _log_tray_exception, try_log_event
 from keyrgb.tray.controllers.lighting_controller import start_current_effect
-from keyrgb.tray.controllers.runtime_coordination import (
-    capture_transition_revision,
-    run_tray_observation_if_current,
-    run_tray_transition,
-)
 from keyrgb.tray.pollers import _lifecycle as polling_lifecycle
+
+SchedulerBrightnessState = _layers.SchedulerBrightnessState
+compose_power_source_brightness_overrides = _layers.compose_power_source_brightness_overrides
+is_scheduler_night = _layers.is_scheduler_night
+parse_scheduler_time = _layers.parse_scheduler_time
+resolve_scheduler_brightness_state = _layers.resolve_scheduler_brightness_state
+capture_transition_revision = _coord.capture_transition_revision
+run_tray_observation_if_current = _coord.run_tray_observation_if_current
+run_tray_transition = _coord.run_tray_transition
 
 if TYPE_CHECKING:
     from keyrgb.tray.protocols import LightingTrayProtocol
