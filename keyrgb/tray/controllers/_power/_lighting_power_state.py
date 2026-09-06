@@ -221,11 +221,11 @@ def power_restore_impl(
             # An explicit user-off wants the deck dark; clear any stale guard so a
             # later genuine controller sleep can latch again.
             _set_controller_sleep_resume_guard(tray, False)
-            return
+            return None
 
         if policy_state.guard_state.idle_forced_off is True:
             _set_controller_sleep_resume_guard(tray, False)
-            return
+            return None
 
         if policy_state.should_log_power_restore:
             try_log_event(tray, "power", "restore")
@@ -236,7 +236,7 @@ def power_restore_impl(
             _set_controller_sleep_off(tray, False)
             _set_controller_sleep_resume_guard(tray, False)
             tray.is_off = True
-            return
+            return None
 
         # Arm before clearing the prior native-sleep latch and before crossing the
         # effect/backend boundary. A concurrent hardware poll must not re-latch the

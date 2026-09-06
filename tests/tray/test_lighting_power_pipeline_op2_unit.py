@@ -263,3 +263,118 @@ class TestRestoringFirewall:
 
         tray.engine.turn_off.assert_called_once_with()
         assert tray.engine.turn_off.call_args.kwargs.get("fade") is not True
+
+
+class TestExtractedPipelineCoverage:
+    def test_store_deck_state_swallows_assignment_errors(self) -> None:
+        from keyrgb.tray.deck_pipeline import _store_deck_state
+
+        with patch(
+            "keyrgb.tray._deck_state_store.ensure_tray_idle_power_state",
+            side_effect=TypeError("synthetic"),
+        ):
+            _store_deck_state(object(), DeckState.LIT)
+
+    def test_deferred_plan_does_not_run_leaf(self) -> None:
+        from keyrgb.tray.deck_pipeline import commit_lighting_power_intent
+        from keyrgb.tray.deck_state import SleepWakePlan
+
+        tray = make_owner_backed_mock_tray(is_off=False)
+        calls: list[int] = []
+
+        with patch(
+            "keyrgb.tray.deck_pipeline.decide_sleep_wake",
+            return_value=SleepWakePlan(state=DeckState.LIT, should_commit=False, deferred=True),
+        ):
+            committed = commit_lighting_power_intent(
+                tray,
+                SleepWakeIntentKind.MANUAL_OFF,
+                lambda: calls.append(1),
+            )
+
+        assert committed is False
+        assert calls == []
+
+    def test_restore_leaf_false_reverts_origin(self) -> None:
+        from keyrgb.tray.deck_pipeline import commit_lighting_power_intent
+
+        tray = _bare_is_off_tray(last_brightness=25)
+        tray.config.brightness = 25
+        origin = tray.tray_idle_power_state.deck_state
+
+        committed = commit_lighting_power_intent(tray, SleepWakeIntentKind.MANUAL_ON, lambda: False)
+
+        assert committed is False
+        assert tray.tray_idle_power_state.deck_state is origin
+
+    def test_restore_leaf_keeps_is_off_as_failure(self) -> None:
+        from keyrgb.tray.deck_pipeline import commit_lighting_power_intent
+
+        tray = _bare_is_off_tray(last_brightness=25)
+        tray.config.brightness = 25
+
+        def _leaf() -> bool:
+            tray.is_off = True
+            return True
+
+        committed = commit_lighting_power_intent(tray, SleepWakeIntentKind.MANUAL_ON, _leaf)
+
+        assert committed is False
+
+    def test_reactive_seed_and_consume_errors_are_nonfatal(self) -> None:
+        from keyrgb.tray._deck_lighting_power import (
+            _consume_lighting_power_restore_seed,
+            _seed_lighting_power_restore_windows,
+        )
+
+        tray = make_owner_backed_mock_tray(is_off=False)
+        tray.config.effect = "reactive_ripple"
+
+        with patch(
+            "keyrgb.core.effects.reactive._reactive_restore_seed.seed_reactive_restore_windows",
+            side_effect=TypeError("synthetic seed"),
+        ):
+            assert _seed_lighting_power_restore_windows(tray, fade_in_duration_s=0.1) is False
+
+        with patch(
+            "keyrgb.core.effects.reactive._reactive_restore_seed.apply_queued_reactive_restore_seed",
+            side_effect=ValueError("synthetic consume"),
+        ):
+            _consume_lighting_power_restore_seed(tray)
+
+    def test_keyboard_wake_uses_dim_temp_and_clears_resume_guard(self) -> None:
+        from keyrgb.tray._deck_sleep_wake_commits import _commit_keyboard_wake
+
+        tray = make_owner_backed_mock_tray(is_off=True, dim_temp_active=True, dim_temp_target_brightness=8)
+        tray.tray_idle_power_state.controller_sleep_resume_guard = True
+
+        with (
+            patch(
+                "keyrgb.tray.pollers.hardware._controller_sleep.restart_effect_after_firmware_wake_best_effort",
+                return_value=True,
+            ),
+            patch("keyrgb.tray.pollers.hardware._recovery.controller_sleep_resume_guard_active", return_value=True),
+            patch("keyrgb.tray.pollers.hardware._recovery.set_controller_sleep_resume_guard") as set_guard,
+            patch("keyrgb.tray.pollers.hardware._recovery._seed_reactive_restore_damp_best_effort"),
+            patch("keyrgb.tray.pollers.hardware._recovery.set_controller_sleep_off"),
+            patch("keyrgb.tray.pollers.hardware._recovery._refresh_ui_without_icon_animation"),
+        ):
+            assert _commit_keyboard_wake(tray, now=1.0, dim_temp_target=None) is True
+
+        set_guard.assert_called_once_with(tray, False)
+
+    def test_unknown_idle_intent_is_a_noop(self) -> None:
+        from keyrgb.tray._deck_sleep_wake_commits import _commit_idle_action
+
+        tray = make_owner_backed_mock_tray(is_off=False)
+        assert _commit_idle_action(tray, SleepWakeIntentKind.AUTO_HEAL, dim_temp_brightness=5) is False
+
+    def test_derive_deck_state_falls_back_when_bool_reads_fail(self) -> None:
+        from keyrgb.tray.deck_pipeline import derive_deck_state
+
+        tray = make_owner_backed_mock_tray(is_off=False, user_forced_off=True)
+        with patch(
+            "keyrgb.tray.idle_power_state.read_idle_power_state_bool_field",
+            side_effect=TypeError("synthetic"),
+        ):
+            assert derive_deck_state(tray) is DeckState.USER_OFF
