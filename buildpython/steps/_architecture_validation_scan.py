@@ -3,22 +3,8 @@ from __future__ import annotations
 from collections.abc import Iterable
 from pathlib import Path
 
+from . import _architecture_validation_helpers as _helpers
 from ._architecture_validation_call_scan import _scan_python_calls
-from ._architecture_validation_helpers import (
-    _iter_rule_files,
-    _line_number,
-    _line_snippet,
-    _module_matches_import_rule,
-    _rel_path,
-    _scan_python_assignments,
-    _scan_python_lock_acquisitions,
-    _scan_python_signals,
-    _ScannedAssignment,
-    _ScannedAttribute,
-    _ScannedCall,
-    _ScannedImport,
-    _ScannedLockAcquisition,
-)
 from ._architecture_validation_models import (
     ArchitectureFinding,
     ArchitectureLockOrderRule,
@@ -31,15 +17,17 @@ def scan_architecture(root: Path, rules: Iterable[ArchitectureRule]) -> Architec
     findings: list[ArchitectureFinding] = []
     seen_findings: set[tuple[str, str, int, str, str]] = set()
     scanned_files: set[str] = set()
-    scanned_python_signals: dict[str, tuple[tuple[_ScannedImport, ...], tuple[_ScannedAttribute, ...]]] = {}
-    scanned_python_assignments: dict[str, tuple[_ScannedAssignment, ...]] = {}
-    scanned_python_calls: dict[str, tuple[_ScannedCall, ...]] = {}
-    scanned_python_lock_acquisitions: dict[str, tuple[_ScannedLockAcquisition, ...]] = {}
+    scanned_python_signals: dict[
+        str, tuple[tuple[_helpers._ScannedImport, ...], tuple[_helpers._ScannedAttribute, ...]]
+    ] = {}
+    scanned_python_assignments: dict[str, tuple[_helpers._ScannedAssignment, ...]] = {}
+    scanned_python_calls: dict[str, tuple[_helpers._ScannedCall, ...]] = {}
+    scanned_python_lock_acquisitions: dict[str, tuple[_helpers._ScannedLockAcquisition, ...]] = {}
     rules_list = list(rules)
 
     for rule in rules_list:
-        for path in _iter_rule_files(root=root, rule=rule):
-            rel = _rel_path(root, path)
+        for path in _helpers._iter_rule_files(root=root, rule=rule):
+            rel = _helpers._rel_path(root, path)
             scanned_files.add(rel)
             try:
                 text = path.read_text(encoding="utf-8", errors="replace")
@@ -49,8 +37,8 @@ def scan_architecture(root: Path, rules: Iterable[ArchitectureRule]) -> Architec
             lines = text.splitlines()
             for pattern in rule.patterns:
                 for match in pattern.compiled.finditer(text):
-                    line = _line_number(text=text, offset=match.start())
-                    snippet = _line_snippet(lines=lines, line=line)
+                    line = _helpers._line_number(text=text, offset=match.start())
+                    snippet = _helpers._line_snippet(lines=lines, line=line)
                     finding_key = (rule.rule_id, rel, line, pattern.message, pattern.regex)
                     if finding_key in seen_findings:
                         continue
@@ -70,19 +58,19 @@ def scan_architecture(root: Path, rules: Iterable[ArchitectureRule]) -> Architec
             if rule.imports or rule.attributes:
                 signals = scanned_python_signals.get(rel)
                 if signals is None:
-                    signals = _scan_python_signals(text)
+                    signals = _helpers._scan_python_signals(text)
                     scanned_python_signals[rel] = signals
                 imports, attributes = signals
 
-            assignments: tuple[_ScannedAssignment, ...] = ()
+            assignments: tuple[_helpers._ScannedAssignment, ...] = ()
             if rule.assignments:
                 cached_assignments = scanned_python_assignments.get(rel)
                 if cached_assignments is None:
-                    cached_assignments = _scan_python_assignments(text)
+                    cached_assignments = _helpers._scan_python_assignments(text)
                     scanned_python_assignments[rel] = cached_assignments
                 assignments = cached_assignments
 
-            calls: tuple[_ScannedCall, ...] = ()
+            calls: tuple[_helpers._ScannedCall, ...] = ()
             if rule.calls or rule.forbidden_under_locks:
                 cached_calls = scanned_python_calls.get(rel)
                 if cached_calls is None:
@@ -94,11 +82,11 @@ def scan_architecture(root: Path, rules: Iterable[ArchitectureRule]) -> Architec
                 for import_rule in rule.imports:
                     finding_token = f"import:{import_rule.module}"
                     for scanned_import in imports:
-                        if not _module_matches_import_rule(scanned_import.module, import_rule.module):
+                        if not _helpers._module_matches_import_rule(scanned_import.module, import_rule.module):
                             continue
 
                         line = scanned_import.line
-                        snippet = _line_snippet(lines=lines, line=line)
+                        snippet = _helpers._line_snippet(lines=lines, line=line)
                         finding_key = (rule.rule_id, rel, line, import_rule.message, finding_token)
                         if finding_key in seen_findings:
                             continue
@@ -123,7 +111,7 @@ def scan_architecture(root: Path, rules: Iterable[ArchitectureRule]) -> Architec
                             continue
 
                         line = scanned_attribute.line
-                        snippet = _line_snippet(lines=lines, line=line)
+                        snippet = _helpers._line_snippet(lines=lines, line=line)
                         finding_key = (rule.rule_id, rel, line, attribute_rule.message, finding_token)
                         if finding_key in seen_findings:
                             continue
@@ -160,7 +148,7 @@ def scan_architecture(root: Path, rules: Iterable[ArchitectureRule]) -> Architec
                             path=rel,
                             line=scanned_assignment.line,
                             message=assignment_rule.message,
-                            snippet=_line_snippet(lines=lines, line=scanned_assignment.line),
+                            snippet=_helpers._line_snippet(lines=lines, line=scanned_assignment.line),
                             regex=finding_token,
                         )
                     )
@@ -168,7 +156,7 @@ def scan_architecture(root: Path, rules: Iterable[ArchitectureRule]) -> Architec
             if rule.lock_orders:
                 acquisitions = scanned_python_lock_acquisitions.get(rel)
                 if acquisitions is None:
-                    acquisitions = _scan_python_lock_acquisitions(text)
+                    acquisitions = _helpers._scan_python_lock_acquisitions(text)
                     scanned_python_lock_acquisitions[rel] = acquisitions
                 for lock_order in rule.lock_orders:
                     levels = {
@@ -203,7 +191,7 @@ def scan_architecture(root: Path, rules: Iterable[ArchitectureRule]) -> Architec
                                 path=rel,
                                 line=acquisition.line,
                                 message=message,
-                                snippet=_line_snippet(lines=lines, line=acquisition.line),
+                                snippet=_helpers._line_snippet(lines=lines, line=acquisition.line),
                                 regex=finding_token,
                                 lock=inner_name,
                                 outer_locks=acquisition.outer_locks,
@@ -248,7 +236,7 @@ def scan_architecture(root: Path, rules: Iterable[ArchitectureRule]) -> Architec
                             path=rel,
                             line=scanned_call.line,
                             message=message,
-                            snippet=_line_snippet(lines=lines, line=scanned_call.line),
+                            snippet=_helpers._line_snippet(lines=lines, line=scanned_call.line),
                             regex=finding_token,
                         )
                     )
@@ -280,7 +268,7 @@ def scan_architecture(root: Path, rules: Iterable[ArchitectureRule]) -> Architec
                             path=rel,
                             line=scanned_call.line,
                             message=forbidden_rule.message,
-                            snippet=_line_snippet(lines=lines, line=scanned_call.line),
+                            snippet=_helpers._line_snippet(lines=lines, line=scanned_call.line),
                             regex=finding_token,
                             lock=matching_lock,
                         )
