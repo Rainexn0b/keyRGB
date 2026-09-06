@@ -6,25 +6,22 @@ from keyrgb.core.utils.safe_attrs import safe_bool_attr, safe_int_attr, safe_str
 from keyrgb.tray.idle_power_state import read_idle_power_state_float_field
 from keyrgb.tray.protocols import ConfigPollingTrayProtocol, ConfigStateResolveTrayProtocol
 
-from . import _planning, _post_fast_path_apply
-from ._apply_callbacks import (
-    _apply_effect,
-    _apply_perkey,
-    _apply_turn_off,
-    _apply_uniform,
-    _handle_forced_off,
-    _sync_reactive,
-    _sync_software_target_policy,
-)
+from . import _apply_callbacks as _callbacks, _config_apply_state as _apply_state, _planning, _post_fast_path_apply
 from ._apply_plan import should_skip_config_apply_for_power_source_transition
-from ._config_apply_state import (
-    _CONFIG_FALLBACK_EXCEPTIONS,
-    ConfigApplyState,
-    _safe_perkey_signature,
-    _safe_tuple_attr,
-    build_config_apply_state,
-)
 from ._fast_path import apply_fast_path_change, classify_fast_path_change
+
+ConfigApplyState = _apply_state.ConfigApplyState
+_CONFIG_FALLBACK_EXCEPTIONS = _apply_state._CONFIG_FALLBACK_EXCEPTIONS
+_safe_perkey_signature = _apply_state._safe_perkey_signature
+_safe_tuple_attr = _apply_state._safe_tuple_attr
+build_config_apply_state = _apply_state.build_config_apply_state
+_apply_effect = _callbacks._apply_effect
+_apply_perkey = _callbacks._apply_perkey
+_apply_turn_off = _callbacks._apply_turn_off
+_apply_uniform = _callbacks._apply_uniform
+_handle_forced_off = _callbacks._handle_forced_off
+_sync_reactive = _callbacks._sync_reactive
+_sync_software_target_policy = _callbacks._sync_software_target_policy
 
 REACTIVE_EFFECTS_SET = frozenset(REACTIVE_EFFECTS)
 _FAST_PATH_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
