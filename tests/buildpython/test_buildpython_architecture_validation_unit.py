@@ -1040,6 +1040,40 @@ _fade_api = build_reactive_api()
     assert result.findings == ()
 
 
+def test_configured_gui_async_rule_forbids_direct_worker_threads(tmp_path) -> None:
+    result = _scan_configured_rule(
+        tmp_path,
+        "from threading import Thread\nThread(target=work, daemon=True).start()\n",
+        rule_id="gui-background-work-uses-tk-async",
+        relative_path="keyrgb/gui/windows/uniform.py",
+    )
+
+    assert result.findings
+    assert {finding.rule_id for finding in result.findings} == {"gui-background-work-uses-tk-async"}
+
+
+def test_configured_gui_async_rule_allows_tk_async_owner_and_helpers(tmp_path) -> None:
+    owner = _scan_configured_rule(
+        tmp_path,
+        "Thread(target=worker, daemon=True).start()\n",
+        rule_id="gui-background-work-uses-tk-async",
+        relative_path="keyrgb/gui/utils/tk_async.py",
+    )
+    helper = _scan_configured_rule(
+        tmp_path,
+        """from keyrgb.gui.utils.tk_async import TkAsyncCoordinator, submit_gui_work
+
+self.tk_jobs = TkAsyncCoordinator()
+submit_gui_work(self, self.root, work, on_done)
+""",
+        rule_id="gui-background-work-uses-tk-async",
+        relative_path="keyrgb/gui/windows/power_mode.py",
+    )
+
+    assert owner.findings == ()
+    assert helper.findings == ()
+
+
 @pytest.mark.parametrize("method", ["turn_off", "start_effect"])
 def test_poller_engine_mutations_are_forbidden_outside_commit_leaves(tmp_path, method: str) -> None:
     result = _scan_poller_engine_call(tmp_path, f"tray.engine.{method}()\n")

@@ -167,6 +167,25 @@
       ]
     },
     {
+      "id": "gui-background-work-uses-tk-async",
+      "description": "GUI modules must not spawn worker threads directly. Blocking hardware and OS work goes through keyrgb.gui.utils.tk_async.",
+      "severity": "error",
+      "corpus": {
+        "include": [
+          "keyrgb/gui/**/*.py"
+        ],
+        "exclude": [
+          "keyrgb/gui/utils/tk_async.py"
+        ]
+      },
+      "patterns": [
+        {
+          "regex": "Thread\\s*\\(\\s*target\\s*=",
+          "message": "GUI modules must not start Thread(target=...) directly; use TkAsyncCoordinator, submit_gui_work, or run_in_thread."
+        }
+      ]
+    },
+    {
       "id": "tray-ui-no-backend-selection",
       "description": "Tray UI should not probe backends directly; selection belongs in app or controller layers.",
       "severity": "error",

@@ -22,6 +22,10 @@ result.
 Cancelled or superseded jobs never invoke `on_done`. The worker may still finish
 a USB/sysfs call already in flight; only the UI delivery is suppressed.
 
+Enforced by architecture rule `gui-background-work-uses-tk-async` in
+`buildpython/config/architecture_rules.json`: GUI modules outside `tk_async.py`
+must not spawn `Thread(target=...)` themselves.
+
 ## Window owners
 
 Production windows create `tk_jobs = TkAsyncCoordinator()` and submit:
