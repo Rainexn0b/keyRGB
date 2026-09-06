@@ -72,7 +72,7 @@
   "file_size_analysis": {
     "counts": {
       "large_files": 0,
-      "long_import_blocks": 15,
+      "long_import_blocks": 14,
       "flat_directories": 0,
       "delegation_candidates": 0,
       "middleman_modules": 2,

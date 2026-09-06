@@ -681,7 +681,9 @@ def test_load_architecture_rules_rejects_non_dict_keyword_exemptions(tmp_path, m
         load_architecture_rules(config_path)
 
 
-def test_architecture_validation_runner_returns_failed_result_for_malformed_keyword_exemption(monkeypatch, tmp_path) -> None:
+def test_architecture_validation_runner_returns_failed_result_for_malformed_keyword_exemption(
+    monkeypatch, tmp_path
+) -> None:
     payload = _poller_engine_call_rule_payload()
     payload["rules"][0]["calls"][1]["skip_if_keywords"] = ["not a dict"]
     (tmp_path / "buildpython/config").mkdir(parents=True)
@@ -1176,10 +1178,7 @@ def test_forbidden_under_lock_canonicalizes_imported_and_module_aliases(
 def test_forbidden_under_lock_does_not_treat_shadowed_callback_as_subprocess_run(tmp_path) -> None:
     result = _scan_forbidden_under_lock(
         tmp_path,
-        "from subprocess import run\n"
-        "def invoke(run):\n"
-        "    with kb_lock:\n"
-        "        run([])\n",
+        "from subprocess import run\ndef invoke(run):\n    with kb_lock:\n        run([])\n",
     )
 
     assert result.findings == ()
