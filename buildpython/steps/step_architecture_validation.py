@@ -88,6 +88,13 @@ def architecture_validation_runner() -> RunResult:
                     }
                     for item in rule.calls
                 ],
+                "lock_orders": [
+                    {
+                        "locks": [{"name": lock.name, "aliases": list(lock.aliases)} for lock in item.locks],
+                        "message": item.message,
+                    }
+                    for item in rule.lock_orders
+                ],
             }
             for rule in rules
         ],
@@ -100,6 +107,8 @@ def architecture_validation_runner() -> RunResult:
                 "message": finding.message,
                 "snippet": finding.snippet,
                 "regex": finding.regex,
+                "lock": finding.lock,
+                "outer_locks": list(finding.outer_locks),
             }
             for finding in result.findings
         ],

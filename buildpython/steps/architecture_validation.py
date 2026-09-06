@@ -13,10 +13,12 @@ from ._architecture_validation_helpers import (
     _module_matches_import_rule,
     _rel_path,
     _scan_python_calls,
+    _scan_python_lock_acquisitions,
     _scan_python_signals,
     _ScannedAttribute,
     _ScannedCall,
     _ScannedImport,
+    _ScannedLockAcquisition,
 )
 
 
@@ -59,6 +61,18 @@ class ArchitectureCallRule:
 
 
 @dataclass(frozen=True)
+class ArchitectureLock:
+    name: str
+    aliases: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ArchitectureLockOrderRule:
+    locks: tuple[ArchitectureLock, ...]
+    message: str
+
+
+@dataclass(frozen=True)
 class ArchitectureRule:
     rule_id: str
     description: str
@@ -69,6 +83,7 @@ class ArchitectureRule:
     imports: tuple[ArchitectureImportRule, ...]
     attributes: tuple[ArchitectureAttributeRule, ...]
     calls: tuple[ArchitectureCallRule, ...] = ()
+    lock_orders: tuple[ArchitectureLockOrderRule, ...] = ()
 
     @property
     def call_rules(self) -> tuple[ArchitectureCallRule, ...]:
@@ -86,6 +101,8 @@ class ArchitectureFinding:
     message: str
     snippet: str
     regex: str
+    lock: str = ""
+    outer_locks: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -201,9 +218,10 @@ def load_architecture_rules(config_path: Path) -> list[ArchitectureRule]:
                 )
             )
 
-        if not patterns and not imports and not attributes and not calls:
+        lock_orders = _load_lock_order_rules(raw_rule=raw_rule, rule_id=rule_id)
+        if not patterns and not imports and not attributes and not calls and not lock_orders:
             raise ValueError(
-                f"architecture rule {rule_id!r} has no patterns, import rules, attribute rules, or call rules"
+                f"architecture rule {rule_id!r} has no patterns, import rules, attribute rules, call rules, or lock-order rules"
             )
 
         rules.append(
@@ -217,6 +235,7 @@ def load_architecture_rules(config_path: Path) -> list[ArchitectureRule]:
                 imports=tuple(imports),
                 attributes=tuple(attributes),
                 calls=tuple(calls),
+                lock_orders=tuple(lock_orders),
             )
         )
 
@@ -229,6 +248,7 @@ def scan_architecture(root: Path, rules: Iterable[ArchitectureRule]) -> Architec
     scanned_files: set[str] = set()
     scanned_python_signals: dict[str, tuple[tuple[_ScannedImport, ...], tuple[_ScannedAttribute, ...]]] = {}
     scanned_python_calls: dict[str, tuple[_ScannedCall, ...]] = {}
+    scanned_python_lock_acquisitions: dict[str, tuple[_ScannedLockAcquisition, ...]] = {}
     rules_list = list(rules)
 
     for rule in rules_list:
@@ -268,12 +288,13 @@ def scan_architecture(root: Path, rules: Iterable[ArchitectureRule]) -> Architec
                     scanned_python_signals[rel] = signals
                 imports, attributes = signals
 
-            calls = ()
+            calls: tuple[_ScannedCall, ...] = ()
             if rule.calls:
-                calls = scanned_python_calls.get(rel)
-                if calls is None:
-                    calls = _scan_python_calls(text)
-                    scanned_python_calls[rel] = calls
+                cached_calls = scanned_python_calls.get(rel)
+                if cached_calls is None:
+                    cached_calls = _scan_python_calls(text)
+                    scanned_python_calls[rel] = cached_calls
+                calls = cached_calls
 
             if rule.imports:
                 for import_rule in rule.imports:
@@ -322,6 +343,51 @@ def scan_architecture(root: Path, rules: Iterable[ArchitectureRule]) -> Architec
                                 message=attribute_rule.message,
                                 snippet=snippet,
                                 regex=finding_token,
+                            )
+                        )
+
+            if rule.lock_orders:
+                acquisitions = scanned_python_lock_acquisitions.get(rel)
+                if acquisitions is None:
+                    acquisitions = _scan_python_lock_acquisitions(text)
+                    scanned_python_lock_acquisitions[rel] = acquisitions
+                for lock_order in rule.lock_orders:
+                    levels = {
+                        alias: index
+                        for index, lock in enumerate(lock_order.locks)
+                        for alias in (lock.name, *lock.aliases)
+                    }
+                    for acquisition in acquisitions:
+                        inner_level = _lock_level(acquisition.lock, lock_order=lock_order, levels=levels)
+                        if inner_level is None:
+                            continue
+                        violating_outer_locks = tuple(
+                            outer_lock
+                            for outer_lock in acquisition.outer_locks
+                            if (outer_level := _lock_level(outer_lock, lock_order=lock_order, levels=levels))
+                            is not None
+                            and outer_level > inner_level
+                        )
+                        if not violating_outer_locks:
+                            continue
+                        inner_name = lock_order.locks[inner_level].name
+                        message = lock_order.message
+                        finding_token = f"lock-order:{acquisition.lock}"
+                        finding_key = (rule.rule_id, rel, acquisition.line, message, finding_token)
+                        if finding_key in seen_findings:
+                            continue
+                        seen_findings.add(finding_key)
+                        findings.append(
+                            ArchitectureFinding(
+                                rule_id=rule.rule_id,
+                                severity=rule.severity,
+                                path=rel,
+                                line=acquisition.line,
+                                message=message,
+                                snippet=_line_snippet(lines=lines, line=acquisition.line),
+                                regex=finding_token,
+                                lock=inner_name,
+                                outer_locks=acquisition.outer_locks,
                             )
                         )
 
@@ -392,3 +458,73 @@ def _literal_keyword_matches(*, actual: object, expected: object) -> bool:
     """Compare literal keyword values without treating ``False`` as ``0``."""
 
     return type(actual) is type(expected) and actual == expected
+
+
+def _load_lock_order_rules(*, raw_rule: object, rule_id: str) -> list[ArchitectureLockOrderRule]:
+    if not isinstance(raw_rule, dict):
+        raise ValueError(f"architecture rule {rule_id!r} must be an object")  # noqa: TRY004
+    raw_lock_orders = raw_rule.get(
+        "lock_orders",
+        raw_rule.get("lock_order", raw_rule.get("lock_order_rules", [])),
+    )
+    if raw_lock_orders is None:
+        return []
+    if isinstance(raw_lock_orders, dict):
+        raw_lock_orders = [raw_lock_orders]
+    if not isinstance(raw_lock_orders, list):
+        raise ValueError(f"architecture rule {rule_id!r} has invalid lock-order rules")  # noqa: TRY004
+
+    lock_orders: list[ArchitectureLockOrderRule] = []
+    for raw_lock_order in raw_lock_orders:
+        if not isinstance(raw_lock_order, dict):
+            raise ValueError(f"architecture rule {rule_id!r} has an invalid lock-order entry")  # noqa: TRY004
+        raw_locks = raw_lock_order.get("locks", raw_lock_order.get("levels", raw_lock_order.get("order")))
+        raw_alias_map = raw_lock_order.get("aliases", {})
+        message = str(raw_lock_order.get("message", "")).strip()
+        if not isinstance(raw_locks, list) or len(raw_locks) < 2 or not message:
+            raise ValueError(f"architecture rule {rule_id!r} has an invalid lock-order entry")
+        if not isinstance(raw_alias_map, (dict, list)):
+            raise ValueError(f"architecture rule {rule_id!r} has an invalid lock alias map")  # noqa: TRY004
+
+        locks: list[ArchitectureLock] = []
+        seen_names: set[str] = set()
+        for raw_lock in raw_locks:
+            if isinstance(raw_lock, str):
+                name = raw_lock.strip()
+                mapped_aliases = raw_alias_map.get(name, []) if isinstance(raw_alias_map, dict) else []
+                if not isinstance(mapped_aliases, list):
+                    raise ValueError(f"architecture rule {rule_id!r} has an invalid lock alias list")  # noqa: TRY004
+                aliases = tuple(str(alias).strip() for alias in mapped_aliases)
+            elif isinstance(raw_lock, dict):
+                name = str(raw_lock.get("name", "")).strip()
+                raw_aliases = raw_lock.get("aliases", [])
+                if not isinstance(raw_aliases, list):
+                    raise ValueError(f"architecture rule {rule_id!r} has an invalid lock alias list")  # noqa: TRY004
+                aliases = tuple(str(alias).strip() for alias in raw_aliases)
+            else:
+                raise ValueError(f"architecture rule {rule_id!r} has an invalid lock entry")  # noqa: TRY004
+            if not name or any(not alias for alias in aliases):
+                raise ValueError(f"architecture rule {rule_id!r} has an invalid lock entry")
+            names = (name, *aliases)
+            if len(set(names)) != len(names) or seen_names.intersection(names):
+                raise ValueError(f"architecture rule {rule_id!r} has duplicate lock names or aliases")
+            seen_names.update(names)
+            locks.append(ArchitectureLock(name=name, aliases=aliases))
+        lock_orders.append(ArchitectureLockOrderRule(locks=tuple(locks), message=message))
+    return lock_orders
+
+
+def _lock_level(
+    lock_name: str,
+    *,
+    lock_order: ArchitectureLockOrderRule,
+    levels: dict[str, int],
+) -> int | None:
+    direct_level = levels.get(lock_name)
+    if direct_level is not None:
+        return direct_level
+    terminal_name = lock_name.rsplit(".", 1)[-1]
+    for level, lock in enumerate(lock_order.locks):
+        if terminal_name == lock.name:
+            return level
+    return None

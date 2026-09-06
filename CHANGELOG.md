@@ -21,6 +21,8 @@
   outside approved output owners or without lexical `kb_lock` protection.
 - Build/Architecture: Keep pollers observation-only for primary engine mutations;
   cache-only brightness bookkeeping is the sole keyword-exempt path.
+- Build/Architecture: Enforce the configured `_start_lock -> kb_lock ->
+  _brightness_fade_lock` order for nested runtime lock acquisitions.
 
 ## 0.34.0 (2026-08-31)
 

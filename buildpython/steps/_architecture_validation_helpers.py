@@ -35,6 +35,13 @@ class _ScannedCall:
     literal_keywords: tuple[tuple[str, object], ...]
 
 
+@dataclass(frozen=True)
+class _ScannedLockAcquisition:
+    lock: str
+    line: int
+    outer_locks: tuple[str, ...]
+
+
 def _iter_rule_files(*, root: Path, rule: _ArchitectureRuleCorpus) -> list[Path]:
     matched: dict[str, Path] = {}
     for pattern in rule.include_globs:
@@ -243,3 +250,86 @@ def _scan_python_calls(text: str) -> tuple[_ScannedCall, ...]:
     _CallVisitor().visit(tree)
     scanned_calls.sort(key=lambda item: (item.line, item.receiver, item.method))
     return tuple(scanned_calls)
+
+
+def _scan_python_lock_acquisitions(text: str) -> tuple[_ScannedLockAcquisition, ...]:
+    """Collect lexical context-manager acquisitions without following calls.
+
+    Function and lambda bodies start with an empty lock stack.  Class bodies
+    retain the surrounding stack because class bodies execute immediately,
+    matching the scope behavior of the call scanner above.  This intentionally
+    provides no interprocedural proof for locks acquired in another function.
+    """
+
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return ()
+
+    acquisitions: list[_ScannedLockAcquisition] = []
+
+    class _LockVisitor(ast.NodeVisitor):
+        def __init__(self) -> None:
+            self._lexical_locks: list[str] = []
+
+        def visit_With(self, node: ast.With) -> None:
+            self._visit_with(node)
+
+        def visit_AsyncWith(self, node: ast.AsyncWith) -> None:
+            self._visit_with(node)
+
+        def _visit_with(self, node: ast.With | ast.AsyncWith) -> None:
+            acquired = 0
+            for item in node.items:
+                self.visit(item.context_expr)
+                context_name = _dotted_name(item.context_expr)
+                if context_name is not None:
+                    acquisitions.append(
+                        _ScannedLockAcquisition(
+                            lock=context_name,
+                            line=int(getattr(item.context_expr, "lineno", getattr(node, "lineno", 0))),
+                            outer_locks=tuple(self._lexical_locks),
+                        )
+                    )
+                    self._lexical_locks.append(context_name)
+                    acquired += 1
+                if item.optional_vars is not None:
+                    self.visit(item.optional_vars)
+            for statement in node.body:
+                self.visit(statement)
+            if acquired:
+                del self._lexical_locks[-acquired:]
+
+        def visit_ClassDef(self, node: ast.ClassDef) -> None:
+            self.generic_visit(node)
+
+        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+            self._visit_function_definition(node)
+
+        def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+            self._visit_function_definition(node)
+
+        def visit_Lambda(self, node: ast.Lambda) -> None:
+            for default in (*node.args.defaults, *node.args.kw_defaults):
+                if default is not None:
+                    self.visit(default)
+            saved_locks = self._lexical_locks
+            self._lexical_locks = []
+            self.visit(node.body)
+            self._lexical_locks = saved_locks
+
+        def _visit_function_definition(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
+            for decorator in node.decorator_list:
+                self.visit(decorator)
+            for default in (*node.args.defaults, *node.args.kw_defaults):
+                if default is not None:
+                    self.visit(default)
+            saved_locks = self._lexical_locks
+            self._lexical_locks = []
+            for statement in node.body:
+                self.visit(statement)
+            self._lexical_locks = saved_locks
+
+    _LockVisitor().visit(tree)
+    acquisitions.sort(key=lambda item: (item.line, item.lock, item.outer_locks))
+    return tuple(acquisitions)

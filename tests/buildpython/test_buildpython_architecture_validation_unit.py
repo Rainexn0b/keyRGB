@@ -67,6 +67,42 @@ def _scan_call_rule(
     return scan_architecture(root, load_architecture_rules(config_path))
 
 
+def _lock_order_payload() -> dict:
+    return {
+        "rules": [
+            {
+                "id": "runtime-lock-order",
+                "description": "Runtime lock order",
+                "severity": "error",
+                "corpus": {"include": ["keyrgb/**/*.py"]},
+                "lock_orders": [
+                    {
+                        "locks": [
+                            {"name": "_start_lock", "aliases": ["self._start_lock"]},
+                            {"name": "kb_lock", "aliases": ["self.kb_lock"]},
+                            {
+                                "name": "_brightness_fade_lock",
+                                "aliases": ["self._brightness_fade_lock"],
+                            },
+                        ],
+                        "message": "Runtime locks are out of order",
+                    }
+                ],
+            }
+        ]
+    }
+
+
+def _scan_lock_order(tmp_path, source: str):
+    root = tmp_path / "repo"
+    target = root / "keyrgb/runtime.py"
+    target.parent.mkdir(parents=True)
+    target.write_text(source, encoding="utf-8")
+    config_path = tmp_path / "architecture_rules.json"
+    config_path.write_text(json.dumps(_lock_order_payload()), encoding="utf-8")
+    return scan_architecture(root, load_architecture_rules(config_path))
+
+
 def _poller_engine_call_rule_payload() -> dict:
     return {
         "rules": [
@@ -230,6 +266,110 @@ def test_load_architecture_rules_parses_attribute_rules(tmp_path) -> None:
     assert rules[0].attributes[0].message == "Tray UI should not call private runtime menu refresh hooks directly"
 
 
+def test_load_architecture_rules_rejects_malformed_lock_order(tmp_path) -> None:
+    config_path = tmp_path / "architecture_rules.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "rules": [
+                    {
+                        "id": "bad-lock-order",
+                        "description": "Bad lock order",
+                        "severity": "error",
+                        "corpus": {"include": ["keyrgb/**/*.py"]},
+                        "lock_orders": [{"locks": [{"name": "kb_lock"}]}],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="invalid lock-order entry"):
+        load_architecture_rules(config_path)
+
+
+def test_scan_lock_order_accepts_full_order_and_aliases(tmp_path) -> None:
+    result = _scan_lock_order(
+        tmp_path,
+        """with self._start_lock:
+    with engine.kb_lock:
+        with tray.engine._brightness_fade_lock:
+            pass
+""",
+    )
+
+    assert result.findings == ()
+
+
+@pytest.mark.parametrize(
+    ("source", "inner_lock", "outer_locks"),
+    [
+        ("with engine.kb_lock:\n    with self._start_lock:\n        pass\n", "_start_lock", ("engine.kb_lock",)),
+        (
+            "with tray.engine._brightness_fade_lock:\n    with kb_lock:\n        pass\n",
+            "kb_lock",
+            ("tray.engine._brightness_fade_lock",),
+        ),
+        (
+            "with _brightness_fade_lock:\n    with self._start_lock:\n        pass\n",
+            "_start_lock",
+            ("_brightness_fade_lock",),
+        ),
+    ],
+)
+def test_scan_lock_order_reports_each_inversion(
+    tmp_path, source: str, inner_lock: str, outer_locks: tuple[str, ...]
+) -> None:
+    result = _scan_lock_order(tmp_path, source)
+
+    assert len(result.findings) == 1
+    finding = result.findings[0]
+    assert finding.line == 2
+    assert finding.lock == inner_lock
+    assert finding.outer_locks == outer_locks
+    assert finding.regex.startswith("lock-order:")
+
+
+def test_scan_lock_order_allows_same_level_reentrant_acquisition(tmp_path) -> None:
+    result = _scan_lock_order(tmp_path, "with kb_lock:\n    with self.kb_lock:\n        pass\n")
+
+    assert result.findings == ()
+
+
+def test_scan_lock_order_ignores_unrelated_locks(tmp_path) -> None:
+    result = _scan_lock_order(tmp_path, "with unrelated_lock:\n    with self._start_lock:\n        pass\n")
+
+    assert result.findings == ()
+
+
+def test_scan_lock_order_supports_async_with(tmp_path) -> None:
+    result = _scan_lock_order(
+        tmp_path,
+        """async def apply():
+    async with self._start_lock:
+        async with engine.kb_lock:
+            async with tray.engine._brightness_fade_lock:
+                pass
+""",
+    )
+
+    assert result.findings == ()
+
+
+def test_scan_lock_order_nested_function_does_not_inherit_outer_lock(tmp_path) -> None:
+    result = _scan_lock_order(
+        tmp_path,
+        """with self._brightness_fade_lock:
+    def later():
+        with self._start_lock:
+            pass
+""",
+    )
+
+    assert result.findings == ()
+
+
 def test_load_architecture_rules_parses_call_rules_and_runner_serializes_them(monkeypatch, tmp_path) -> None:
     config_path = tmp_path / "architecture_rules.json"
     config_path.write_text(json.dumps(_call_rule_payload()), encoding="utf-8")
@@ -267,6 +407,33 @@ def test_load_architecture_rules_parses_call_rules_and_runner_serializes_them(mo
     report = json.loads((tmp_path / "buildlog/architecture-validation.json").read_text(encoding="utf-8"))
     assert report["rules"][0]["calls"][0]["allowed_files"] == ["keyrgb/core/effects/fades.py"]
     assert report["findings"] == []
+
+
+def test_architecture_validation_runner_serializes_lock_orders_and_findings(monkeypatch, tmp_path) -> None:
+    config_path = tmp_path / "architecture_rules.json"
+    config_path.write_text(json.dumps(_lock_order_payload()), encoding="utf-8")
+    (tmp_path / "keyrgb").mkdir()
+    (tmp_path / "keyrgb/runtime.py").write_text(
+        "with engine.kb_lock:\n    with self._start_lock:\n        pass\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "buildpython/config").mkdir(parents=True)
+    (tmp_path / "buildpython/config/architecture_rules.json").write_text(
+        config_path.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    monkeypatch.setattr(step_architecture_validation, "repo_root", lambda: tmp_path)
+    monkeypatch.setattr(step_architecture_validation, "buildlog_dir", lambda: tmp_path / "buildlog")
+
+    result = step_architecture_validation.architecture_validation_runner()
+
+    assert result.exit_code == 1
+    report = json.loads((tmp_path / "buildlog/architecture-validation.json").read_text(encoding="utf-8"))
+    assert report["rules"][0]["lock_orders"][0]["locks"][0] == {
+        "name": "_start_lock",
+        "aliases": ["self._start_lock"],
+    }
+    assert report["findings"][0]["lock"] == "_start_lock"
+    assert report["findings"][0]["outer_locks"] == ["engine.kb_lock"]
 
 
 def test_load_architecture_rules_parses_optional_locks_and_keyword_exemptions(tmp_path) -> None:

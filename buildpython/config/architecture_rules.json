@@ -259,6 +259,47 @@
           "message": "Pollers must not apply primary brightness directly; route the mutation through the deck pipeline or an approved commit leaf."
         }
       ]
+    },
+    {
+      "id": "runtime-lock-acquisition-order",
+      "description": "Nested in-process runtime locks must follow the canonical acquisition order.",
+      "severity": "error",
+      "corpus": {
+        "include": [
+          "keyrgb/**/*.py"
+        ]
+      },
+      "lock_orders": [
+        {
+          "locks": [
+            {
+              "name": "_start_lock",
+              "aliases": [
+                "self._start_lock",
+                "engine._start_lock",
+                "tray.engine._start_lock"
+              ]
+            },
+            {
+              "name": "kb_lock",
+              "aliases": [
+                "self.kb_lock",
+                "engine.kb_lock",
+                "tray.engine.kb_lock"
+              ]
+            },
+            {
+              "name": "_brightness_fade_lock",
+              "aliases": [
+                "self._brightness_fade_lock",
+                "engine._brightness_fade_lock",
+                "tray.engine._brightness_fade_lock"
+              ]
+            }
+          ],
+          "message": "Nested runtime lock acquisitions must follow _start_lock -> kb_lock -> _brightness_fade_lock order."
+        }
+      ]
     }
   ]
 }
