@@ -412,10 +412,7 @@ def test_successful_invalid_high_brightness_recovery_is_latched_until_valid_read
     tray._refresh_ui = lambda **_kw: None
     tray._log_event = lambda *_a, **_kw: None
 
-    results = [
-        _recover_invalid_high_brightness_best_effort(tray, current_brightness=60)
-        for _attempt in range(4)
-    ]
+    results = [_recover_invalid_high_brightness_best_effort(tray, current_brightness=60) for _attempt in range(4)]
 
     assert results == [True, False, False, False]
     assert tray.tray_idle_power_state.invalid_high_brightness_recovery_attempt_count == 1
@@ -435,10 +432,7 @@ def test_failed_invalid_high_brightness_recovery_is_bounded(monkeypatch) -> None
 
     monkeypatch.setattr(recovery, "_reassert_user_mode_while_running_best_effort", fail_reassert)
 
-    results = [
-        _recover_invalid_high_brightness_best_effort(tray, current_brightness=60)
-        for _attempt in range(4)
-    ]
+    results = [_recover_invalid_high_brightness_best_effort(tray, current_brightness=60) for _attempt in range(4)]
 
     assert results == [False, False, False, False]
     assert len(attempts) == 3

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import inspect
-from typing import cast
+from collections.abc import Callable
+from typing import Any, cast
 
 from keyrgb.core.backends.policies.sleep_state import is_controller_sleep_state
 from keyrgb.tray.idle_power_state import set_idle_power_state_field
@@ -19,12 +20,11 @@ def _callback_accepts_controller_handoff(callback: object) -> bool:
     """Preserve older tray callback facades that predate the handoff keyword."""
 
     try:
-        parameters = inspect.signature(callback).parameters.values()
+        parameters = inspect.signature(cast(Callable[..., Any], callback)).parameters.values()
     except (TypeError, ValueError):
         return False
     return any(
-        parameter.name == "controller_brightness_handoff"
-        or parameter.kind is inspect.Parameter.VAR_KEYWORD
+        parameter.name == "controller_brightness_handoff" or parameter.kind is inspect.Parameter.VAR_KEYWORD
         for parameter in parameters
     )
 

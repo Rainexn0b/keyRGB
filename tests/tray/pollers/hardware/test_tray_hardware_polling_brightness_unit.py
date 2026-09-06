@@ -148,9 +148,7 @@ def test_invalid_high_heal_clears_stale_logical_off_state(monkeypatch) -> None:
     tray = _DummyTray(brightness=10, is_off=True)
     tray.tray_idle_power_state.deck_state = DeckState.RESTORING
     refreshed_states: list[tuple[bool, DeckState]] = []
-    tray._refresh_ui = lambda **_kw: refreshed_states.append(
-        (bool(tray.is_off), tray.tray_idle_power_state.deck_state)
-    )
+    tray._refresh_ui = lambda **_kw: refreshed_states.append((bool(tray.is_off), tray.tray_idle_power_state.deck_state))
 
     result = hp._apply_polled_hardware_state(
         tray,

@@ -17,6 +17,7 @@ from __future__ import annotations
 # @quality-exception file-size-analysis: cohesive hardware blank-recovery + shared poll helpers; intentionally extracted as one ownership unit from hardware_polling
 import time
 from collections.abc import Callable
+from operator import attrgetter
 from typing import TypeVar
 
 from keyrgb.core.effects.reactive._render_brightness_support import ensure_reactive_state
@@ -52,6 +53,19 @@ _BRIGHTNESS_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
 _HARDWARE_POLL_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 _HARDWARE_POLL_RECOVERY_EXCEPTIONS = (OSError, RuntimeError, ValueError)
 _INVALID_HIGH_BRIGHTNESS_MAX_CONSECUTIVE_ATTEMPTS = 3
+
+
+def _engine_thread_generation(engine: object) -> int | None:
+    try:
+        value = attrgetter("_thread_generation")(engine)
+    except AttributeError:
+        return None
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -359,14 +373,14 @@ def _reassert_user_mode_while_running_best_effort(
     if engine is None:
         return False
     try:
-        render_generation = getattr(engine, "_thread_generation", None)
+        render_generation = _engine_thread_generation(engine)
         # Synchronize with the renderer's cache publication. Without this lock,
         # a frame already in flight could restore its old signature after this
         # invalidation and lose the corrective repaint.
         with engine.kb_lock:
             if not bool(getattr(engine, "running", False)):
                 return False
-            if getattr(engine, "_thread_generation", None) != render_generation:
+            if _engine_thread_generation(engine) != render_generation:
                 return False
             # Record the hardware's actual observed brightness so the next
             # frame issues a plain set_brightness(target) rather than skipping
@@ -387,10 +401,7 @@ def _reassert_user_mode_while_running_best_effort(
             # ``stop()`` publishes a new generation before clearing these
             # caches. If it raced the assignments above, withdraw our cache
             # claim so a later start cannot inherit stale recovery state.
-            if (
-                not bool(getattr(engine, "running", False))
-                or getattr(engine, "_thread_generation", None) != render_generation
-            ):
+            if not bool(getattr(engine, "running", False)) or _engine_thread_generation(engine) != render_generation:
                 engine._last_hw_mode_brightness = None
                 engine._last_reactive_per_key_frame_signature = None
                 if reactive_state is not None:
@@ -525,7 +536,7 @@ def _recover_invalid_high_brightness_best_effort(
     engine = getattr(tray, "engine", None)
     if engine is None:
         return False
-    recovery_generation = getattr(engine, "_thread_generation", None)
+    recovery_generation = _engine_thread_generation(engine)
     try:
         owner = ensure_tray_idle_power_state(tray)
         if owner.invalid_high_brightness_recovery_generation != recovery_generation:
@@ -548,16 +559,10 @@ def _recover_invalid_high_brightness_best_effort(
             observed_brightness=int(current_brightness),
             controller_handoff=True,
         ):
-            if (
-                _effect_engine_is_running(tray)
-                and getattr(engine, "_thread_generation", None) == recovery_generation
-            ):
+            if _effect_engine_is_running(tray) and _engine_thread_generation(engine) == recovery_generation:
                 owner.invalid_high_brightness_recovery_attempt_count = attempts + 1
             return False
-        if (
-            not _effect_engine_is_running(tray)
-            or getattr(engine, "_thread_generation", None) != recovery_generation
-        ):
+        if not _effect_engine_is_running(tray) or _engine_thread_generation(engine) != recovery_generation:
             return False
         owner.invalid_high_brightness_recovery_attempt_count = attempts + 1
         owner.invalid_high_brightness_recovery_generation = recovery_generation
@@ -567,10 +572,7 @@ def _recover_invalid_high_brightness_best_effort(
             state_name="last_invalid_high_brightness_recovery_at",
             value=float(time.monotonic()),
         )
-        if (
-            not _effect_engine_is_running(tray)
-            or getattr(engine, "_thread_generation", None) != recovery_generation
-        ):
+        if not _effect_engine_is_running(tray) or _engine_thread_generation(engine) != recovery_generation:
             # The render publication was superseded while its generation-bound
             # latch was being recorded. Withdraw the latch so the replacement
             # generation can retry rather than publishing stale lit state.
