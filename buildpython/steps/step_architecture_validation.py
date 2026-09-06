@@ -73,6 +73,14 @@ def architecture_validation_runner() -> RunResult:
                     }
                     for item in rule.attributes
                 ],
+                "assignments": [
+                    {
+                        "targets": list(item.targets),
+                        "target_suffixes": list(item.target_suffixes),
+                        "message": item.message,
+                    }
+                    for item in rule.assignments
+                ],
                 "calls": [
                     {
                         "receivers": list(item.receivers),

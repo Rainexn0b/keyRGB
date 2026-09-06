@@ -19,6 +19,9 @@
   software-idle fade completes, avoiding a one-frame `10 -> 50` visual jump.
 - Build/Architecture: Reject new tray/effect primary-keyboard lighting writes
   outside approved output owners or without lexical `kb_lock` protection.
+- Build/Architecture: Add config-driven AST assignment rules so hardware
+  observation modules cannot directly mutate desired lighting config or forced-off
+  policy fields; recovery-leaf `tray.is_off` assignments remain permitted.
 - Build/Architecture: Keep pollers observation-only for primary engine mutations;
   cache-only brightness bookkeeping is the sole keyword-exempt path.
 - Build/Architecture: Enforce the configured `_start_lock -> kb_lock ->

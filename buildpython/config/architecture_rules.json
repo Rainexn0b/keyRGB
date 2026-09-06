@@ -1,6 +1,40 @@
 {
   "rules": [
     {
+      "id": "hardware-observation-no-desired-state-assignments",
+      "description": "Hardware observation modules must not directly mutate desired config or forced-off policy.",
+      "severity": "error",
+      "corpus": {
+        "include": [
+          "keyrgb/tray/pollers/hardware/**/*.py",
+          "keyrgb/tray/pollers/hardware_polling.py"
+        ]
+      },
+      "assignments": [
+        {
+          "targets": [
+            "config.brightness",
+            "config.effect",
+            "config.perkey_brightness",
+            "config.reactive_brightness"
+          ],
+          "target_suffixes": [
+            ".config.brightness",
+            ".config.effect",
+            ".config.perkey_brightness",
+            ".config.reactive_brightness",
+            ".user_forced_off",
+            ".power_forced_off",
+            ".idle_forced_off",
+            "._user_forced_off",
+            "._power_forced_off",
+            "._idle_forced_off"
+          ],
+          "message": "Hardware observation modules must not directly mutate desired config or forced-off policy; use the owning policy or pipeline boundary."
+        }
+      ]
+    },
+    {
       "id": "core-layer-boundary",
       "description": "Core modules must stay independent from tray and GUI layers.",
       "severity": "error",

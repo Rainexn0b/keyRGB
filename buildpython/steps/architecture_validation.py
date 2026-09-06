@@ -12,9 +12,11 @@ from ._architecture_validation_helpers import (
     _line_snippet,
     _module_matches_import_rule,
     _rel_path,
+    _scan_python_assignments,
     _scan_python_calls,
     _scan_python_lock_acquisitions,
     _scan_python_signals,
+    _ScannedAssignment,
     _ScannedAttribute,
     _ScannedCall,
     _ScannedImport,
@@ -39,6 +41,13 @@ class ArchitectureImportRule:
 @dataclass(frozen=True)
 class ArchitectureAttributeRule:
     name: str
+    message: str
+
+
+@dataclass(frozen=True)
+class ArchitectureAssignmentRule:
+    targets: tuple[str, ...]
+    target_suffixes: tuple[str, ...]
     message: str
 
 
@@ -95,12 +104,19 @@ class ArchitectureRule:
     calls: tuple[ArchitectureCallRule, ...] = ()
     forbidden_under_locks: tuple[ArchitectureForbiddenUnderLockCallRule, ...] = ()
     lock_orders: tuple[ArchitectureLockOrderRule, ...] = ()
+    assignments: tuple[ArchitectureAssignmentRule, ...] = ()
 
     @property
     def call_rules(self) -> tuple[ArchitectureCallRule, ...]:
         """Compatibility alias for callers that name the rule category explicitly."""
 
         return self.calls
+
+    @property
+    def assignment_rules(self) -> tuple[ArchitectureAssignmentRule, ...]:
+        """Compatibility alias for callers that name the rule category explicitly."""
+
+        return self.assignments
 
     @property
     def forbidden_call_rules(self) -> tuple[ArchitectureForbiddenUnderLockCallRule, ...]:
@@ -194,6 +210,35 @@ def load_architecture_rules(config_path: Path) -> list[ArchitectureRule]:
             if not name or not message:
                 raise ValueError(f"architecture rule {rule_id!r} has an invalid attribute entry")
             attributes.append(ArchitectureAttributeRule(name=name, message=message))
+
+        assignments: list[ArchitectureAssignmentRule] = []
+        raw_assignments = raw_rule.get("assignments", raw_rule.get("assignment_rules", []))
+        if raw_assignments is None:
+            raw_assignments = []
+        if not isinstance(raw_assignments, list):
+            raise ValueError(f"architecture rule {rule_id!r} has invalid assignment rules")  # noqa: TRY004
+        for raw_assignment in raw_assignments:
+            if not isinstance(raw_assignment, dict):
+                raise ValueError(f"architecture rule {rule_id!r} has an invalid assignment entry")  # noqa: TRY004
+            targets = _load_assignment_string_values(
+                raw_assignment.get("targets", []), rule_id=rule_id, field="targets"
+            )
+            target_suffixes = _load_assignment_string_values(
+                raw_assignment.get("target_suffixes", []), rule_id=rule_id, field="target_suffixes"
+            )
+            raw_message = raw_assignment.get("message", "")
+            if not isinstance(raw_message, str) or not raw_message.strip():
+                raise ValueError(f"architecture rule {rule_id!r} has an invalid assignment entry")
+            message = raw_message.strip()
+            if not targets and not target_suffixes:
+                raise ValueError(f"architecture rule {rule_id!r} has an invalid assignment entry")
+            assignments.append(
+                ArchitectureAssignmentRule(
+                    targets=targets,
+                    target_suffixes=target_suffixes,
+                    message=message,
+                )
+            )
 
         calls: list[ArchitectureCallRule] = []
         raw_calls = raw_rule.get("calls", raw_rule.get("call_rules", [])) or []
@@ -297,13 +342,14 @@ def load_architecture_rules(config_path: Path) -> list[ArchitectureRule]:
             not patterns
             and not imports
             and not attributes
+            and not assignments
             and not calls
             and not forbidden_under_locks
             and not lock_orders
         ):
             raise ValueError(
                 f"architecture rule {rule_id!r} has no patterns, import rules, attribute rules, call rules, "
-                "forbidden-under-lock call rules, or lock-order rules"
+                "assignment rules, forbidden-under-lock call rules, or lock-order rules"
             )
 
         rules.append(
@@ -316,6 +362,7 @@ def load_architecture_rules(config_path: Path) -> list[ArchitectureRule]:
                 patterns=tuple(patterns),
                 imports=tuple(imports),
                 attributes=tuple(attributes),
+                assignments=tuple(assignments),
                 calls=tuple(calls),
                 forbidden_under_locks=tuple(forbidden_under_locks),
                 lock_orders=tuple(lock_orders),
@@ -330,6 +377,7 @@ def scan_architecture(root: Path, rules: Iterable[ArchitectureRule]) -> Architec
     seen_findings: set[tuple[str, str, int, str, str]] = set()
     scanned_files: set[str] = set()
     scanned_python_signals: dict[str, tuple[tuple[_ScannedImport, ...], tuple[_ScannedAttribute, ...]]] = {}
+    scanned_python_assignments: dict[str, tuple[_ScannedAssignment, ...]] = {}
     scanned_python_calls: dict[str, tuple[_ScannedCall, ...]] = {}
     scanned_python_lock_acquisitions: dict[str, tuple[_ScannedLockAcquisition, ...]] = {}
     rules_list = list(rules)
@@ -370,6 +418,14 @@ def scan_architecture(root: Path, rules: Iterable[ArchitectureRule]) -> Architec
                     signals = _scan_python_signals(text)
                     scanned_python_signals[rel] = signals
                 imports, attributes = signals
+
+            assignments: tuple[_ScannedAssignment, ...] = ()
+            if rule.assignments:
+                cached_assignments = scanned_python_assignments.get(rel)
+                if cached_assignments is None:
+                    cached_assignments = _scan_python_assignments(text)
+                    scanned_python_assignments[rel] = cached_assignments
+                assignments = cached_assignments
 
             calls: tuple[_ScannedCall, ...] = ()
             if rule.calls or rule.forbidden_under_locks:
@@ -428,6 +484,31 @@ def scan_architecture(root: Path, rules: Iterable[ArchitectureRule]) -> Architec
                                 regex=finding_token,
                             )
                         )
+
+            for assignment_rule in rule.assignments:
+                for scanned_assignment in assignments:
+                    target_matches = scanned_assignment.target in assignment_rule.targets or any(
+                        scanned_assignment.target.endswith(suffix) for suffix in assignment_rule.target_suffixes
+                    )
+                    if not target_matches:
+                        continue
+
+                    finding_token = f"assignment:{scanned_assignment.target}"
+                    finding_key = (rule.rule_id, rel, scanned_assignment.line, assignment_rule.message, finding_token)
+                    if finding_key in seen_findings:
+                        continue
+                    seen_findings.add(finding_key)
+                    findings.append(
+                        ArchitectureFinding(
+                            rule_id=rule.rule_id,
+                            severity=rule.severity,
+                            path=rel,
+                            line=scanned_assignment.line,
+                            message=assignment_rule.message,
+                            snippet=_line_snippet(lines=lines, line=scanned_assignment.line),
+                            regex=finding_token,
+                        )
+                    )
 
             if rule.lock_orders:
                 acquisitions = scanned_python_lock_acquisitions.get(rel)
@@ -581,6 +662,14 @@ def _load_string_values(raw_values: object, *, rule_id: str, field: str) -> tupl
         return ()
     if not isinstance(raw_values, list) or any(not isinstance(value, str) or not value.strip() for value in raw_values):
         raise ValueError(f"architecture rule {rule_id!r} has invalid forbidden-under-lock {field}")
+    return tuple(value.strip() for value in raw_values)
+
+
+def _load_assignment_string_values(raw_values: object, *, rule_id: str, field: str) -> tuple[str, ...]:
+    if raw_values is None:
+        return ()
+    if not isinstance(raw_values, list) or any(not isinstance(value, str) or not value.strip() for value in raw_values):
+        raise ValueError(f"architecture rule {rule_id!r} has invalid assignment {field}")
     return tuple(value.strip() for value in raw_values)
 
 

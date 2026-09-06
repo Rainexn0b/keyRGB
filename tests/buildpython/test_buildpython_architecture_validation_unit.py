@@ -67,6 +67,36 @@ def _scan_call_rule(
     return scan_architecture(root, load_architecture_rules(config_path))
 
 
+def _assignment_rule_payload() -> dict:
+    return {
+        "rules": [
+            {
+                "id": "no-state-assignments",
+                "description": "Observation modules do not mutate state",
+                "severity": "error",
+                "corpus": {"include": ["keyrgb/**/*.py"]},
+                "assignments": [
+                    {
+                        "targets": ["desired.exact", "named_expr"],
+                        "target_suffixes": [".forbidden", ".compat"],
+                        "message": "direct state assignment",
+                    }
+                ],
+            }
+        ]
+    }
+
+
+def _scan_assignment_rule(tmp_path, source: str, *, relative_path: str = "keyrgb/runtime.py"):
+    root = tmp_path / "repo"
+    target = root / relative_path
+    target.parent.mkdir(parents=True)
+    target.write_text(source, encoding="utf-8")
+    config_path = tmp_path / "architecture_rules.json"
+    config_path.write_text(json.dumps(_assignment_rule_payload()), encoding="utf-8")
+    return scan_architecture(root, load_architecture_rules(config_path))
+
+
 def _forbidden_under_lock_payload() -> dict:
     return {
         "rules": [
@@ -315,6 +345,39 @@ def test_load_architecture_rules_parses_attribute_rules(tmp_path) -> None:
     assert rules[0].attributes[0].message == "Tray UI should not call private runtime menu refresh hooks directly"
 
 
+def test_load_architecture_rules_parses_assignment_rules(tmp_path) -> None:
+    config_path = tmp_path / "architecture_rules.json"
+    config_path.write_text(json.dumps(_assignment_rule_payload()), encoding="utf-8")
+
+    assignment_rules = load_architecture_rules(config_path)[0].assignment_rules
+
+    assert len(assignment_rules) == 1
+    assert assignment_rules[0].targets == ("desired.exact", "named_expr")
+    assert assignment_rules[0].target_suffixes == (".forbidden", ".compat")
+    assert assignment_rules[0].message == "direct state assignment"
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda payload: payload["rules"][0].update(assignments={}),
+        lambda payload: payload["rules"][0].update(assignments=["not an object"]),
+        lambda payload: payload["rules"][0]["assignments"][0].update(targets="desired.exact"),
+        lambda payload: payload["rules"][0]["assignments"][0].update(targets=[], target_suffixes=[]),
+        lambda payload: payload["rules"][0]["assignments"][0].update(message=""),
+        lambda payload: payload["rules"][0]["assignments"][0].update(message=None),
+    ],
+)
+def test_load_architecture_rules_rejects_malformed_assignment_rules(tmp_path, mutate) -> None:
+    payload = _assignment_rule_payload()
+    mutate(payload)
+    config_path = tmp_path / "architecture_rules.json"
+    config_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="assignment"):
+        load_architecture_rules(config_path)
+
+
 def test_load_architecture_rules_parses_forbidden_under_lock_calls(tmp_path) -> None:
     config_path = tmp_path / "architecture_rules.json"
     config_path.write_text(json.dumps(_forbidden_under_lock_payload()), encoding="utf-8")
@@ -509,6 +572,35 @@ def test_architecture_validation_runner_serializes_lock_orders_and_findings(monk
     assert report["findings"][0]["outer_locks"] == ["engine.kb_lock"]
 
 
+def test_architecture_validation_runner_serializes_assignment_rules_and_findings(monkeypatch, tmp_path) -> None:
+    config_path = tmp_path / "architecture_rules.json"
+    config_path.write_text(json.dumps(_assignment_rule_payload()), encoding="utf-8")
+    (tmp_path / "keyrgb").mkdir()
+    (tmp_path / "keyrgb/runtime.py").write_text("desired.exact = 1\n", encoding="utf-8")
+    (tmp_path / "buildpython/config").mkdir(parents=True)
+    (tmp_path / "buildpython/config/architecture_rules.json").write_text(
+        config_path.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    monkeypatch.setattr(step_architecture_validation, "repo_root", lambda: tmp_path)
+    monkeypatch.setattr(step_architecture_validation, "buildlog_dir", lambda: tmp_path / "buildlog")
+
+    result = step_architecture_validation.architecture_validation_runner()
+
+    assert result.exit_code == 1
+    report = json.loads((tmp_path / "buildlog/architecture-validation.json").read_text(encoding="utf-8"))
+    assert report["rules"][0]["assignments"] == [
+        {
+            "targets": ["desired.exact", "named_expr"],
+            "target_suffixes": [".forbidden", ".compat"],
+            "message": "direct state assignment",
+        }
+    ]
+    assert report["findings"][0]["regex"] == "assignment:desired.exact"
+    assert "direct state assignment" in (tmp_path / "buildlog/architecture-validation.csv").read_text(encoding="utf-8")
+    assert "no-state-assignments" in (tmp_path / "buildlog/architecture-validation.md").read_text(encoding="utf-8")
+    assert "direct state assignment" in result.stdout
+
+
 def test_load_architecture_rules_parses_optional_locks_and_keyword_exemptions(tmp_path) -> None:
     config_path = tmp_path / "architecture_rules.json"
     config_path.write_text(json.dumps(_poller_engine_call_rule_payload()), encoding="utf-8")
@@ -633,6 +725,82 @@ def test_current_repo_has_no_architecture_findings() -> None:
     rules = load_architecture_rules(root / "buildpython/config/architecture_rules.json")
 
     assert scan_architecture(root, rules).findings == ()
+
+
+def test_configured_hardware_assignment_rule_is_scoped_and_keeps_is_off_allowed(tmp_path) -> None:
+    root = tmp_path / "repo"
+    (root / "keyrgb/tray/pollers/hardware/nested").mkdir(parents=True)
+    (root / "keyrgb/tray/pollers/hardware/nested/example.py").write_text(
+        "tray.config.brightness = 25\ntray._power_forced_off = True\ntray.is_off = True\n",
+        encoding="utf-8",
+    )
+    (root / "keyrgb/tray/pollers/hardware_polling.py").write_text(
+        "tray.config.effect = 'none'\ntray.idle_forced_off = True\n",
+        encoding="utf-8",
+    )
+    (root / "keyrgb/tray/other.py").parent.mkdir(parents=True, exist_ok=True)
+    (root / "keyrgb/tray/other.py").write_text("tray.config.brightness = 25\n", encoding="utf-8")
+    config_root = Path(__file__).resolve().parents[2]
+
+    rules = load_architecture_rules(config_root / "buildpython/config/architecture_rules.json")
+    findings = scan_architecture(root, rules).findings
+
+    assignment_findings = [
+        finding for finding in findings if finding.rule_id == "hardware-observation-no-desired-state-assignments"
+    ]
+    assert [(finding.path, finding.line, finding.regex) for finding in assignment_findings] == [
+        ("keyrgb/tray/pollers/hardware/nested/example.py", 1, "assignment:tray.config.brightness"),
+        ("keyrgb/tray/pollers/hardware/nested/example.py", 2, "assignment:tray._power_forced_off"),
+        ("keyrgb/tray/pollers/hardware_polling.py", 1, "assignment:tray.config.effect"),
+        ("keyrgb/tray/pollers/hardware_polling.py", 2, "assignment:tray.idle_forced_off"),
+    ]
+
+
+def test_scan_architecture_assignment_rules_covers_all_assignment_forms_and_destructuring(tmp_path) -> None:
+    result = _scan_assignment_rule(
+        tmp_path,
+        """desired.exact = 1
+ann.forbidden: int = 2
+aug.compat += 1
+(first.forbidden, [nested.compat, irrelevant]) = (1, 2, 3)
+named_expr = 5
+(named_expr := 6)
+""",
+    )
+
+    assert [(finding.line, finding.regex) for finding in result.findings] == [
+        (1, "assignment:desired.exact"),
+        (2, "assignment:ann.forbidden"),
+        (3, "assignment:aug.compat"),
+        (4, "assignment:first.forbidden"),
+        (4, "assignment:nested.compat"),
+        (5, "assignment:named_expr"),
+        (6, "assignment:named_expr"),
+    ]
+
+
+def test_scan_architecture_assignment_rules_match_exact_and_terminal_suffix_only(tmp_path) -> None:
+    result = _scan_assignment_rule(
+        tmp_path,
+        """desired.exact = 1
+other.forbidden = 2
+other.compat = 3
+other.forbidden_extra = 4
+unrelated.value = 5
+""",
+    )
+
+    assert [finding.regex for finding in result.findings] == [
+        "assignment:desired.exact",
+        "assignment:other.forbidden",
+        "assignment:other.compat",
+    ]
+
+
+def test_scan_architecture_assignment_rules_do_not_ban_observational_is_off_assignment(tmp_path) -> None:
+    result = _scan_assignment_rule(tmp_path, "tray.is_off = True\n")
+
+    assert result.findings == ()
 
 
 def test_scan_architecture_call_rule_reports_unapproved_owner(tmp_path) -> None:

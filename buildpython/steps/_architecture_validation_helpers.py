@@ -27,6 +27,12 @@ class _ScannedAttribute:
 
 
 @dataclass(frozen=True)
+class _ScannedAssignment:
+    target: str
+    line: int
+
+
+@dataclass(frozen=True)
 class _ScannedCall:
     receiver: str
     method: str
@@ -131,6 +137,45 @@ def _scan_python_signals(text: str) -> tuple[tuple[_ScannedImport, ...], tuple[_
     scanned_imports.sort(key=lambda item: (item.line, item.module))
     scanned_attributes.sort(key=lambda item: (item.line, item.name))
     return tuple(scanned_imports), tuple(scanned_attributes)
+
+
+def _scan_python_assignments(text: str) -> tuple[_ScannedAssignment, ...]:
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return ()
+
+    scanned_assignments: list[_ScannedAssignment] = []
+    seen_assignments: set[tuple[str, int]] = set()
+
+    def _record_target(target: ast.AST, fallback_line: int) -> None:
+        if isinstance(target, (ast.List, ast.Tuple)):
+            for element in target.elts:
+                _record_target(element, fallback_line)
+            return
+        if isinstance(target, ast.Starred):
+            _record_target(target.value, fallback_line)
+            return
+
+        dotted_target = _dotted_name(target)
+        if dotted_target is None:
+            return
+        line = int(getattr(target, "lineno", fallback_line))
+        key = (dotted_target, line)
+        if key in seen_assignments:
+            return
+        seen_assignments.add(key)
+        scanned_assignments.append(_ScannedAssignment(target=dotted_target, line=line))
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                _record_target(target, int(getattr(node, "lineno", 0)))
+        elif isinstance(node, (ast.AnnAssign, ast.AugAssign, ast.NamedExpr)):
+            _record_target(node.target, int(getattr(node, "lineno", 0)))
+
+    scanned_assignments.sort(key=lambda item: (item.line, item.target))
+    return tuple(scanned_assignments)
 
 
 def _dotted_name(node: ast.AST) -> str | None:
