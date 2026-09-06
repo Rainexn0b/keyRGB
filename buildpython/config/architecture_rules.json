@@ -208,6 +208,57 @@
           "lock_message": "Tray/effect primary-keyboard lighting writes must be lexically protected by the keyboard lock."
         }
       ]
+    },
+    {
+      "id": "pollers-no-primary-engine-mutations",
+      "description": "Pollers observe; the deck pipeline and approved leaves commit primary engine mutations.",
+      "severity": "error",
+      "corpus": {
+        "include": [
+          "keyrgb/tray/pollers/**/*.py"
+        ]
+      },
+      "calls": [
+        {
+          "receivers": [
+            "engine"
+          ],
+          "receiver_suffixes": [
+            ".engine"
+          ],
+          "methods": [
+            "turn_off",
+            "start_effect"
+          ],
+          "allowed_files": [
+            "keyrgb/tray/pollers/config_polling_internal/_apply_callbacks.py",
+            "keyrgb/tray/pollers/idle_power/_action_execution.py"
+          ],
+          "message": "Pollers must observe; route primary engine mutations through the deck pipeline or an approved commit leaf."
+        },
+        {
+          "receivers": [
+            "engine"
+          ],
+          "receiver_suffixes": [
+            ".engine"
+          ],
+          "methods": [
+            "set_brightness"
+          ],
+          "allowed_files": [
+            "keyrgb/tray/pollers/config_polling_internal/_apply_callbacks.py",
+            "keyrgb/tray/pollers/idle_power/_action_execution.py"
+          ],
+          "skip_if_keywords": [
+            {
+              "name": "apply_to_hardware",
+              "equals": false
+            }
+          ],
+          "message": "Pollers must not apply primary brightness directly; route the mutation through the deck pipeline or an approved commit leaf."
+        }
+      ]
     }
   ]
 }

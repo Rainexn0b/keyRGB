@@ -32,6 +32,7 @@ class _ScannedCall:
     method: str
     line: int
     lexical_locks: tuple[str, ...]
+    literal_keywords: tuple[tuple[str, object], ...]
 
 
 def _iter_rule_files(*, root: Path, rule: _ArchitectureRuleCorpus) -> list[Path]:
@@ -136,6 +137,20 @@ def _dotted_name(node: ast.AST) -> str | None:
     return None
 
 
+_NON_LITERAL = object()
+
+
+def _literal_value(node: ast.AST) -> object:
+    """Return a safe scalar AST literal, without evaluating arbitrary code."""
+
+    if not isinstance(node, ast.Constant):
+        return _NON_LITERAL
+    value = node.value
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    return _NON_LITERAL
+
+
 def _scan_python_calls(text: str) -> tuple[_ScannedCall, ...]:
     try:
         tree = ast.parse(text)
@@ -158,6 +173,12 @@ def _scan_python_calls(text: str) -> tuple[_ScannedCall, ...]:
                             method=node.func.attr,
                             line=int(getattr(node, "lineno", 0)),
                             lexical_locks=tuple(self._lexical_locks),
+                            literal_keywords=tuple(
+                                (keyword.arg, value)
+                                for keyword in node.keywords
+                                if keyword.arg is not None
+                                and (value := _literal_value(keyword.value)) is not _NON_LITERAL
+                            ),
                         )
                     )
             self.generic_visit(node)

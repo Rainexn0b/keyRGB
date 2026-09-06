@@ -100,22 +100,6 @@ def _run_idle_power_runtime_boundary_best_effort(operation: Callable[[], None]) 
         return
 
 
-def _rearm_controller_sleep_restore(tray: IdlePowerTrayProtocol) -> bool:
-    """Reset the ITE off latch before restoring from honored firmware sleep."""
-
-    try:
-        # Hardware evidence shows that user-mode and brightness writes can be
-        # accepted while the deck remains latched dark after controller sleep.
-        # A fresh explicit off immediately before the normal soft-on sequence
-        # resets that latch, matching the manual off->on recovery path.
-        tray.engine.turn_off()
-    except _IDLE_POWER_RUNTIME_EXCEPTIONS:
-        logger.warning("Controller-sleep hardware re-arm failed", exc_info=True)
-        return False
-    logger.info("EVENT idle_power:controller_sleep_rearm trigger=keyboard_evdev")
-    return True
-
-
 def _maybe_restore_from_controller_sleep(
     tray: IdlePowerTrayProtocol,
     *,

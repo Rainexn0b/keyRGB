@@ -41,12 +41,19 @@ class ArchitectureAttributeRule:
 
 
 @dataclass(frozen=True)
+class ArchitectureKeywordExemption:
+    name: str
+    equals: object
+
+
+@dataclass(frozen=True)
 class ArchitectureCallRule:
     receivers: tuple[str, ...]
     receiver_suffixes: tuple[str, ...]
     methods: tuple[str, ...]
     allowed_files: tuple[str, ...]
     required_locks: tuple[str, ...]
+    skip_if_keywords: tuple[ArchitectureKeywordExemption, ...]
     message: str
     lock_message: str
 
@@ -153,9 +160,7 @@ def load_architecture_rules(config_path: Path) -> list[ArchitectureRule]:
         for raw_call in raw_calls:
             receivers = tuple(str(item).strip() for item in (raw_call.get("receivers", []) or []) if str(item).strip())
             receiver_suffixes = tuple(
-                str(item).strip()
-                for item in (raw_call.get("receiver_suffixes", []) or [])
-                if str(item).strip()
+                str(item).strip() for item in (raw_call.get("receiver_suffixes", []) or []) if str(item).strip()
             )
             methods = tuple(str(item).strip() for item in (raw_call.get("methods", []) or []) if str(item).strip())
             allowed_files = tuple(
@@ -164,15 +169,23 @@ def load_architecture_rules(config_path: Path) -> list[ArchitectureRule]:
             required_locks = tuple(
                 str(item).strip() for item in (raw_call.get("required_locks", []) or []) if str(item).strip()
             )
+            skip_if_keywords: list[ArchitectureKeywordExemption] = []
+            for raw_exemption in raw_call.get("skip_if_keywords", []) or []:
+                name = str(raw_exemption.get("name", "")).strip()
+                if not name or "equals" not in raw_exemption:
+                    raise ValueError(f"architecture rule {rule_id!r} has an invalid keyword exemption")
+                equals = raw_exemption["equals"]
+                if equals is not None and not isinstance(equals, (bool, int, float, str)):
+                    raise ValueError(f"architecture rule {rule_id!r} has a non-literal keyword exemption")
+                skip_if_keywords.append(ArchitectureKeywordExemption(name=name, equals=equals))
             message = str(raw_call.get("message", "")).strip()
             lock_message = str(raw_call.get("lock_message", "")).strip()
             if (
                 (not receivers and not receiver_suffixes)
                 or not methods
                 or not allowed_files
-                or not required_locks
                 or not message
-                or not lock_message
+                or (required_locks and not lock_message)
             ):
                 raise ValueError(f"architecture rule {rule_id!r} has an invalid call entry")
             calls.append(
@@ -182,13 +195,16 @@ def load_architecture_rules(config_path: Path) -> list[ArchitectureRule]:
                     methods=methods,
                     allowed_files=allowed_files,
                     required_locks=required_locks,
+                    skip_if_keywords=tuple(skip_if_keywords),
                     message=message,
                     lock_message=lock_message,
                 )
             )
 
         if not patterns and not imports and not attributes and not calls:
-            raise ValueError(f"architecture rule {rule_id!r} has no patterns, import rules, attribute rules, or call rules")
+            raise ValueError(
+                f"architecture rule {rule_id!r} has no patterns, import rules, attribute rules, or call rules"
+            )
 
         rules.append(
             ArchitectureRule(
@@ -317,9 +333,20 @@ def scan_architecture(root: Path, rules: Iterable[ArchitectureRule]) -> Architec
                     if not receiver_matches or scanned_call.method not in call_rule.methods:
                         continue
 
+                    if any(
+                        any(
+                            name == exemption.name and _literal_keyword_matches(actual=value, expected=exemption.equals)
+                            for name, value in scanned_call.literal_keywords
+                        )
+                        for exemption in call_rule.skip_if_keywords
+                    ):
+                        continue
+
                     if not _path_matches_any(rel, call_rule.allowed_files):
                         message = call_rule.message
-                    elif not any(lock in call_rule.required_locks for lock in scanned_call.lexical_locks):
+                    elif call_rule.required_locks and not any(
+                        lock in call_rule.required_locks for lock in scanned_call.lexical_locks
+                    ):
                         message = call_rule.lock_message
                     else:
                         continue
@@ -359,3 +386,9 @@ def _regex_flags(raw_flags: str) -> int:
 def _path_matches_any(path: str, patterns: tuple[str, ...]) -> bool:
     posix_path = Path(path).as_posix()
     return any(posix_path == pattern or Path(posix_path).match(pattern) for pattern in patterns)
+
+
+def _literal_keyword_matches(*, actual: object, expected: object) -> bool:
+    """Compare literal keyword values without treating ``False`` as ``0``."""
+
+    return type(actual) is type(expected) and actual == expected

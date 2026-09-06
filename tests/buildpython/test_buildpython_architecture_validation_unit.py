@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from pathlib import Path
 
 import pytest
 
@@ -28,7 +29,14 @@ def _call_rule_payload(
                     {
                         "receivers": ["kb", "keyboard"],
                         "receiver_suffixes": [".kb", ".keyboard"],
-                        "methods": ["set_brightness", "set_color", "set_key_colors", "enable_user_mode", "turn_off", "set_effect"],
+                        "methods": [
+                            "set_brightness",
+                            "set_color",
+                            "set_key_colors",
+                            "enable_user_mode",
+                            "turn_off",
+                            "set_effect",
+                        ],
                         "allowed_files": allowed_files or ["keyrgb/core/effects/fades.py"],
                         "required_locks": ["kb_lock", "engine.kb_lock", "self.kb_lock", "tray.engine.kb_lock"],
                         "message": "unapproved primary lighting owner",
@@ -56,6 +64,57 @@ def _scan_call_rule(
         json.dumps(_call_rule_payload(exclude_globs=exclude_globs)),
         encoding="utf-8",
     )
+    return scan_architecture(root, load_architecture_rules(config_path))
+
+
+def _poller_engine_call_rule_payload() -> dict:
+    return {
+        "rules": [
+            {
+                "id": "pollers-no-primary-engine-mutations",
+                "description": "Pollers observe; approved leaves commit",
+                "severity": "error",
+                "corpus": {"include": ["keyrgb/tray/pollers/**/*.py"]},
+                "calls": [
+                    {
+                        "receivers": ["engine"],
+                        "receiver_suffixes": [".engine"],
+                        "methods": ["turn_off", "start_effect"],
+                        "allowed_files": [
+                            "keyrgb/tray/pollers/config_polling_internal/_apply_callbacks.py",
+                            "keyrgb/tray/pollers/idle_power/_action_execution.py",
+                        ],
+                        "message": "poller primary engine mutation",
+                    },
+                    {
+                        "receivers": ["engine"],
+                        "receiver_suffixes": [".engine"],
+                        "methods": ["set_brightness"],
+                        "allowed_files": [
+                            "keyrgb/tray/pollers/config_polling_internal/_apply_callbacks.py",
+                            "keyrgb/tray/pollers/idle_power/_action_execution.py",
+                        ],
+                        "skip_if_keywords": [{"name": "apply_to_hardware", "equals": False}],
+                        "message": "poller primary brightness mutation",
+                    }
+                ],
+            }
+        ]
+    }
+
+
+def _scan_poller_engine_call(
+    tmp_path,
+    source: str,
+    *,
+    relative_path: str = "keyrgb/tray/pollers/hardware_polling.py",
+):
+    root = tmp_path / "repo"
+    target = root / relative_path
+    target.parent.mkdir(parents=True)
+    target.write_text(source, encoding="utf-8")
+    config_path = tmp_path / "architecture_rules.json"
+    config_path.write_text(json.dumps(_poller_engine_call_rule_payload()), encoding="utf-8")
     return scan_architecture(root, load_architecture_rules(config_path))
 
 
@@ -210,8 +269,108 @@ def test_load_architecture_rules_parses_call_rules_and_runner_serializes_them(mo
     assert report["findings"] == []
 
 
+def test_load_architecture_rules_parses_optional_locks_and_keyword_exemptions(tmp_path) -> None:
+    config_path = tmp_path / "architecture_rules.json"
+    config_path.write_text(json.dumps(_poller_engine_call_rule_payload()), encoding="utf-8")
+
+    call_rule = load_architecture_rules(config_path)[0].calls[1]
+
+    assert call_rule.required_locks == ()
+    assert [(item.name, item.equals) for item in call_rule.skip_if_keywords] == [("apply_to_hardware", False)]
+
+
+@pytest.mark.parametrize("method", ["turn_off", "start_effect"])
+def test_poller_engine_mutations_are_forbidden_outside_commit_leaves(tmp_path, method: str) -> None:
+    result = _scan_poller_engine_call(tmp_path, f"tray.engine.{method}()\n")
+
+    assert len(result.findings) == 1
+    assert result.findings[0].message == "poller primary engine mutation"
+    assert result.findings[0].regex == f"call:tray.engine.{method}"
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "keyrgb/tray/pollers/config_polling_internal/_apply_callbacks.py",
+        "keyrgb/tray/pollers/idle_power/_action_execution.py",
+    ],
+)
+def test_poller_turn_off_commit_leaves_are_allowed(tmp_path, relative_path: str) -> None:
+    result = _scan_poller_engine_call(tmp_path, "tray.engine.turn_off()\n", relative_path=relative_path)
+
+    assert result.findings == ()
+
+
+def test_poller_non_brightness_mutation_cannot_use_brightness_keyword_exemption(tmp_path) -> None:
+    result = _scan_poller_engine_call(
+        tmp_path,
+        "tray.engine.turn_off(apply_to_hardware=False)\n",
+    )
+
+    assert len(result.findings) == 1
+    assert result.findings[0].regex == "call:tray.engine.turn_off"
+
+
+def test_poller_cache_only_brightness_is_exempt(tmp_path) -> None:
+    result = _scan_poller_engine_call(
+        tmp_path,
+        "tray.engine.set_brightness(5, apply_to_hardware=False)\n",
+    )
+
+    assert result.findings == ()
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "tray.engine.set_brightness(5, apply_to_hardware=True)\n",
+        "tray.engine.set_brightness(5, apply_to_hardware=0)\n",
+        "tray.engine.set_brightness(5)\n",
+        "apply = False\ntray.engine.set_brightness(5, apply_to_hardware=apply)\n",
+    ],
+)
+def test_poller_hardware_brightness_requires_literal_false_exemption(tmp_path, source: str) -> None:
+    result = _scan_poller_engine_call(tmp_path, source)
+
+    assert len(result.findings) == 1
+    assert result.findings[0].regex == "call:tray.engine.set_brightness"
+
+
+def test_architecture_runner_serializes_keyword_exemptions(monkeypatch, tmp_path) -> None:
+    config_path = tmp_path / "architecture_rules.json"
+    config_path.write_text(json.dumps(_poller_engine_call_rule_payload()), encoding="utf-8")
+    (tmp_path / "keyrgb/tray/pollers").mkdir(parents=True)
+    (tmp_path / "keyrgb/tray/pollers/example.py").write_text(
+        "tray.engine.set_brightness(5, apply_to_hardware=False)\n", encoding="utf-8"
+    )
+    (tmp_path / "buildpython/config").mkdir(parents=True)
+    (tmp_path / "buildpython/config/architecture_rules.json").write_text(
+        config_path.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    monkeypatch.setattr(step_architecture_validation, "repo_root", lambda: tmp_path)
+    monkeypatch.setattr(step_architecture_validation, "buildlog_dir", lambda: tmp_path / "buildlog")
+
+    result = step_architecture_validation.architecture_validation_runner()
+
+    assert result.exit_code == 0
+    report = json.loads((tmp_path / "buildlog/architecture-validation.json").read_text(encoding="utf-8"))
+    call_report = report["rules"][0]["calls"][1]
+    assert call_report["required_locks"] == []
+    assert call_report["skip_if_keywords"] == [{"name": "apply_to_hardware", "equals": False}]
+    assert report["findings"] == []
+
+
+def test_current_repo_has_no_architecture_findings() -> None:
+    root = Path(__file__).resolve().parents[2]
+    rules = load_architecture_rules(root / "buildpython/config/architecture_rules.json")
+
+    assert scan_architecture(root, rules).findings == ()
+
+
 def test_scan_architecture_call_rule_reports_unapproved_owner(tmp_path) -> None:
-    result = _scan_call_rule(tmp_path, "engine.kb.set_color((1, 2, 3), brightness=1)\n", relative_path="keyrgb/core/other.py")
+    result = _scan_call_rule(
+        tmp_path, "engine.kb.set_color((1, 2, 3), brightness=1)\n", relative_path="keyrgb/core/other.py"
+    )
 
     assert len(result.findings) == 1
     assert result.findings[0].message == "unapproved primary lighting owner"
