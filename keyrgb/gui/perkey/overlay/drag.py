@@ -71,9 +71,11 @@ class _OverlayDragContext:
 class OverlayDragController:
     """Stateful overlay drag/resize controller for the per-key canvas."""
 
+    _ctx: _OverlayDragContext | None
+
     def __init__(self, canvas):
         self._canvas = canvas
-        self._ctx: _OverlayDragContext | None = None
+        self._ctx = None
 
     def on_press(self, event) -> None:
         c = self._canvas

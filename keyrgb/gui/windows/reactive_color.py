@@ -66,6 +66,7 @@ class ReactiveColorGUI:
     _last_drag_committed_color: tuple[int, int, int] | None
     _drag_commit_interval: float
     _last_drag_committed_brightness: int | None
+    _wrap_labels: list[object]
 
     def __init__(self):
         self.root = tk.Tk()
@@ -77,7 +78,7 @@ class ReactiveColorGUI:
         apply_clam_theme(self.root, include_checkbuttons=True, map_checkbutton_state=True)
 
         self.config = Config()
-        self._settings_adapter: _settings_adapter.ReactiveColorSettingsAdapter | None = None
+        self._settings_adapter = None
         self._get_settings_adapter().initialize_drag_state()
 
         init_state = _init_adapter.initialize_runtime_state(
@@ -90,7 +91,7 @@ class ReactiveColorGUI:
         main = ttk.Frame(self.root, padding=20)
         main.pack(fill="both", expand=True)
         self._main_frame = main
-        self._wrap_labels: list[object] = []
+        self._wrap_labels = []
 
         title = ttk.Label(main, text="Reactive Typing Settings", font=("Sans", 14, "bold"))
         title.pack(pady=(0, 10))

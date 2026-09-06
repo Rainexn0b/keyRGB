@@ -117,9 +117,9 @@ def _handle_hardware_polling_exception(
 def start_hardware_polling(tray: IdlePowerTrayProtocol) -> threading.Thread:
     """Poll keyboard hardware state to detect physical button changes."""
 
-    def poll_hardware():
-        last_brightness = None
-        last_off_state = None
+    def poll_hardware() -> None:
+        last_brightness: object | None = None
+        last_off_state: object | None = None
         last_error_at = 0.0
         last_real_poll_at = time.monotonic()
         poll_revision: int | None = None
@@ -164,13 +164,19 @@ def start_hardware_polling(tray: IdlePowerTrayProtocol) -> threading.Thread:
                     **kwargs,
                 )
 
-            polled_state = _run_recoverable_hardware_poll_boundary(
-                lambda lb=last_brightness, lo=last_off_state: _runtime_support.poll_hardware_once(
+            def _poll_once(
+                lb: object | None = last_brightness,
+                lo: object | None = last_off_state,
+            ) -> tuple[int, bool] | None:
+                return _runtime_support.poll_hardware_once(
                     tray,
                     last_brightness=lb,
                     last_off_state=lo,
                     apply_polled_state_fn=apply_current_observation,
-                ),
+                )
+
+            polled_state = _run_recoverable_hardware_poll_boundary(
+                _poll_once,
                 on_recoverable=_recover_polling_error,
             )
             last_real_poll_at = time.monotonic()
