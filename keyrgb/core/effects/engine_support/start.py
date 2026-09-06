@@ -172,15 +172,21 @@ class _EngineStart:
                 else:
                     fade_to_color = registration.start_color
 
-                start_sw_kwargs = {
-                    "target": partial(registration.runner, self),
-                    "prev_color": prev_color,
-                    "fade_to_color": fade_to_color,
-                    "from_sw_effect": prev_effect_was_sw,
-                }
                 if controller_brightness_handoff is not None:
-                    start_sw_kwargs["controller_brightness_handoff"] = int(controller_brightness_handoff)
-                self._start_sw_effect(**start_sw_kwargs)
+                    self._start_sw_effect(
+                        target=partial(registration.runner, self),
+                        prev_color=prev_color,
+                        fade_to_color=fade_to_color,
+                        from_sw_effect=prev_effect_was_sw,
+                        controller_brightness_handoff=int(controller_brightness_handoff),
+                    )
+                else:
+                    self._start_sw_effect(
+                        target=partial(registration.runner, self),
+                        prev_color=prev_color,
+                        fade_to_color=fade_to_color,
+                        from_sw_effect=prev_effect_was_sw,
+                    )
 
     def _start_sw_effect(
         self,

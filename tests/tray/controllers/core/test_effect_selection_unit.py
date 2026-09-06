@@ -47,7 +47,9 @@ class TestApplyEffectSelection:
             ("none", "none"),
         ],
     )
-    def test_off_family_effect_selection_persists_without_runtime_writes(self, effect_name, expected_effect, monkeypatch):
+    def test_off_family_effect_selection_persists_without_runtime_writes(
+        self, effect_name, expected_effect, monkeypatch
+    ):
         """Dark-deck choices wait for the legal restore transition."""
         from keyrgb.tray.controllers import effect_selection
         from keyrgb.tray.controllers.effect_selection import apply_effect_selection
@@ -60,7 +62,9 @@ class TestApplyEffectSelection:
         backend = self._backend("wave")
         mock_tray.backend = backend
         if effect_name == "perkey":
-            monkeypatch.setattr(effect_selection, "_load_per_key_colors_from_profile", lambda _config: {(0, 0): (1, 2, 3)})
+            monkeypatch.setattr(
+                effect_selection, "_load_per_key_colors_from_profile", lambda _config: {(0, 0): (1, 2, 3)}
+            )
 
         apply_effect_selection(mock_tray, effect_name=effect_name)
 

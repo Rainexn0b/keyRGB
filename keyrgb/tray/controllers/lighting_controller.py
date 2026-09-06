@@ -2,6 +2,7 @@ from __future__ import annotations
 
 # @quality-exception file-size-analysis: thin public lighting-controller facade; mode/helpers already extracted to sibling modules
 import logging
+from typing import TypedDict
 
 from keyrgb.core.effects import catalog as effects_catalog
 from keyrgb.core.utils import exceptions as core_exceptions, safe_attrs
@@ -24,6 +25,11 @@ SW_EFFECTS = effects_catalog.SW_EFFECTS_SET
 restore_secondary_software_targets = software_target_controller.restore_secondary_software_targets
 
 logger = logging.getLogger(__name__)
+
+
+class _OptionalEngineStartKwargs(TypedDict, total=False):
+    preserve_last_rendered_brightness: bool
+    controller_brightness_handoff: int
 
 
 _START_CURRENT_EFFECT_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
@@ -223,20 +229,22 @@ def start_current_effect(
             target_brightness=target_brightness,
         )
 
-        engine_start_kwargs = {
-            "speed": tray.config.get_effect_speed(effect),
-            "brightness": start_brightness,
-            "color": tray.config.color,
-            "reactive_color": getattr(tray.config, "reactive_color", None),
-            "reactive_use_manual_color": bool(getattr(tray.config, "reactive_use_manual_color", False)),
-            "reactive_visual_mode": reactive_visual_mode,
-            "direction": getattr(tray.config, "direction", None),
-        }
+        extra_start_kwargs: _OptionalEngineStartKwargs = {}
         if preserve_last_rendered_brightness:
-            engine_start_kwargs["preserve_last_rendered_brightness"] = True
+            extra_start_kwargs["preserve_last_rendered_brightness"] = True
         if controller_brightness_handoff is not None and lighting_controller_helpers.is_reactive_effect(effect):
-            engine_start_kwargs["controller_brightness_handoff"] = int(controller_brightness_handoff)
-        tray.engine.start_effect(effect, **engine_start_kwargs)
+            extra_start_kwargs["controller_brightness_handoff"] = int(controller_brightness_handoff)
+        tray.engine.start_effect(
+            effect,
+            speed=tray.config.get_effect_speed(effect),
+            brightness=start_brightness,
+            color=tray.config.color,
+            reactive_color=getattr(tray.config, "reactive_color", None),
+            reactive_use_manual_color=bool(getattr(tray.config, "reactive_use_manual_color", False)),
+            reactive_visual_mode=reactive_visual_mode,
+            direction=getattr(tray.config, "direction", None),
+            **extra_start_kwargs,
+        )
         tray.is_off = False
 
         # Sync the global speed to the per-effect speed that was just started

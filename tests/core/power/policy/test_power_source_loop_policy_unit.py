@@ -206,9 +206,7 @@ def test_power_source_loop_policy_does_not_retry_successful_apply_when_observati
 
     first = policy.update(_inputs(active_power_mode=PowerMode.BALANCED, ac_power_mode=PowerMode.PERFORMANCE))
     policy.record_power_mode_apply_result(PowerMode.PERFORMANCE, True)
-    later = policy.update(
-        _inputs(now=30.0, active_power_mode=PowerMode.BALANCED, ac_power_mode=PowerMode.PERFORMANCE)
-    )
+    later = policy.update(_inputs(now=30.0, active_power_mode=PowerMode.BALANCED, ac_power_mode=PowerMode.PERFORMANCE))
 
     assert ActivatePowerMode(PowerMode.PERFORMANCE) in first.actions
     assert not any(isinstance(action, ActivatePowerMode) for action in later.actions)

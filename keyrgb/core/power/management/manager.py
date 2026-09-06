@@ -355,18 +355,16 @@ class PowerManager:
             return True
 
         def execute_plan() -> bool:
-            execute_kwargs = {
-                "poll_interval_s": poll_interval_s,
-                "apply_brightness_fn": self._apply_brightness_policy,
-                "activate_power_mode_fn": self._activate_power_source_mode,
-                "activate_perkey_profile_fn": self._activate_power_source_perkey_profile,
-            }
-            if callable(record_power_mode_apply_result_fn):
-                execute_kwargs["record_power_mode_apply_result_fn"] = record_power_mode_apply_result_fn
             return _battery_saver.execute_battery_saver_iteration_plan(
                 self,
                 plan,
-                **execute_kwargs,
+                poll_interval_s=poll_interval_s,
+                apply_brightness_fn=self._apply_brightness_policy,
+                activate_power_mode_fn=self._activate_power_source_mode,
+                activate_perkey_profile_fn=self._activate_power_source_perkey_profile,
+                record_power_mode_apply_result_fn=(
+                    record_power_mode_apply_result_fn if callable(record_power_mode_apply_result_fn) else None
+                ),
             )
 
         if bool(getattr(plan, "should_sleep", False)):
