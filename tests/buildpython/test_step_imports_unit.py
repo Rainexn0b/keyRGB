@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from buildpython.steps import step_imports
@@ -54,7 +56,11 @@ def test_import_validation_runner_skips_gui_imports_without_tk(monkeypatch, tmp_
     result = step_imports.import_validation_runner()
 
     assert result.exit_code == 0
-    assert seen == ["keyrgb.tray.entrypoint"]
+    assert seen == [
+        "keyrgb.tray.entrypoint",
+        "keyrgb.core.diagnostics",
+        "keyrgb.core.diagnostics.diagnostic_session",
+    ]
     assert "Tkinter not available; skipped Tk GUI imports." in result.stdout
 
 
@@ -70,3 +76,45 @@ def test_import_validation_runner_propagates_unexpected_probe_failures(monkeypat
 
     with pytest.raises(AssertionError, match="unexpected probe bug"):
         step_imports.import_validation_runner()
+
+
+def _public_script_modules() -> list[str]:
+    scripts: list[str] = []
+    in_scripts = False
+    for raw_line in Path("pyproject.toml").read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if line.startswith("[") and line.endswith("]"):
+            in_scripts = line == "[project.scripts]"
+            continue
+        if not in_scripts or "=" not in line:
+            continue
+        _name, value = line.split("=", 1)
+        target = value.strip().strip('"').strip("'")
+        module, _separator, _attr = target.partition(":")
+        if module.startswith("keyrgb."):
+            scripts.append(module)
+    return scripts
+
+
+def test_import_validation_covers_every_public_script() -> None:
+    assert step_imports.DEFAULT_IMPORTS == _public_script_modules()
+
+
+def test_import_validation_runner_probes_every_default_import(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(step_imports, "repo_root", lambda: tmp_path)
+    monkeypatch.setattr(step_imports, "_has_tkinter", lambda: True)
+    seen: list[str] = []
+
+    def fake_probe(module: str, *, cwd):
+        assert cwd == tmp_path
+        seen.append(module)
+        return _probe_result(module)
+
+    monkeypatch.setattr(step_imports, "probe_module_import", fake_probe)
+
+    result = step_imports.import_validation_runner()
+
+    assert result.exit_code == 0
+    assert seen == list(step_imports.DEFAULT_IMPORTS)
+    for module in step_imports.DEFAULT_IMPORTS:
+        assert f"  - {module}" in result.stdout

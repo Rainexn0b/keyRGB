@@ -6,11 +6,16 @@ from ..utils.import_probe import probe_module_import
 from ..utils.paths import repo_root
 from ..utils.subproc import RunResult
 
+# Keep this list aligned with [project.scripts] in pyproject.toml.
 DEFAULT_IMPORTS = [
     "keyrgb.tray.entrypoint",
-    # Tk-based GUIs are optional in CI environments where tkinter isn't present.
     "keyrgb.gui.perkey",
+    "keyrgb.gui.windows.uniform",
+    "keyrgb.gui.windows.reactive_color",
     "keyrgb.gui.calibrator",
+    "keyrgb.gui.settings",
+    "keyrgb.core.diagnostics",
+    "keyrgb.core.diagnostics.diagnostic_session",
 ]
 
 
