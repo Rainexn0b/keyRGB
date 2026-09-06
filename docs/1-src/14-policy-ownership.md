@@ -30,7 +30,8 @@ from keyrgb.core.backends.policies.per_key_mode import per_key_mode_policy
 
 Avoid broad imports from `keyrgb.core.backends.policies` in implementation code:
 leaf imports make dependencies explicit and avoid importing unrelated policy
-families.
+families. Enforced by architecture rule `canonical-backend-policy-imports` in
+`buildpython/config/architecture_rules.json`.
 
 KeyRGB is still in its beta/0.x compatibility window, so the former internal
 facades (`keyrgb/core/backends/policy.py`, `keyrgb/core/backends/sleep_state.py`, and

@@ -971,6 +971,75 @@ tray._refresh_ui(animate_icon=False, refresh_menu=False)
     assert result.findings == ()
 
 
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from keyrgb.core.backends.policy import per_key_mode_policy\n",
+        "from keyrgb.core.backends.sleep_state import is_controller_sleep_state\n",
+        "from keyrgb.core.backends.policies import sleep_state\n",
+        "import keyrgb.core.backends.policies as policies\n",
+    ],
+)
+def test_configured_policy_import_rule_forbids_historical_and_package_root_imports(tmp_path, source: str) -> None:
+    result = _scan_configured_rule(
+        tmp_path,
+        source,
+        rule_id="canonical-backend-policy-imports",
+        relative_path="keyrgb/tray/pollers/hardware/_controller_sleep.py",
+    )
+
+    assert result.findings
+    assert {finding.rule_id for finding in result.findings} == {"canonical-backend-policy-imports"}
+
+
+def test_configured_policy_import_rule_allows_canonical_leaf_imports(tmp_path) -> None:
+    result = _scan_configured_rule(
+        tmp_path,
+        """from keyrgb.core.backends.policies.sleep_state import is_controller_sleep_state
+from keyrgb.core.backends.policies.per_key_mode import per_key_mode_policy
+from keyrgb.core.backends.policies.backend_selection import stability_for_backend
+""",
+        rule_id="canonical-backend-policy-imports",
+        relative_path="keyrgb/tray/pollers/hardware/_controller_sleep.py",
+    )
+
+    assert result.findings == ()
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "globals().update({'render': render})\n",
+        "api = sys.modules[__name__]\n",
+    ],
+)
+def test_configured_reactive_rule_forbids_module_global_injection(tmp_path, source: str) -> None:
+    result = _scan_configured_rule(
+        tmp_path,
+        source,
+        rule_id="reactive-no-module-global-injection",
+        relative_path="keyrgb/core/effects/reactive/effects.py",
+    )
+
+    assert result.findings
+    assert {finding.rule_id for finding in result.findings} == {"reactive-no-module-global-injection"}
+
+
+def test_configured_reactive_rule_allows_explicit_facade_construction(tmp_path) -> None:
+    result = _scan_configured_rule(
+        tmp_path,
+        """# Build immutable API facades (replaces globals().update + sys.modules cast)
+from keyrgb.core.effects.reactive._effects_api import build_reactive_api
+
+_fade_api = build_reactive_api()
+""",
+        rule_id="reactive-no-module-global-injection",
+        relative_path="keyrgb/core/effects/reactive/effects.py",
+    )
+
+    assert result.findings == ()
+
+
 @pytest.mark.parametrize("method", ["turn_off", "start_effect"])
 def test_poller_engine_mutations_are_forbidden_outside_commit_leaves(tmp_path, method: str) -> None:
     result = _scan_poller_engine_call(tmp_path, f"tray.engine.{method}()\n")

@@ -49,6 +49,9 @@ Reactive code must not:
 - recover an API from `sys.modules`; or
 - cast a module object to a loop protocol.
 
+Enforced by architecture rule `reactive-no-module-global-injection` in
+`buildpython/config/architecture_rules.json`.
+
 Tests can replace a facade with `dataclasses.replace()` and inject only the
 dependencies relevant to the test.
 

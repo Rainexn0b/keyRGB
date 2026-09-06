@@ -98,6 +98,38 @@
       ]
     },
     {
+      "id": "canonical-backend-policy-imports",
+      "description": "Production code must import backend policy from canonical leaf modules, not historical facades or the policies package root.",
+      "severity": "error",
+      "corpus": {
+        "include": [
+          "keyrgb/**/*.py"
+        ]
+      },
+      "imports": [
+        {
+          "module": "keyrgb.core.backends.policy",
+          "message": "Historical keyrgb.core.backends.policy is removed; import the owning leaf under keyrgb.core.backends.policies."
+        },
+        {
+          "module": "keyrgb.core.backends.sleep_state",
+          "message": "Historical keyrgb.core.backends.sleep_state is removed; import keyrgb.core.backends.policies.sleep_state."
+        }
+      ],
+      "patterns": [
+        {
+          "regex": "^\\s*from\\s+keyrgb\\.core\\.backends\\.policies\\s+import\\b",
+          "flags": "m",
+          "message": "Import the exact backend policy leaf module; do not import the policies package root."
+        },
+        {
+          "regex": "^\\s*import\\s+keyrgb\\.core\\.backends\\.policies(?:\\s+as\\s+\\w+)?\\s*(?:#|$)",
+          "flags": "m",
+          "message": "Import the exact backend policy leaf module; do not import the policies package root."
+        }
+      ]
+    },
+    {
       "id": "diagnostics-no-live-config",
       "description": "Diagnostics collection must not import or construct the live mutable Config object.",
       "severity": "error",
@@ -344,6 +376,26 @@
           "regex": "^\\s*(?:from|import)\\s+keyrgb\\.core\\.effects\\.ite_backend\\b",
           "flags": "m",
           "message": "Legacy keyrgb.core.effects.ite_backend imports are forbidden."
+        }
+      ]
+    },
+    {
+      "id": "reactive-no-module-global-injection",
+      "description": "Reactive loops receive an explicit dependency facade; they must not inject APIs through module globals or sys.modules.",
+      "severity": "error",
+      "corpus": {
+        "include": [
+          "keyrgb/core/effects/reactive/**/*.py"
+        ]
+      },
+      "patterns": [
+        {
+          "regex": "globals\\(\\)\\.update\\s*\\(",
+          "message": "Reactive code must not inject dependencies through globals().update(); pass a ReactiveApiFacade."
+        },
+        {
+          "regex": "sys\\.modules\\[",
+          "message": "Reactive code must not recover an API from sys.modules; pass a ReactiveApiFacade."
         }
       ]
     },
