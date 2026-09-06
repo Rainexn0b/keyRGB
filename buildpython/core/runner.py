@@ -6,19 +6,9 @@ import time
 
 from ..utils.paths import buildlog_dir
 from . import summary as summary_module
-from ._runner_display import (
-    _BOLD,
-    _CYAN,
-    _DIM,
-    _color,
-    _print_step_footer,
-    _print_step_header,
-    _status_icon,
-    _step_highlights,
-    _write_log,
-)
 from .debt_index import write_debt_index
 from .model import Step, StepOutcome
+from .runner_support import display as _ui
 
 
 def _is_module_available(module: str) -> bool:
@@ -29,12 +19,12 @@ def run_step(
     step: Step, *, index: int, total_steps: int, name_width: int, label_width: int, verbose: bool
 ) -> StepOutcome:
     start = time.time()
-    _print_step_header(step, index=index, total_steps=total_steps, name_width=name_width, label_width=label_width)
+    _ui._print_step_header(step, index=index, total_steps=total_steps, name_width=name_width, label_width=label_width)
 
     # Optional step gating
     if step.name in {"Ruff", "Ruff Format"} and not _is_module_available("ruff"):
         duration = time.time() - start
-        _write_log(
+        _ui._write_log(
             step,
             "python -m ruff ...",
             "(skipped: ruff not installed)\n",
@@ -48,12 +38,12 @@ def run_step(
             duration_s=duration,
             message="ruff not installed",
         )
-        _print_step_footer(outcome, ["ruff not installed"])
+        _ui._print_step_footer(outcome, ["ruff not installed"])
         return outcome
 
     if step.name == "Black" and not _is_module_available("black"):
         duration = time.time() - start
-        _write_log(
+        _ui._write_log(
             step,
             "python -m black ...",
             "(skipped: black not installed)\n",
@@ -67,12 +57,12 @@ def run_step(
             duration_s=duration,
             message="black not installed",
         )
-        _print_step_footer(outcome, ["black not installed"])
+        _ui._print_step_footer(outcome, ["black not installed"])
         return outcome
 
     if step.name == "Type Check" and not _is_module_available("mypy"):
         duration = time.time() - start
-        _write_log(
+        _ui._write_log(
             step,
             "python -m mypy ...",
             "(skipped: mypy not installed)\n",
@@ -86,12 +76,12 @@ def run_step(
             duration_s=duration,
             message="mypy not installed",
         )
-        _print_step_footer(outcome, ["mypy not installed"])
+        _ui._print_step_footer(outcome, ["mypy not installed"])
         return outcome
 
     if step.name == "Coverage" and (not _is_module_available("coverage") or not _is_module_available("pytest")):
         duration = time.time() - start
-        _write_log(
+        _ui._write_log(
             step,
             "python -m coverage ...",
             "(skipped: coverage or pytest not installed)\n",
@@ -105,12 +95,12 @@ def run_step(
             duration_s=duration,
             message="coverage or pytest not installed",
         )
-        _print_step_footer(outcome, ["coverage or pytest not installed"])
+        _ui._print_step_footer(outcome, ["coverage or pytest not installed"])
         return outcome
 
     if step.name == "Dead Code" and not _is_module_available("vulture"):
         duration = time.time() - start
-        _write_log(
+        _ui._write_log(
             step,
             "python -m vulture ...",
             "(skipped: vulture not installed)\n",
@@ -124,12 +114,12 @@ def run_step(
             duration_s=duration,
             message="vulture not installed",
         )
-        _print_step_footer(outcome, ["vulture not installed"])
+        _ui._print_step_footer(outcome, ["vulture not installed"])
         return outcome
 
     if step.name == "ShellCheck" and shutil.which("shellcheck") is None:
         duration = time.time() - start
-        _write_log(
+        _ui._write_log(
             step,
             "shellcheck ...",
             "(skipped: shellcheck not installed)\n",
@@ -143,13 +133,13 @@ def run_step(
             duration_s=duration,
             message="shellcheck not installed",
         )
-        _print_step_footer(outcome, ["shellcheck not installed"])
+        _ui._print_step_footer(outcome, ["shellcheck not installed"])
         return outcome
 
     result = step.runner()
     duration = time.time() - start
 
-    _write_log(
+    _ui._write_log(
         step,
         result.command_str,
         result.stdout,
@@ -163,8 +153,8 @@ def run_step(
         exit_code=result.exit_code,
         duration_s=duration,
     )
-    highlights = _step_highlights(step, stdout=result.stdout, stderr=result.stderr)
-    _print_step_footer(outcome, highlights)
+    highlights = _ui._step_highlights(step, stdout=result.stdout, stderr=result.stderr)
+    _ui._print_step_footer(outcome, highlights)
 
     if verbose or result.exit_code != 0:
         if result.stdout.strip():
@@ -193,7 +183,7 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
     label_width = len(f"[{total_steps}/{total_steps}]")
     build_label = f"\u00b7  {total_steps} steps  \u00b7  Logs in {buildlog_dir()}"
 
-    print(f"\U0001f527  {_color('KeyRGB Build', _BOLD + _CYAN)}  {_color(build_label, _DIM)}")
+    print(f"\U0001f527  {_ui._color('KeyRGB Build', _ui._BOLD + _ui._CYAN)}  {_ui._color(build_label, _ui._DIM)}")
 
     started = time.time()
     summaries: list[summary_module.StepSummary] = []
@@ -221,7 +211,7 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
         )
 
         if outcome.status == "failure" and not continue_on_error:
-            print(f"\n{_status_icon('failure')}Build stopped at [{index}/{total_steps}]: {step.name}")
+            print(f"\n{_ui._status_icon('failure')}Build stopped at [{index}/{total_steps}]: {step.name}")
 
             score = _health_score()
 

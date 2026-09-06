@@ -3,11 +3,11 @@ from __future__ import annotations
 import re
 import sys
 
-from ..utils.log_format import StepLogRecord, format_standard_log
-from ..utils.paths import buildlog_dir
-from . import summary as summary_module
-from .model import Step, StepOutcome
-from .summary_support import debt_terminal
+from ...utils.log_format import StepLogRecord, format_standard_log
+from ...utils.paths import buildlog_dir
+from .. import summary as summary_module
+from ..model import Step, StepOutcome
+from ..summary_support import debt_terminal
 
 _USE_COLOR = sys.stdout.isatty()
 _RESET = "\033[0m" if _USE_COLOR else ""
