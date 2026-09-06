@@ -115,11 +115,7 @@ The 5-condition gate is evaluated inline with implicit short-circuit priority:
 
 ```python
 allow_pulse_hw_lift = (
-    not per_key_hw
-    and uniform_hw_streak_count >= 6
-    and pulse_mix > 0.0
-    and eff > hw
-    and not cooldown_active
+    not per_key_hw and uniform_hw_streak_count >= 6 and pulse_mix > 0.0 and eff > hw and not cooldown_active
 )
 ```
 
@@ -148,14 +144,10 @@ def _can_lift_hw_brightness(
     keypress from causing a brightness spike before the render loop is stable.
     """
     if per_key_hw:
-        return False   # per-key: contrast path, never lift
+        return False  # per-key: contrast path, never lift
     if uniform_hw_streak < 6:
-        return False   # not enough stable frames yet
-    return (
-        pulse_mix > 0.0
-        and effective_brightness > current_hw_brightness
-        and not cooldown_active
-    )
+        return False  # not enough stable frames yet
+    return pulse_mix > 0.0 and effective_brightness > current_hw_brightness and not cooldown_active
 ```
 
 **Acceptance criteria:**
@@ -201,8 +193,9 @@ elif now < damp_until:
 ```python
 class _RestorePhase(Enum):
     NORMAL = "normal"
-    DAMP_PENDING = "damp_pending"   # first post-restore keystroke not seen yet
-    DAMPING = "damping"             # timer active, apply damp scale
+    DAMP_PENDING = "damp_pending"  # first post-restore keystroke not seen yet
+    DAMPING = "damping"  # timer active, apply damp scale
+
 
 @dataclass
 class ReactiveRenderState:
@@ -242,12 +235,15 @@ def dispatch_brightness_change(self) -> None:
     except _WRAP_SYNC_ERRORS as exc:
         _log_sync_error("brightness", exc)
 
+
 def dispatch_trail_change(self) -> None:
     try:
         value = self._read_trail_slider()
         self._adapter.commit_trail(value)
     except _WRAP_SYNC_ERRORS as exc:
         _log_sync_error("trail", exc)
+
+
 # ... 8 more identical structures
 ```
 
@@ -260,6 +256,7 @@ def _make_sync_dispatcher(name: str, read_fn: Callable, commit_fn: Callable) -> 
             commit_fn(self, read_fn(self))
         except _WRAP_SYNC_ERRORS as exc:
             _log_sync_error(name, exc)
+
     _dispatch.__name__ = f"dispatch_{name}_change"
     return _dispatch
 ```
@@ -268,7 +265,8 @@ Each dispatcher becomes a one-liner declaration:
 
 ```python
 dispatch_brightness_change = _make_sync_dispatcher(
-    "brightness", ReactiveColorWiring._read_brightness_slider,
+    "brightness",
+    ReactiveColorWiring._read_brightness_slider,
     ReactiveColorWiring._commit_brightness,
 )
 ```

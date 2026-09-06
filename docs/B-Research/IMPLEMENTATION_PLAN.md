@@ -34,7 +34,7 @@ The research identified **5 priority tiers** for expansion:
 ```python
 # File: keyrgb/core/backends/ite8291r3.py
 # Add to the USB PID list
-SUPPORTED_PIDS = [0xce00, 0x6004, 0x6006, 0x6008, 0x600b]
+SUPPORTED_PIDS = [0xCE00, 0x6004, 0x6006, 0x6008, 0x600B]
 ```
 
 **Rationale:** All 8291 variants use identical protocol. Only USB PID differs.
@@ -117,6 +117,7 @@ def _supports_color_attr(self) -> bool:
     color_path = self._led_path / "color"
     return color_path.exists()
 
+
 def set_color(self, color, *, brightness: int):
     if self._supports_color_attr():
         # Write hex format
@@ -147,6 +148,7 @@ def set_key_colors(self, color_map, *, brightness: int, enable_user_mode: bool =
         # Existing per-key logic (which won't work, but won't crash)
         pass
 
+
 def _is_hp_omen_device(self) -> bool:
     zone_colors_path = self._led_path / "zone_colors"
     return zone_colors_path.exists()
@@ -159,16 +161,16 @@ def _is_hp_omen_device(self) -> bool:
 # Existing: kbd, keyboard
 # Add:
 LED_PATTERNS = [
-    "kbd",           # Existing
-    "keyboard",      # Existing
-    "rgb:kbd",       # Tuxedo/Clevo multicolor
-    "tuxedo::kbd",   # Tuxedo WMI
-    "ite_8291_lb",   # ITE lightbar
+    "kbd",  # Existing
+    "keyboard",  # Existing
+    "rgb:kbd",  # Tuxedo/Clevo multicolor
+    "tuxedo::kbd",  # Tuxedo WMI
+    "ite_8291_lb",  # ITE lightbar
     "hp_omen::kbd",  # HP Omen
-    "dell::kbd",     # Dell (brightness only)
-    "tpacpi::kbd",   # ThinkPad (brightness only)
-    "asus::kbd",     # ASUS WMI (brightness only)
-    "system76::kbd", # System76
+    "dell::kbd",  # Dell (brightness only)
+    "tpacpi::kbd",  # ThinkPad (brightness only)
+    "asus::kbd",  # ASUS WMI (brightness only)
+    "system76::kbd",  # System76
 ]
 ```
 
@@ -245,11 +247,12 @@ def _detect_lightbar(self):
     interfaces = self._dev.get_interfaces()
     return len(interfaces) > 1
 
+
 class Ite8297Device(KeyboardDevice):
     def set_key_colors(self, color_map, *, brightness: int, enable_user_mode: bool = True):
         """Support keyboard matrix"""
         # ... keyboard RGB logic
-        
+
     def set_lightbar_color(self, color, *, brightness: int):
         """Support lightbar if present"""
         if not self._has_lightbar:
@@ -287,19 +290,20 @@ class Ite8297Device(KeyboardDevice):
 ```python
 # File: keyrgb/core/backends/asus_aura.py
 
+
 class AsusAuraBackend(KeyboardBackend):
     """ASUS Aura RGB Controller"""
-    
-    VENDOR_ID = 0x0b05
-    PRODUCT_IDS = [0x1866, 0x19b6, 0x18a3]
-    
+
+    VENDOR_ID = 0x0B05
+    PRODUCT_IDS = [0x1866, 0x19B6, 0x18A3]
+
     def set_color(self, color, *, brightness: int):
         """ASUS Aura packet structure"""
         # Uses control transfers to endpoint 0
         # or dedicated interrupt endpoint
         packet = self._build_aura_packet(color, brightness)
         self._dev.ctrl_transfer(0x21, 0x09, 0x0300, 0x00, packet)
-    
+
     def _build_aura_packet(self, color, brightness):
         """Build Aura protocol packet"""
         # Based on rog-core implementation
@@ -336,12 +340,13 @@ class AsusAuraBackend(KeyboardBackend):
 ```python
 # File: keyrgb/core/backends/msi_steelseries.py
 
+
 class MsiSteelSeriesBackend(KeyboardBackend):
     """MSI SteelSeries RGB Controller"""
-    
+
     VENDOR_ID = 0x1770
-    PRODUCT_IDS = [0xff00]
-    
+    PRODUCT_IDS = [0xFF00]
+
     def set_color(self, color, *, brightness: int):
         """3-zone or per-key depending on device"""
         # Detect device capabilities
@@ -349,7 +354,7 @@ class MsiSteelSeriesBackend(KeyboardBackend):
             self._set_perkey_color(color_map)
         else:
             self._set_zone_colors(color)
-    
+
     def _supports_perkey(self):
         """Check if device supports per-key RGB"""
         # MSI has both 3-zone and per-key variants

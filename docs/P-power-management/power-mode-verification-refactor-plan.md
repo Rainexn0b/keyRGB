@@ -116,6 +116,7 @@ def set_mode(mode: PowerMode, *, allow_interactive: bool = True) -> bool:
     applied = _apply.apply_mode(mode, allow_interactive=allow_interactive)
     return applied
 
+
 def get_status() -> PowerModeStatus:
     """Observe the current system state. Best-effort; may disagree with last-applied mode."""
     return _observe.infer_status()

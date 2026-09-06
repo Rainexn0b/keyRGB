@@ -69,8 +69,9 @@ class ReactiveRenderState:
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
     # ... existing fields ...
 
-    def seed_transition(self, *, from_brightness: int, to_brightness: int,
-                        started_at: float, duration_s: float) -> None:
+    def seed_transition(
+        self, *, from_brightness: int, to_brightness: int, started_at: float, duration_s: float
+    ) -> None:
         with self._lock:
             self._reactive_transition_from_brightness = from_brightness
             self._reactive_transition_to_brightness = to_brightness
@@ -79,13 +80,14 @@ class ReactiveRenderState:
 
     def read_transition(self) -> tuple[int, int, float, float] | None:
         with self._lock:
-            if (self._reactive_transition_from_brightness is None
-                    or self._reactive_transition_to_brightness is None):
+            if self._reactive_transition_from_brightness is None or self._reactive_transition_to_brightness is None:
                 return None
-            return (self._reactive_transition_from_brightness,
-                    self._reactive_transition_to_brightness,
-                    self._reactive_transition_started_at or 0.0,
-                    self._reactive_transition_duration_s or 0.0)
+            return (
+                self._reactive_transition_from_brightness,
+                self._reactive_transition_to_brightness,
+                self._reactive_transition_started_at or 0.0,
+                self._reactive_transition_duration_s or 0.0,
+            )
 
     def update_pulse_mix(self, mix: float) -> None:
         with self._lock:
@@ -227,8 +229,8 @@ POST_RESTORE_PULSE_HW_LIFT_HOLDOFF_S: float = 2.0
 POST_RESTORE_PULSE_VISUAL_MIN_FACTOR: float = 0.35
 
 # --- Pulse mix rise/decay ---
-PULSE_MIX_DECAY_STEP: float = 0.34      # per-frame decay when pulses end
-PULSE_MIX_RISE_STEP: float = 0.45       # per-frame rise during active burst
+PULSE_MIX_DECAY_STEP: float = 0.34  # per-frame decay when pulses end
+PULSE_MIX_RISE_STEP: float = 0.45  # per-frame rise during active burst
 PULSE_MIX_INITIAL_RISE_STEP: float = 0.18  # first keypress after idle
 
 # --- Uniform backend HW-lift streak gate ---
@@ -286,6 +288,7 @@ Additionally, `_backlight_state_or_defaults()` uses `cast(_BacklightStateTray, t
 ```python
 import os
 import signal
+
 
 def _read_int_with_timeout(path: Path, timeout_s: float = 0.5) -> int | None:
     """Read an integer from a sysfs path with a timeout guard."""
@@ -426,6 +429,7 @@ def test_concurrent_transition_seed_and_render_read():
     [from_brightness, to_brightness] range."""
     state = ReactiveRenderState()
     errors = []
+
     def seeder():
         for i in range(1000):
             state.seed_transition(
@@ -434,10 +438,12 @@ def test_concurrent_transition_seed_and_render_read():
                 started_at=time.monotonic(),
                 duration_s=0.42,
             )
+
     def reader():
         for _ in range(10000):
             # Read all four fields and verify consistency
             ...
+
     # Assert no out-of-range values observed
 ```
 
@@ -559,6 +565,7 @@ Cache `attrgetter` instances for frequently-read attributes:
 # In _render_brightness_support.py
 _cached_getters: dict[str, Callable] = {}
 
+
 def _get_attrgetter(name: str) -> Callable:
     if name not in _cached_getters:
         _cached_getters[name] = attrgetter(name)
@@ -582,6 +589,7 @@ For `_scale_color_map()`, use a pre-allocated buffer when `transition_visual_sca
 ```python
 # In EffectsEngine or render context
 self._color_map_buffer: dict[Key, Color] = {}
+
 
 def _scale_color_map_into(dest: dict[Key, Color], src: Mapping[Key, Color], *, factor: float) -> None:
     f = max(0.0, min(1.0, factor))

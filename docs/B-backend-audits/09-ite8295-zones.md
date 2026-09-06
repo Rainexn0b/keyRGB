@@ -126,12 +126,12 @@ newer models seeing "no matching hidraw device" despite compatible hardware.
 
 **Original** (`backend.py` line 53):
 ```python
-"No hidraw device found for supported ITE 8291 IDs: "
+"No hidraw device found for supported ITE 8291 IDs:"
 ```
 
 **Fixed:**
 ```python
-"No hidraw device found for supported ITE 8295 4-zone IDs: "
+"No hidraw device found for supported ITE 8295 4-zone IDs:"
 ```
 
 This was a copy-paste from the `ite8291` backend template. The error message is only shown
