@@ -25,7 +25,8 @@ fields such as `backend_probe.identifiers`, `device_discovery`, and
 - backend `probe()` / `is_available()`
 - engine `_ensure_device_available()`
 
-Enforced by architecture rule `tray-ui-no-live-observation` in
+Enforced by architecture rules `tray-ui-no-live-observation` and
+`automatic-power-paths-no-live-menu-rebuild` in
 `buildpython/config/architecture_rules.json`.
 
 Checked radio state is captured from the snapshot at build time. Applying a

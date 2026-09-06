@@ -938,6 +938,39 @@ from keyrgb.core.config.paths import config_file_path
     assert result.findings == ()
 
 
+@pytest.mark.parametrize(
+    ("source", "relative_path"),
+    [
+        ("tray._update_menu()\n", "keyrgb/tray/pollers/hardware_polling.py"),
+        ("tray._refresh_ui(refresh_menu=True)\n", "keyrgb/tray/pollers/idle_power/_actions.py"),
+        ("tray._refresh_ui(animate_icon=False, refresh_menu = True)\n", "keyrgb/core/power/management/manager.py"),
+    ],
+)
+def test_configured_automatic_power_paths_cannot_rebuild_live_menu(tmp_path, source: str, relative_path: str) -> None:
+    result = _scan_configured_rule(
+        tmp_path,
+        source,
+        rule_id="automatic-power-paths-no-live-menu-rebuild",
+        relative_path=relative_path,
+    )
+
+    assert result.findings
+    assert {finding.rule_id for finding in result.findings} == {"automatic-power-paths-no-live-menu-rebuild"}
+
+
+def test_configured_automatic_power_paths_allow_icon_refresh_without_menu(tmp_path) -> None:
+    result = _scan_configured_rule(
+        tmp_path,
+        """tray._update_icon()
+tray._refresh_ui(animate_icon=False, refresh_menu=False)
+""",
+        rule_id="automatic-power-paths-no-live-menu-rebuild",
+        relative_path="keyrgb/tray/pollers/time_scheduler.py",
+    )
+
+    assert result.findings == ()
+
+
 @pytest.mark.parametrize("method", ["turn_off", "start_effect"])
 def test_poller_engine_mutations_are_forbidden_outside_commit_leaves(tmp_path, method: str) -> None:
     result = _scan_poller_engine_call(tmp_path, f"tray.engine.{method}()\n")

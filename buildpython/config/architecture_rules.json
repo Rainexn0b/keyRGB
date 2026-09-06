@@ -303,6 +303,33 @@
       ]
     },
     {
+      "id": "automatic-power-paths-no-live-menu-rebuild",
+      "description": "Automatic AC/DC, idle, scheduler, and hardware-poller paths must not rebuild the live tray menu; rebuilding an open AppIndicator/SNI menu can crash KDE plasmashell.",
+      "severity": "error",
+      "corpus": {
+        "include": [
+          "keyrgb/tray/pollers/hardware/**/*.py",
+          "keyrgb/tray/pollers/hardware_polling.py",
+          "keyrgb/tray/pollers/idle_power/**/*.py",
+          "keyrgb/tray/pollers/time_scheduler.py",
+          "keyrgb/tray/controllers/_power/**/*.py",
+          "keyrgb/core/power/**/*.py"
+        ]
+      },
+      "attributes": [
+        {
+          "name": "_update_menu",
+          "message": "Automatic power/idle/hardware paths must not call _update_menu(); pass refresh_menu=False on UI refresh."
+        }
+      ],
+      "patterns": [
+        {
+          "regex": "refresh_menu\\s*=\\s*True",
+          "message": "Automatic power/idle/hardware paths must not rebuild the live tray menu; pass refresh_menu=False."
+        }
+      ]
+    },
+    {
       "id": "no-legacy-effects-shim",
       "description": "The removed legacy effects ite_backend shim must stay unused.",
       "severity": "error",
