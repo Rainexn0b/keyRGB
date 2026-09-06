@@ -15,6 +15,7 @@ def apply_brightness_step_guard(
     idle_hw: int,
     eff: int,
     policy_cap: int | None,
+    force_guard: bool,
     logger: logging.Logger,
 ) -> int:
     """Clamp abrupt frame-to-frame brightness jumps unless policy allows bypass."""
@@ -24,9 +25,16 @@ def apply_brightness_step_guard(
 
     delta = hw - prev_i
     guard_active = abs(delta) > max_step_per_frame
-    if guard_active and dim_temp_active and delta < 0:
+    if guard_active and not force_guard and dim_temp_active and delta < 0:
         guard_active = False
-    if guard_active and (not per_key_hw) and delta < 0 and prev_i > idle_hw and eff > idle_hw:
+    if (
+        guard_active
+        and not force_guard
+        and (not per_key_hw)
+        and delta < 0
+        and prev_i > idle_hw
+        and eff > idle_hw
+    ):
         guard_active = False
 
     if not guard_active:

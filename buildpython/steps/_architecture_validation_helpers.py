@@ -26,6 +26,14 @@ class _ScannedAttribute:
     line: int
 
 
+@dataclass(frozen=True)
+class _ScannedCall:
+    receiver: str
+    method: str
+    line: int
+    lexical_locks: tuple[str, ...]
+
+
 def _iter_rule_files(*, root: Path, rule: _ArchitectureRuleCorpus) -> list[Path]:
     matched: dict[str, Path] = {}
     for pattern in rule.include_globs:
@@ -115,3 +123,102 @@ def _scan_python_signals(text: str) -> tuple[tuple[_ScannedImport, ...], tuple[_
     scanned_imports.sort(key=lambda item: (item.line, item.module))
     scanned_attributes.sort(key=lambda item: (item.line, item.name))
     return tuple(scanned_imports), tuple(scanned_attributes)
+
+
+def _dotted_name(node: ast.AST) -> str | None:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        parent = _dotted_name(node.value)
+        if parent is None:
+            return None
+        return f"{parent}.{node.attr}"
+    return None
+
+
+def _scan_python_calls(text: str) -> tuple[_ScannedCall, ...]:
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return ()
+
+    scanned_calls: list[_ScannedCall] = []
+
+    class _CallVisitor(ast.NodeVisitor):
+        def __init__(self) -> None:
+            self._lexical_locks: list[str] = []
+
+        def visit_Call(self, node: ast.Call) -> None:
+            if isinstance(node.func, ast.Attribute):
+                receiver = _dotted_name(node.func.value)
+                if receiver is not None:
+                    scanned_calls.append(
+                        _ScannedCall(
+                            receiver=receiver,
+                            method=node.func.attr,
+                            line=int(getattr(node, "lineno", 0)),
+                            lexical_locks=tuple(self._lexical_locks),
+                        )
+                    )
+            self.generic_visit(node)
+
+        def visit_With(self, node: ast.With) -> None:
+            self._visit_with(node)
+
+        def visit_AsyncWith(self, node: ast.AsyncWith) -> None:
+            self._visit_with(node)
+
+        def _visit_with(self, node: ast.With | ast.AsyncWith) -> None:
+            lock_count = 0
+            for item in node.items:
+                self.visit(item.context_expr)
+                context_name = _dotted_name(item.context_expr)
+                if context_name is not None:
+                    self._lexical_locks.append(context_name)
+                    lock_count += 1
+                if item.optional_vars is not None:
+                    self.visit(item.optional_vars)
+            for statement in node.body:
+                self.visit(statement)
+            if lock_count:
+                del self._lexical_locks[-lock_count:]
+
+        def _visit_nested_scope(self, node: ast.AST) -> None:
+            saved_locks = self._lexical_locks
+            self._lexical_locks = []
+            self.generic_visit(node)
+            self._lexical_locks = saved_locks
+
+        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+            self._visit_function_definition(node)
+
+        def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+            self._visit_function_definition(node)
+
+        def visit_Lambda(self, node: ast.Lambda) -> None:
+            for default in (*node.args.defaults, *node.args.kw_defaults):
+                if default is not None:
+                    self.visit(default)
+            saved_locks = self._lexical_locks
+            self._lexical_locks = []
+            self.visit(node.body)
+            self._lexical_locks = saved_locks
+
+        def visit_ClassDef(self, node: ast.ClassDef) -> None:
+            self.generic_visit(node)
+
+        def _visit_function_definition(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
+            for decorator in node.decorator_list:
+                self.visit(decorator)
+            for default in (*node.args.defaults, *node.args.kw_defaults):
+                if default is not None:
+                    self.visit(default)
+            saved_locks = self._lexical_locks
+            self._lexical_locks = []
+            for statement in node.body:
+                self.visit(statement)
+            self._lexical_locks = saved_locks
+
+    _CallVisitor().visit(tree)
+    scanned_calls.sort(key=lambda item: (item.line, item.receiver, item.method))
+    return tuple(scanned_calls)

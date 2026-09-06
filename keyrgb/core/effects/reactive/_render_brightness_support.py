@@ -61,6 +61,10 @@ class ReactiveRenderState:
     # flips. Pulse damp may continue after this envelope ends.
     _reactive_restore_frame_started_at: float | None = None
     _reactive_restore_frame_duration_s: float | None = None
+    # Firmware can relight at its own full brightness before userspace regains
+    # control. While active, downward correction uses the normal per-frame step
+    # guard even during temporary dim, making the handoff visibly intentional.
+    _reactive_controller_brightness_handoff_active: bool = False
 
     # --- Uniform backend streak gate ---
     # Counts consecutive frames with active pulse on uniform-only backends.

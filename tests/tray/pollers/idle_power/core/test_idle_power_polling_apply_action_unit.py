@@ -331,7 +331,6 @@ def test_restore_brightness_does_nothing_if_tray_is_off() -> None:
 def test_restore_does_not_restore_when_user_forced_off(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import keyrgb.tray.pollers.idle_power.polling as module
     from keyrgb.tray.idle_power_state import set_idle_power_state_field
 
     tray = _mk_tray(effect="wave", brightness=25)
@@ -348,7 +347,6 @@ def test_restore_does_not_restore_when_user_forced_off(
 def test_restore_does_not_restore_when_owner_user_forced_off_and_legacy_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import keyrgb.tray.pollers.idle_power.polling as module
     from keyrgb.tray.idle_power_state import TrayIdlePowerState
 
     tray = SimpleNamespace(

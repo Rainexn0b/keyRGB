@@ -18,6 +18,7 @@ from keyrgb.tray.idle_power_state import (
 )
 from keyrgb.tray.pollers.hardware import _controller_sleep, _recovery, _runtime_support
 from keyrgb.tray.pollers.hardware._decisions import (
+    CONFIG_BRIGHTNESS_MAX,
     REACTIVE_PULSE_POLL_DEFER_RETRY_S as _REACTIVE_PULSE_POLL_DEFER_RETRY_S,
     coerce_poll_int as _coerce_poll_int,
     normalize_brightness_to_config_scale as _normalize_brightness_to_config_scale,
@@ -35,10 +36,14 @@ _hardware_poll_interval_s = _recovery._hardware_poll_interval_s
 _log_hardware_polling_error_best_effort = _recovery._log_hardware_polling_error_best_effort
 _log_polled_hardware_event = _recovery._log_polled_hardware_event
 _power_source_recovery_window_active = _recovery._power_source_recovery_window_active
+_recover_invalid_high_brightness_best_effort = _recovery._recover_invalid_high_brightness_best_effort
 _recover_recent_power_source_blank_best_effort = _recovery._recover_recent_power_source_blank_best_effort
 _recover_stable_zero_brightness_best_effort = _recovery._recover_stable_zero_brightness_best_effort
 _refresh_ui_without_icon_animation = _recovery._refresh_ui_without_icon_animation
 _reset_stable_zero_recovery_attempt_count = _recovery.reset_stable_zero_recovery_attempt_count
+_reset_invalid_high_brightness_recovery_attempt_count = (
+    _recovery.reset_invalid_high_brightness_recovery_attempt_count
+)
 _set_pending_zero_confirm_at = _recovery.set_pending_zero_confirm_at
 _controller_sleep_off_active = _recovery.controller_sleep_off_active
 _controller_sleep_respect_enabled = _recovery.controller_sleep_respect_enabled
@@ -100,6 +105,7 @@ def _commit_polled_intent(
         dim_temp_target=dim_temp_target,
         recover_stable_zero=_recover_stable_zero_brightness_best_effort,
         recover_power_source=_recover_recent_power_source_blank_best_effort,
+        recover_invalid_brightness=_recover_invalid_high_brightness_best_effort,
         stop_engine=_stop_engine_for_controller_sleep_best_effort,
         clear_post_stop=_clear_post_stop_controller_sleep_write_best_effort,
         restart_firmware_wake=_restart_effect_after_controller_firmware_wake_best_effort,
@@ -127,6 +133,9 @@ def _apply_polled_hardware_state(
         raw_brightness = current_brightness
 
     current_brightness = _normalize_brightness_to_config_scale(current_brightness)
+    raw_brightness_value = _coerce_poll_int(raw_brightness, default=current_brightness)
+    if raw_brightness_value <= CONFIG_BRIGHTNESS_MAX:
+        _reset_invalid_high_brightness_recovery_attempt_count(tray)
     now = time.monotonic()
     last_resume_at = float(read_last_resume_at(tray) or 0.0)
     recently_restored = last_resume_at > 0.0 and (now - last_resume_at) < POST_RESUME_IDLE_ACTION_SUPPRESSION_S
@@ -142,7 +151,7 @@ def _apply_polled_hardware_state(
     # must not clear the honored-sleep flag.
     if _controller_sleep_off_active(tray):
         if current_brightness > 0 and not current_off and not forced_off:
-            _commit_polled_intent(
+            if _commit_polled_intent(
                 tray,
                 SleepWakeIntent(SleepWakeIntentKind.FIRMWARE_WAKE),
                 now=now,
@@ -150,7 +159,9 @@ def _apply_polled_hardware_state(
                 dim_temp_target=wake_dim_target,
                 recently_restored=recently_restored,
                 respect=respect,
-            )
+            ):
+                return current_brightness, False
+            return current_brightness, True
         else:
             # Forced-off policy wins over a stale/non-zero poll sampled during
             # the fade to off. In particular, a suspend transition can begin
@@ -186,11 +197,33 @@ def _apply_polled_hardware_state(
     if current_brightness == 0 and (bool(current_off) or forced_off):
         current_off = True
 
+    # Some ITE firmware reports raw 60 (outside KeyRGB's 0..50 range)
+    # during AC/resume transitions. The normalized value may remain at a
+    # previously tracked 50, so inspect every observation rather than only a
+    # normalized brightness change. A running render cache otherwise retains
+    # its prior target and skips the corrective hardware brightness write.
+    if (
+        raw_brightness_value > CONFIG_BRIGHTNESS_MAX
+        and not current_off
+        and not forced_off
+        and _configured_brightness_intent(tray) > 0
+        and _commit_polled_intent(
+            tray,
+            SleepWakeIntent(SleepWakeIntentKind.AUTO_HEAL),
+            now=now,
+            current_brightness=raw_brightness_value,
+            dim_temp_target=wake_dim_target,
+            recently_restored=recently_restored,
+            respect=respect,
+        )
+    ):
+        return current_brightness, False
+
     if last_brightness is not None and current_brightness != last_brightness:
         _log_polled_hardware_event(
             tray,
             "brightness_change",
-            raw=_coerce_poll_int(raw_brightness, default=current_brightness),
+            raw=raw_brightness_value,
             old=_coerce_poll_int(last_brightness, default=current_brightness),
             new=int(current_brightness),
             dim_temp_active=bool(dim_temp_active),

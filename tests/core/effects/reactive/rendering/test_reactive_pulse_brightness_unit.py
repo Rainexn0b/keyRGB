@@ -55,6 +55,75 @@ def test_pulse_brightness_keeps_direct_slider_scale_on_very_dim_backdrops() -> N
     assert pulse_brightness_scale_factor(eng) == 1.0
 
 
+def test_post_fade_reactive_release_removes_effect_target_step(monkeypatch) -> None:
+    from keyrgb.core.effects.reactive import _render_brightness_transition
+    from keyrgb.core.effects.reactive._render_brightness_support import (
+        ReactiveRestorePhase,
+        ensure_reactive_state,
+    )
+
+    eng = _DummyEngine(brightness=10, reactive_brightness=50)
+    eng.per_key_colors = {(0, 0): (0, 0, 0)}
+    eng.per_key_brightness = 10
+    eng._last_rendered_brightness = 10
+    state = ensure_reactive_state(eng)
+    state._reactive_restore_damp_until = 204.0
+    state._reactive_restore_phase = ReactiveRestorePhase.DAMPING
+    state._reactive_transition_from_brightness = 10
+    state._reactive_transition_to_brightness = 50
+    state._reactive_transition_started_at = 200.0
+    state._reactive_transition_duration_s = 0.42
+    clock = SimpleNamespace(now=200.0)
+    monkeypatch.setattr("keyrgb.core.effects.reactive.render.time.monotonic", lambda: clock.now)
+    monkeypatch.setattr(_render_brightness_transition.time, "monotonic", lambda: clock.now)
+
+    scales = [pulse_brightness_scale_factor(eng)]
+    clock.now = 200.01
+    scales.append(pulse_brightness_scale_factor(eng))
+    clock.now = 200.21
+    scales.append(pulse_brightness_scale_factor(eng))
+    clock.now = 200.42
+    scales.append(pulse_brightness_scale_factor(eng))
+
+    assert scales[0] == pytest.approx(0.07)
+    assert scales[1] < 0.09
+    assert 0.27 <= scales[2] <= 0.30
+    assert scales[3] == pytest.approx(0.48)
+    assert scales == sorted(scales)
+
+
+def test_post_fade_release_matches_lower_effect_target_over_brighter_base(monkeypatch) -> None:
+    from keyrgb.core.effects.reactive import _render_brightness_transition
+    from keyrgb.core.effects.reactive._render_brightness_support import (
+        ReactiveRestorePhase,
+        ensure_reactive_state,
+    )
+
+    eng = _DummyEngine(brightness=10, reactive_brightness=20)
+    eng.per_key_colors = {(0, 0): (0, 0, 0)}
+    eng.per_key_brightness = 50
+    eng._last_rendered_brightness = 10
+    state = ensure_reactive_state(eng)
+    state._reactive_restore_damp_until = 204.0
+    state._reactive_restore_phase = ReactiveRestorePhase.DAMPING
+    state._reactive_transition_from_brightness = 10
+    state._reactive_transition_to_brightness = 50
+    state._reactive_transition_started_at = 200.0
+    state._reactive_transition_duration_s = 0.42
+    clock = SimpleNamespace(now=200.0)
+    monkeypatch.setattr("keyrgb.core.effects.reactive.render.time.monotonic", lambda: clock.now)
+    monkeypatch.setattr(_render_brightness_transition.time, "monotonic", lambda: clock.now)
+
+    scales = [pulse_brightness_scale_factor(eng)]
+    clock.now = 200.21
+    scales.append(pulse_brightness_scale_factor(eng))
+    clock.now = 200.42
+    scales.append(pulse_brightness_scale_factor(eng))
+
+    assert scales == pytest.approx([0.07, 0.105, 0.14])
+    assert scales == sorted(scales)
+
+
 def test_pulse_brightness_damps_very_dim_post_restore_bursts() -> None:
     from keyrgb.core.effects.reactive._render_brightness_support import (
         ReactiveRestorePhase,
@@ -480,6 +549,22 @@ def test_pulse_return_to_idle_skips_guard_tail() -> None:
     # When a pulse has finished, return directly to the idle baseline instead
     # of stepping down through a bright tail frame.
     assert hw == 10
+
+
+def test_controller_handoff_forces_uniform_pulse_return_step_guard() -> None:
+    from keyrgb.core.effects.reactive._render_brightness_support import ensure_reactive_state
+    from keyrgb.core.effects.reactive.render import _resolve_brightness
+
+    eng = _DummyEngine(brightness=10, reactive_brightness=50, has_per_key=False)
+    eng._last_rendered_brightness = 50
+    eng._reactive_active_pulse_mix = 1.0
+    eng._reactive_controller_brightness_handoff_active = True
+
+    _base, eff, hw = _resolve_brightness(eng)
+
+    assert eff == 50
+    assert hw == 42
+    assert ensure_reactive_state(eng)._reactive_controller_brightness_handoff_active is True
 
 
 def test_active_pulse_mix_lift_is_suppressed_during_post_transition_cooldown() -> None:

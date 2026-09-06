@@ -25,12 +25,15 @@ from keyrgb.tray.deck_state import (
     next_state,
 )
 from keyrgb.tray.idle_power_state import (
+    dim_temp_target_brightness,
     ensure_tray_idle_power_state,
     is_dim_temp_active,
     read_forced_off_flags,
     read_last_resume_at,
+    set_idle_power_state_field,
 )
 from keyrgb.tray.pollers.hardware import _controller_sleep, _recovery
+from keyrgb.tray.pollers.hardware._decisions import CONFIG_BRIGHTNESS_MAX
 from keyrgb.tray.pollers.idle_power._constants import POST_RESUME_IDLE_ACTION_SUPPRESSION_S
 
 if TYPE_CHECKING:
@@ -239,6 +242,7 @@ def commit_sleep_wake_intent(
     dim_temp_brightness: int | None = None,
     recover_stable_zero: RecoverFn | None = None,
     recover_power_source: RecoverFn | None = None,
+    recover_invalid_brightness: RecoverFn | None = None,
     stop_engine: StopEngineFn | None = None,
     clear_post_stop: ClearPostStopFn | None = None,
     restart_firmware_wake: RestartWakeFn | None = None,
@@ -247,6 +251,19 @@ def commit_sleep_wake_intent(
 
     kind = intent.kind
     if kind is SleepWakeIntentKind.AUTO_HEAL:
+        if int(current_brightness) > CONFIG_BRIGHTNESS_MAX:
+            invalid_recover = recover_invalid_brightness or _recovery._recover_invalid_high_brightness_best_effort
+            if invalid_recover(
+                tray,
+                current_brightness=int(current_brightness),
+            ):
+                tray.is_off = False
+                _store_deck_state(tray, _completed_lit_state(tray))
+                _recovery.refresh_invalid_high_brightness_recovery_ui_best_effort(tray)
+                return True
+            # Invalid-high is not a blank. A latched duplicate or failed
+            # handoff must not fall through into zero/power blank recovery.
+            return False
         power_recover = recover_power_source or _recovery._recover_recent_power_source_blank_best_effort
         if power_recover(tray, current_brightness=int(current_brightness)):
             _store_deck_state(tray, _completed_lit_state(tray))
@@ -269,6 +286,7 @@ def commit_sleep_wake_intent(
         return _commit_firmware_wake(
             tray,
             now=now,
+            current_brightness=current_brightness,
             dim_temp_target=dim_temp_target,
             restart_firmware_wake=restart_firmware_wake,
         )
@@ -279,7 +297,7 @@ def commit_sleep_wake_intent(
             recover_stable_zero=recover_stable_zero,
         )
     if kind is SleepWakeIntentKind.KEYBOARD_WAKE:
-        return _commit_keyboard_wake(tray)
+        return _commit_keyboard_wake(tray, now=now, dim_temp_target=dim_temp_target)
     if kind in {
         SleepWakeIntentKind.IDLE_TURN_OFF,
         SleepWakeIntentKind.DIM_TO_TEMP,
@@ -313,21 +331,37 @@ def _commit_firmware_wake(
     tray: IdlePowerTrayProtocol,
     *,
     now: float,
+    current_brightness: int,
     dim_temp_target: int | None,
     restart_firmware_wake: RestartWakeFn | None,
 ) -> bool:
+    restarter = restart_firmware_wake or _controller_sleep.restart_effect_after_firmware_wake_best_effort
+    _recovery._seed_reactive_restore_damp_best_effort(tray)
+    restart_kwargs: dict[str, object] = {
+        "now": now,
+        "brightness_override": dim_temp_target,
+    }
+    if _controller_sleep._callback_accepts_controller_handoff(restarter):
+        restart_kwargs["controller_brightness_handoff"] = int(current_brightness)
+    restored = restarter(tray, **restart_kwargs)
+    if not restored:
+        _recovery._log_polled_hardware_event(
+            tray,
+            "controller_sleep_firmware_wake",
+            effect_restored=False,
+        )
+        return False
     _recovery.set_controller_sleep_off(tray, False)
     tray.is_off = False
     if _recovery.controller_sleep_resume_guard_active(tray):
         _recovery.set_controller_sleep_resume_guard(tray, False)
-    restarter = restart_firmware_wake or _controller_sleep.restart_effect_after_firmware_wake_best_effort
-    restored = restarter(tray, now=now, brightness_override=dim_temp_target)
     _recovery._log_polled_hardware_event(
         tray,
         "controller_sleep_firmware_wake",
         effect_restored=bool(restored),
     )
     _store_deck_state(tray, _completed_lit_state(tray))
+    _recovery._refresh_ui_without_icon_animation(tray)
     return True
 
 
@@ -339,17 +373,38 @@ _IDLE_INTENT_ACTIONS = {
 }
 
 
-def _commit_keyboard_wake(tray: IdlePowerTrayProtocol) -> bool:
-    from keyrgb.tray.pollers.idle_power._actions import restore_from_idle
-
-    try:
-        tray.engine.turn_off()
-    except (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError):
-        logger.warning("Controller-sleep hardware re-arm failed", exc_info=True)
+def _commit_keyboard_wake(
+    tray: IdlePowerTrayProtocol,
+    *,
+    now: float,
+    dim_temp_target: int | None,
+) -> bool:
+    effective_dim_target = dim_temp_target
+    if effective_dim_target is None and is_dim_temp_active(tray):
+        effective_dim_target = dim_temp_target_brightness(tray)
+    _recovery._seed_reactive_restore_damp_best_effort(tray)
+    restored = _controller_sleep.restart_effect_after_firmware_wake_best_effort(
+        tray,
+        now=now,
+        brightness_override=effective_dim_target,
+        controller_brightness_handoff=CONFIG_BRIGHTNESS_MAX,
+    )
+    if not restored:
+        logger.warning("Controller-sleep native wake handoff failed")
         return False
-    logger.info("EVENT idle_power:controller_sleep_rearm trigger=keyboard_evdev")
-    restore_from_idle(tray)
+    _recovery.set_controller_sleep_off(tray, False)
+    set_idle_power_state_field(
+        tray,
+        attr_name="_idle_forced_off",
+        state_name="idle_forced_off",
+        value=False,
+    )
+    tray.is_off = False
+    if _recovery.controller_sleep_resume_guard_active(tray):
+        _recovery.set_controller_sleep_resume_guard(tray, False)
+    logger.info("EVENT idle_power:controller_sleep_native_wake_handoff trigger=keyboard_evdev")
     _store_deck_state(tray, _completed_lit_state(tray))
+    _recovery._refresh_ui_without_icon_animation(tray)
     return True
 
 

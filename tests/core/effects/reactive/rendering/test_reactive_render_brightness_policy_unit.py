@@ -117,6 +117,70 @@ def test_render_guard_bypassed_for_dim_temp_downward_jump() -> None:
     assert written[0] == 5
 
 
+@pytest.mark.parametrize("dim_temp_active", [False, True])
+def test_controller_startup_handoff_fades_down_to_policy_target(dim_temp_active: bool) -> None:
+    from keyrgb.core.effects.reactive._render_brightness_support import (
+        ReactiveRenderState,
+    )
+    from keyrgb.core.effects.reactive.render import render
+
+    kb = _DummyKB()
+    engine = SimpleNamespace(
+        kb=kb,
+        kb_lock=_DummyLock(),
+        running=True,
+        brightness=10,
+        reactive_brightness=50,
+        per_key_colors={(0, 0): (255, 255, 255)},
+        per_key_brightness=10,
+        _hw_brightness_cap=None,
+        _dim_temp_active=dim_temp_active,
+        _last_rendered_brightness=50,
+        _last_hw_mode_brightness=60,
+        _reactive_state=ReactiveRenderState(
+            _reactive_controller_brightness_handoff_active=True,
+        ),
+    )
+
+    for _frame in range(5):
+        render(engine, color_map={(0, 0): (255, 255, 255)})
+
+    written = [brightness for (op, brightness) in kb.calls if op == "set_brightness"]
+    assert written == [42, 34, 26, 18, 10]
+    assert engine._reactive_state._reactive_controller_brightness_handoff_active is False
+
+
+def test_controller_handoff_reassert_backend_primes_at_guarded_step() -> None:
+    from keyrgb.core.effects.reactive._render_brightness_support import (
+        ReactiveRenderState,
+    )
+    from keyrgb.core.effects.reactive.render import render
+
+    kb = _DummyKB()
+    kb.keyrgb_per_key_mode_policy = "reassert_every_frame"
+    engine = SimpleNamespace(
+        kb=kb,
+        kb_lock=_DummyLock(),
+        running=True,
+        brightness=10,
+        reactive_brightness=50,
+        per_key_colors={(0, 0): (255, 255, 255)},
+        per_key_brightness=10,
+        _hw_brightness_cap=None,
+        _dim_temp_active=False,
+        _last_rendered_brightness=50,
+        _last_hw_mode_brightness=50,
+        _reactive_state=ReactiveRenderState(
+            _reactive_controller_brightness_handoff_active=True,
+        ),
+    )
+
+    render(engine, color_map={(0, 0): (255, 255, 255)})
+
+    assert ("enable_user_mode", 42) in kb.calls
+    assert ("set_key_colors", 42) in kb.calls
+
+
 def test_render_guard_still_active_for_upward_jumps_under_dim_temp() -> None:
     from keyrgb.core.effects.reactive._constants import MAX_BRIGHTNESS_STEP_PER_FRAME
     from keyrgb.core.effects.reactive.render import render

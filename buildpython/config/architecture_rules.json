@@ -154,6 +154,60 @@
           "message": "Legacy keyrgb.core.effects.ite_backend imports are forbidden."
         }
       ]
+    },
+    {
+      "id": "primary-lighting-write-ownership",
+      "description": "Tray/effect primary-keyboard lighting writes stay in serialized, lock-protected output-owner boundaries.",
+      "severity": "error",
+      "corpus": {
+        "include": [
+          "keyrgb/**/*.py"
+        ],
+        "exclude": [
+          "keyrgb/core/backends/**/*.py",
+          "keyrgb/gui/**/*.py"
+        ]
+      },
+      "calls": [
+        {
+          "receivers": [
+            "kb",
+            "keyboard"
+          ],
+          "receiver_suffixes": [
+            ".kb",
+            ".keyboard"
+          ],
+          "methods": [
+            "set_brightness",
+            "set_color",
+            "set_key_colors",
+            "enable_user_mode",
+            "turn_off",
+            "set_effect"
+          ],
+          "allowed_files": [
+            "keyrgb/core/effects/reactive/_render_runtime.py",
+            "keyrgb/core/effects/software/base.py",
+            "keyrgb/core/effects/engine_support/brightness.py",
+            "keyrgb/core/effects/engine_support/start.py",
+            "keyrgb/core/effects/fades.py",
+            "keyrgb/core/effects/perkey_animation.py",
+            "keyrgb/tray/controllers/_lighting_mode_apply.py",
+            "keyrgb/tray/controllers/effect_selection.py",
+            "keyrgb/tray/pollers/config_polling_internal/_apply_callbacks.py",
+            "keyrgb/tray/pollers/hardware/_controller_sleep.py"
+          ],
+          "required_locks": [
+            "kb_lock",
+            "engine.kb_lock",
+            "self.kb_lock",
+            "tray.engine.kb_lock"
+          ],
+          "message": "Tray/effect primary-keyboard lighting writes must stay in an approved output-owner file.",
+          "lock_message": "Tray/effect primary-keyboard lighting writes must be lexically protected by the keyboard lock."
+        }
+      ]
     }
   ]
 }

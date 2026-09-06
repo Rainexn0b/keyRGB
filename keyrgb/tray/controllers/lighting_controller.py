@@ -155,6 +155,7 @@ def start_current_effect(
     fade_in: bool = False,
     fade_in_duration_s: float = 0.25,
     preserve_last_rendered_brightness: bool = False,
+    controller_brightness_handoff: int | None = None,
 ) -> bool:
     """Start the currently selected effect.
 
@@ -222,29 +223,20 @@ def start_current_effect(
             target_brightness=target_brightness,
         )
 
+        engine_start_kwargs = {
+            "speed": tray.config.get_effect_speed(effect),
+            "brightness": start_brightness,
+            "color": tray.config.color,
+            "reactive_color": getattr(tray.config, "reactive_color", None),
+            "reactive_use_manual_color": bool(getattr(tray.config, "reactive_use_manual_color", False)),
+            "reactive_visual_mode": reactive_visual_mode,
+            "direction": getattr(tray.config, "direction", None),
+        }
         if preserve_last_rendered_brightness:
-            tray.engine.start_effect(
-                effect,
-                speed=tray.config.get_effect_speed(effect),
-                brightness=start_brightness,
-                color=tray.config.color,
-                reactive_color=getattr(tray.config, "reactive_color", None),
-                reactive_use_manual_color=bool(getattr(tray.config, "reactive_use_manual_color", False)),
-                reactive_visual_mode=reactive_visual_mode,
-                direction=getattr(tray.config, "direction", None),
-                preserve_last_rendered_brightness=True,
-            )
-        else:
-            tray.engine.start_effect(
-                effect,
-                speed=tray.config.get_effect_speed(effect),
-                brightness=start_brightness,
-                color=tray.config.color,
-                reactive_color=getattr(tray.config, "reactive_color", None),
-                reactive_use_manual_color=bool(getattr(tray.config, "reactive_use_manual_color", False)),
-                reactive_visual_mode=reactive_visual_mode,
-                direction=getattr(tray.config, "direction", None),
-            )
+            engine_start_kwargs["preserve_last_rendered_brightness"] = True
+        if controller_brightness_handoff is not None and lighting_controller_helpers.is_reactive_effect(effect):
+            engine_start_kwargs["controller_brightness_handoff"] = int(controller_brightness_handoff)
+        tray.engine.start_effect(effect, **engine_start_kwargs)
         tray.is_off = False
 
         # Sync the global speed to the per-effect speed that was just started

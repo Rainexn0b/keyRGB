@@ -8,6 +8,7 @@ from typing import Final, cast
 
 from keyrgb.core.backends.base import BackendCapabilities
 from keyrgb.core.effects.effect_contract import CURRENT_COLOR
+from keyrgb.core.effects.reactive._render_brightness_support import ensure_reactive_state
 from keyrgb.core.effects.registry import get_effect_registration
 from keyrgb.core.utils import exceptions as core_exceptions
 
@@ -87,6 +88,7 @@ class _EngineStart:
         direction: str | None = None,
         *,
         preserve_last_rendered_brightness: bool = False,
+        controller_brightness_handoff: int | None = None,
     ):
         """Start an effect (hardware or software)."""
 
@@ -170,12 +172,15 @@ class _EngineStart:
                 else:
                     fade_to_color = registration.start_color
 
-                self._start_sw_effect(
-                    target=partial(registration.runner, self),
-                    prev_color=prev_color,
-                    fade_to_color=fade_to_color,
-                    from_sw_effect=prev_effect_was_sw,
-                )
+                start_sw_kwargs = {
+                    "target": partial(registration.runner, self),
+                    "prev_color": prev_color,
+                    "fade_to_color": fade_to_color,
+                    "from_sw_effect": prev_effect_was_sw,
+                }
+                if controller_brightness_handoff is not None:
+                    start_sw_kwargs["controller_brightness_handoff"] = int(controller_brightness_handoff)
+                self._start_sw_effect(**start_sw_kwargs)
 
     def _start_sw_effect(
         self,
@@ -184,6 +189,7 @@ class _EngineStart:
         prev_color: Color,
         fade_to_color: Color,
         from_sw_effect: bool = False,
+        controller_brightness_handoff: int | None = None,
     ) -> None:
         start_brightness = int(self.brightness)
         # Soft-on idle/menu/controller-sleep restore starts at
@@ -206,7 +212,18 @@ class _EngineStart:
             and (start_brightness > 1 or needs_mode_reassert)
         )
 
-        if from_sw_effect:
+        if controller_brightness_handoff is not None:
+            # Native ITE sleep wakes the already-lit controller at its own
+            # brightness before userspace can write. Do not insert another
+            # mode prime (target snap) or explicit off. Publish that observed
+            # physical level as the first render baseline; the reactive frame
+            # guard owns the intentional up/down handoff to start_brightness.
+            handoff_brightness = max(0, min(50, int(controller_brightness_handoff)))
+            self._last_hw_mode_brightness = handoff_brightness
+            self._last_rendered_brightness = handoff_brightness
+            ensure_reactive_state(self)._reactive_controller_brightness_handoff_active = True
+            self._device_mode_off = False
+        elif from_sw_effect:
             pass
         elif needs_perkey_prime:
             if self._prime_per_key_frame():

@@ -9,6 +9,7 @@ from keyrgb.core.backends.base import supports_per_key_output
 from keyrgb.core.effects.matrix_layout import geometry_for_engine
 from keyrgb.core.effects.perkey_animation import build_full_color_grid
 
+from . import _render_brightness_support as _brightness_support
 from ._constants import MAX_BRIGHTNESS_STEP_PER_FRAME
 from ._render_brightness import (
     resolve_brightness as _resolve_brightness_impl,
@@ -186,9 +187,18 @@ def pulse_brightness_scale_factor(engine: EffectsEngine) -> float:
         # (e.g. 20) undamped on typing-wake after long idle off — deck-wide flash.
         post_restore_damp, post_restore_holdoff_remaining_s = _post_restore_visual_damp(engine)
         very_dim_curve = visual_hw < 10
+        release_scale = _post_fade_reactive_release_scale(
+            engine,
+            post_restore_damp=post_restore_damp,
+            visual_mode=visual_mode,
+        )
 
         if eff <= visual_hw:
-            final_scale = float(pulse_scale) * float(post_restore_damp)
+            final_scale = (
+                float(pulse_scale) * float(post_restore_damp)
+                if release_scale is None
+                else release_scale
+            )
             log_pulse_visual_scale_change(
                 engine,
                 logger=logger,
@@ -214,6 +224,8 @@ def pulse_brightness_scale_factor(engine: EffectsEngine) -> float:
             final_scale = baseline_scale + ((pulse_scale - baseline_scale) * float(post_restore_damp))
         else:
             final_scale = float(pulse_scale) * float(post_restore_damp)
+        if release_scale is not None:
+            final_scale = release_scale
         log_pulse_visual_scale_change(
             engine,
             logger=logger,
@@ -238,6 +250,129 @@ def pulse_brightness_scale_factor(engine: EffectsEngine) -> float:
         return 1.0
 
     return _apply_reactive_pulse_visual_curve(float(eff) / float(hw), visual_mode=visual_mode)
+
+
+def _post_fade_reactive_release_scale(
+    engine: EffectsEngine,
+    *,
+    post_restore_damp: float,
+    visual_mode: str,
+) -> float | None:
+    """Blend across the idle-restore effect release without a baseline jump."""
+
+    state = _brightness_support.read_engine_attr(
+        engine,
+        "_reactive_state",
+        missing_default=None,
+        error_default=None,
+        logger=logger,
+    )
+    if state is None:
+        return None
+
+    reactive_lock = getattr(engine, "reactive_lock", None)
+    if reactive_lock is not None:
+        transition_from, transition_to, started_at, duration_s = _brightness_support.read_transition_atomic(
+            state,
+            reactive_lock,
+        )
+    else:
+        transition_from = _brightness_support.read_engine_attr(
+            engine,
+            "_reactive_transition_from_brightness",
+            missing_default=None,
+            error_default=None,
+            logger=logger,
+        )
+        transition_to = _brightness_support.read_engine_attr(
+            engine,
+            "_reactive_transition_to_brightness",
+            missing_default=None,
+            error_default=None,
+            logger=logger,
+        )
+        started_at = _brightness_support.read_engine_attr(
+            engine,
+            "_reactive_transition_started_at",
+            missing_default=None,
+            error_default=None,
+            logger=logger,
+        )
+        duration_s = _brightness_support.read_engine_attr(
+            engine,
+            "_reactive_transition_duration_s",
+            missing_default=None,
+            error_default=None,
+            logger=logger,
+        )
+    transition_from = _brightness_support.coerce_brightness(transition_from, default=None)
+    transition_to = _brightness_support.coerce_brightness(transition_to, default=None)
+    if transition_from is None or transition_to is None or transition_to <= transition_from:
+        return None
+    started = _brightness_support.coerce_float(started_at, default=None)
+    duration = _brightness_support.coerce_float(duration_s, default=None)
+    if started is None or duration is None or duration <= 0.0:
+        return None
+
+    raw_global = _brightness_support.read_engine_attr(
+        engine,
+        "brightness",
+        missing_default=None,
+        error_default=None,
+        logger=logger,
+    )
+    global_hw = _brightness_support.coerce_brightness(raw_global, default=None)
+    if global_hw != transition_from:
+        return None
+
+    release_progress = max(0.0, min(1.0, (float(time.monotonic()) - started) / duration))
+    raw_effect_target = _brightness_support.read_engine_attr(
+        engine,
+        "reactive_brightness",
+        missing_default=global_hw,
+        error_default=global_hw,
+        logger=logger,
+    )
+    effect_target = _brightness_support.coerce_brightness(raw_effect_target, default=global_hw)
+    if effect_target is None:
+        effect_target = global_hw
+    base_target = 0
+    per_key_colors = _brightness_support.read_engine_attr(
+        engine,
+        "per_key_colors",
+        missing_default=None,
+        error_default=None,
+        logger=logger,
+    )
+    if per_key_colors:
+        raw_base_target = _brightness_support.read_engine_attr(
+            engine,
+            "per_key_brightness",
+            missing_default=0,
+            error_default=0,
+            logger=logger,
+        )
+        base_target = _brightness_support.coerce_brightness(raw_base_target, default=0) or 0
+
+    start_effect = min(effect_target, transition_from)
+    target_visual_hw = max(global_hw, base_target)
+    start_pulse_scale = _apply_reactive_pulse_visual_curve(
+        float(start_effect) / 50.0,
+        visual_mode=visual_mode,
+    )
+    target_pulse_scale = _apply_reactive_pulse_visual_curve(
+        float(effect_target) / 50.0,
+        visual_mode=visual_mode,
+    )
+    start_scale = float(start_pulse_scale) * float(post_restore_damp)
+    if effect_target <= target_visual_hw:
+        target_scale = float(target_pulse_scale) * float(post_restore_damp)
+    else:
+        baseline_scale = float(target_visual_hw) / 50.0
+        target_scale = baseline_scale + (
+            (target_pulse_scale - baseline_scale) * float(post_restore_damp)
+        )
+    return start_scale + ((target_scale - start_scale) * release_progress)
 
 
 def apply_backdrop_brightness_scale(color_map: dict[Key, Color], *, factor: float) -> dict[Key, Color]:

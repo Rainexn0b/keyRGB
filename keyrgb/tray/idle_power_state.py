@@ -39,6 +39,11 @@ class TrayIdlePowerState:
     hidden_perkey_restore_device_off_hint: bool | None = None
     last_power_source_blank_recovery_at: float = 0.0
     last_hardware_blank_recovery_at: float = 0.0
+    last_invalid_high_brightness_recovery_at: float = 0.0
+    invalid_high_brightness_recovery_generation: int | None = None
+    # Bound repeated cache invalidations if firmware remains above the stable
+    # 0..50 range; any valid-range poll re-arms the correction.
+    invalid_high_brightness_recovery_attempt_count: int = 0
     # Consecutive stable-zero recovery attempts that did not restore a non-zero
     # brightness read.  Drives the circuit breaker in
     # ``should_attempt_stable_zero_brightness_recovery`` so ITE controllers

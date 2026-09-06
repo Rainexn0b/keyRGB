@@ -286,6 +286,12 @@ def resolve_brightness(
         hw = min(hw, policy_cap)
 
     hw = max(0, min(50, hw))
+    requested_hw = hw
+    controller_handoff_active = _support.bool_attr_or_default(
+        engine,
+        "_reactive_controller_brightness_handoff_active",
+        default=False,
+    )
 
     prev = _support.read_engine_attr(
         engine,
@@ -299,13 +305,21 @@ def resolve_brightness(
         hw=hw,
         prev_i=prev_i,
         max_step_per_frame=max_step_per_frame,
-        dim_temp_active=dim_temp_active,
+        dim_temp_active=bool(dim_temp_active and not controller_handoff_active),
         allow_pulse_hw_lift=allow_pulse_hw_lift,
         per_key_hw=per_key_hw,
         idle_hw=idle_hw,
         eff=eff,
         policy_cap=policy_cap,
+        force_guard=controller_handoff_active,
         logger=logger,
     )
+    if controller_handoff_active and hw == requested_hw:
+        _support.set_engine_attr(
+            engine,
+            "_reactive_controller_brightness_handoff_active",
+            False,
+            logger=logger,
+        )
 
     return base, eff, hw

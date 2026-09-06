@@ -55,6 +55,141 @@ def test_hardware_polling_does_not_mark_off_from_zero_brightness_without_off_sta
     assert tray.refresh_count == 0
 
 
+def test_hardware_polling_always_dispatches_raw_invalid_high_to_render_heal(monkeypatch) -> None:
+    import keyrgb.tray.pollers.hardware_polling as hp
+
+    observed: list[int] = []
+
+    def recover(_tray, *, current_brightness: int) -> bool:
+        observed.append(int(current_brightness))
+        return True
+
+    monkeypatch.setattr(hp, "_recover_invalid_high_brightness_best_effort", recover)
+    tray = _DummyTray(brightness=10, is_off=False)
+
+    for last_brightness in (None, 10, 50):
+        result = hp._apply_polled_hardware_state(
+            tray,
+            raw_brightness=60,
+            current_brightness=50,
+            current_off=False,
+            last_brightness=last_brightness,
+            last_off_state=False,
+        )
+        assert result == (50, False)
+
+    assert observed == [60, 60, 60]
+    assert tray.config.brightness == 10
+
+
+def test_hardware_polling_does_not_heal_invalid_high_when_device_is_off(monkeypatch) -> None:
+    import keyrgb.tray.pollers.hardware_polling as hp
+
+    recover = MagicMock(return_value=True)
+    monkeypatch.setattr(hp, "_recover_invalid_high_brightness_best_effort", recover)
+    tray = _DummyTray(brightness=10, is_off=True)
+
+    result = hp._apply_polled_hardware_state(
+        tray,
+        raw_brightness=60,
+        current_brightness=50,
+        current_off=True,
+        last_brightness=50,
+        last_off_state=True,
+    )
+
+    assert result == (50, True)
+    recover.assert_not_called()
+
+
+def test_failed_invalid_high_does_not_fall_through_to_power_blank_recovery(monkeypatch) -> None:
+    import keyrgb.tray.pollers.hardware_polling as hp
+
+    power_recover = MagicMock(return_value=True)
+    monkeypatch.setattr(hp, "_recover_invalid_high_brightness_best_effort", lambda *_a, **_kw: False)
+    monkeypatch.setattr(hp, "_recover_recent_power_source_blank_best_effort", power_recover)
+    tray = _DummyTray(brightness=10, is_off=False)
+
+    hp._apply_polled_hardware_state(
+        tray,
+        raw_brightness=60,
+        current_brightness=50,
+        current_off=False,
+        last_brightness=50,
+        last_off_state=False,
+    )
+
+    power_recover.assert_not_called()
+
+
+def test_valid_hardware_read_rearms_invalid_high_recovery() -> None:
+    tray = _DummyTray(brightness=10, is_off=False)
+    tray.tray_idle_power_state.invalid_high_brightness_recovery_attempt_count = 3
+
+    _apply_polled_hardware_state(
+        tray,
+        raw_brightness=10,
+        current_brightness=10,
+        current_off=False,
+        last_brightness=10,
+        last_off_state=False,
+    )
+
+    assert tray.tray_idle_power_state.invalid_high_brightness_recovery_attempt_count == 0
+    assert tray.tray_idle_power_state.last_invalid_high_brightness_recovery_at == 0.0
+    assert tray.tray_idle_power_state.invalid_high_brightness_recovery_generation is None
+
+
+def test_invalid_high_heal_clears_stale_logical_off_state(monkeypatch) -> None:
+    import keyrgb.tray.pollers.hardware_polling as hp
+    from keyrgb.tray.deck_state import DeckState
+
+    monkeypatch.setattr(hp, "_recover_invalid_high_brightness_best_effort", lambda *_a, **_kw: True)
+    tray = _DummyTray(brightness=10, is_off=True)
+    tray.tray_idle_power_state.deck_state = DeckState.RESTORING
+    refreshed_states: list[tuple[bool, DeckState]] = []
+    tray._refresh_ui = lambda **_kw: refreshed_states.append(
+        (bool(tray.is_off), tray.tray_idle_power_state.deck_state)
+    )
+
+    result = hp._apply_polled_hardware_state(
+        tray,
+        raw_brightness=60,
+        current_brightness=50,
+        current_off=False,
+        last_brightness=50,
+        last_off_state=False,
+    )
+
+    assert result == (50, False)
+    assert tray.is_off is False
+    assert tray.tray_idle_power_state.deck_state is DeckState.LIT
+    assert refreshed_states == [(False, DeckState.LIT)]
+
+
+def test_invalid_high_heal_contains_post_state_refresh_error(monkeypatch) -> None:
+    import keyrgb.tray.pollers.hardware_polling as hp
+
+    errors: list[str] = []
+    monkeypatch.setattr(hp, "_recover_invalid_high_brightness_best_effort", lambda *_a, **_kw: True)
+    tray = _DummyTray(brightness=10, is_off=True)
+    tray._refresh_ui = lambda **_kw: (_ for _ in ()).throw(OSError("refresh failed"))
+    tray._log_exception = lambda message, exc: errors.append(message % exc)
+
+    result = hp._apply_polled_hardware_state(
+        tray,
+        raw_brightness=60,
+        current_brightness=50,
+        current_off=False,
+        last_brightness=50,
+        last_off_state=False,
+    )
+
+    assert result == (50, False)
+    assert tray.is_off is False
+    assert errors == ["Hardware polling error: refresh failed"]
+
+
 def test_fresh_zero_transition_arms_pending_zero_confirm() -> None:
     tray = _DummyTray(brightness=25, is_off=False)
 
@@ -701,7 +836,7 @@ def test_nonzero_read_while_controller_sleep_off_restarts_stopped_effect(monkeyp
     owner.controller_sleep_off = True
     owner.controller_sleep_off_at = 100.0
     start_calls: list[str] = []
-    tray._start_current_effect = lambda: start_calls.append("start") or True
+    tray._start_current_effect = lambda **kwargs: start_calls.append(kwargs) or True
     monkeypatch.setattr("keyrgb.tray.pollers.hardware_polling.time.monotonic", lambda: 101.0)
 
     last_brightness, _last_off = _apply_polled_hardware_state(
@@ -716,7 +851,29 @@ def test_nonzero_read_while_controller_sleep_off_restarts_stopped_effect(monkeyp
     assert tray.is_off is False
     assert last_brightness == 25
     assert owner.last_resume_at == 101.0
-    assert start_calls == ["start"]
+    assert start_calls == [{"controller_brightness_handoff": 25}]
+
+
+def test_failed_firmware_wake_keeps_controller_sleep_latched_for_retry(monkeypatch) -> None:
+    tray = _DummyTray(brightness=25, is_off=True)
+    tray.config.controller_sleep_respect = True
+    owner = tray.tray_idle_power_state
+    owner.controller_sleep_off = True
+    owner.controller_sleep_off_at = 100.0
+    tray._start_current_effect = lambda **_kwargs: False
+    monkeypatch.setattr("keyrgb.tray.pollers.hardware_polling.time.monotonic", lambda: 101.0)
+
+    result = _apply_polled_hardware_state(
+        tray,
+        current_brightness=25,
+        current_off=False,
+        last_brightness=0,
+        last_off_state=True,
+    )
+
+    assert result == (25, True)
+    assert owner.controller_sleep_off is True
+    assert tray.is_off is True
 
 
 def test_firmware_wake_under_active_temp_dim_restores_at_dim_target(monkeypatch) -> None:
@@ -756,7 +913,7 @@ def test_firmware_wake_under_active_temp_dim_restores_at_dim_target(monkeypatch)
 
     # One firmware-wake restore, at the dim target (not full brightness).
     assert len(start_calls) == 1
-    assert start_calls[0] == {"brightness_override": 5}
+    assert start_calls[0] == {"brightness_override": 5, "controller_brightness_handoff": 25}
     assert result == (25, False)
     assert owner.controller_sleep_off is False
     assert tray.is_off is False
@@ -787,7 +944,7 @@ def test_firmware_wake_without_temp_dim_still_restores_full_brightness(monkeypat
 
     assert len(start_calls) == 1
     # No brightness override -> full configured brightness; no forced-off dim.
-    assert start_calls[0] == {}
+    assert start_calls[0] == {"controller_brightness_handoff": 25}
     assert result == (25, False)
     assert owner.last_resume_at == 101.0
 

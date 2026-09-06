@@ -145,3 +145,85 @@ intent, preserving manual-off precedence. Focused merged validation passed with
 355 power/tray tests, targeted Ruff and Step 19 passed, and BuildPython Step 2
 passed with 3803 tests and 1 skip. Another live suspend/lid retest is required
 before this matrix row can be accepted.
+
+## 2026-09-04 maximum-brightness flash follow-up
+
+Session `~/.cache/keyrgb/diagnostic-sessions/20260904T141303.659334Z`
+contains one maximum observation during an AC transition:
+
+- At `t=656243.427`, the controller reported raw brightness `60`; hardware
+  polling normalized this out-of-range value to KeyRGB's UI maximum `50`.
+- KeyRGB did not write brightness `50`. The next AC-profile correction began
+  roughly 1.5 seconds later and wrote `18 -> 26 -> 34 -> 40`.
+- The active render cache still held the prior target `10`, so normal frames
+  skipped a brightness write while the hardware remained at its firmware value.
+- Hardware polling now routes raw values above `50` through the deck pipeline.
+  A running effect records the observed value in its hardware-mode cache and
+  seeds a normalized physical baseline of `50`. The normal eight-step frame
+  guard then renders `42 -> 34 -> 26 -> 18 -> 10` for a target of `10`, without
+  a competing poller write. This handoff remains stepped during temporary dim;
+  ordinary intentional dim transitions retain their existing immediate apply.
+  Stopped/static effects remain with the existing power-profile correction
+  rather than claiming a cache-only recovery succeeded.
+- Explicit hardware-off observations never enter this heal, and persistent
+  invalid readings cannot restart a successful fade. Failed publication is
+  limited to three attempts until a valid-range hardware observation re-arms
+  recovery. The handoff also forces the frame guard for uniform-effect pulse
+  tails, preventing that backend path from bypassing the controlled descent.
+- This cannot prevent the embedded controller's initial full-brightness startup
+  before polling detects it; a live AC/resume retest must confirm that the
+  remaining max-to-target transition reads as an intentional fade.
+
+## 2026-09-05 native keyboard-wake flash follow-up
+
+Session `~/.cache/keyrgb/diagnostic-sessions/20260905T070406.529305Z`
+showed that the final visible flash was not the earlier raw-high polling path:
+
+- Native controller sleep was accepted at log lines `92674-92680` with raw
+  brightness `0` and `is_off=False`.
+- The keyboard event-driven wake at lines `95779-95953` issued `kb.turn_off`,
+  then deliberately restored `1 -> ... -> 40` over 0.60 seconds. No raw `60`
+  poll occurred in that final wake window because the evdev path reacted before
+  the next hardware poll.
+- Combined with live observation that the keyboard naturally wakes at full
+  brightness while KeyRGB is closed, the visible sequence was therefore most
+  likely firmware-full -> KeyRGB forced-off -> software fade-up. The individual
+  software ramp was monotonic, but the forced dark reset made the whole physical
+  transition look like a flash.
+- Keyboard-event wake now keeps the already-lit native controller on and starts
+  reactive rendering with a physical baseline of `50`. It performs no explicit
+  `turn_off` and no pre-render target prime; the first frames descend through the
+  existing guard (for target `40`, `50 -> 42 -> 40`). Firmware-poll-first wake
+  uses the observed normalized brightness as the same handoff baseline.
+- Failed effect restart keeps controller-sleep ownership latched for retry.
+  Legacy start callbacks remain callable without the new handoff keyword, and
+  tray state/UI finalization occurs only after successful restart.
+- This correction is reactive-effect-specific. Static, ordinary software, and
+  hardware effects continue to restore directly to their target rather than
+  claiming a frame-guarded descent.
+
+## 2026-09-05 software-idle reactive release follow-up
+
+Session `~/.cache/keyrgb/diagnostic-sessions/20260905T220953.129561Z`
+isolated a separate visual discontinuity after an otherwise valid software-idle
+restore:
+
+- The software-owned hardware restore was monotonic from `1 -> ... -> 10`; no
+  controller-native wake, raw `60`, forced-off re-arm, or brightness guard
+  recovery occurred.
+- While the global fade owned rendering, effective reactive brightness remained
+  capped at `10` and the damped pulse scale was approximately `0.070`. Clearing
+  the follow-global cap released the configured reactive target directly to
+  `50`, selecting the contrast-preserving branch at approximately `0.480`.
+- The restore path now seeds a second, render-owned release from the completed
+  global target to the active reactive/per-key target. Pulse scaling blends over
+  that release by elapsed time, so crossing the base-brightness boundary cannot
+  create the prior one-frame step. The final scale is calculated from the actual
+  reactive target and only an active per-key base map.
+- Release publication and follow-global cleanup are generation-checked under the
+  engine lifecycle lock, so a replacement effect cannot receive stale release
+  state from a superseded fade.
+- Focused reactive/controller validation passed with 413 tests. Targeted Ruff,
+  `git diff --check`, and Step 19 passed; BuildPython Step 2 passed with 3833
+  tests and 1 skip. A live software-idle wake retest remains required to accept
+  the visual transition.

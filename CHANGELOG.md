@@ -15,6 +15,10 @@
 - Core/Power: Keep saved lit intent retryable when overlapping resume and
   lid-open events supersede a delayed restore, preventing both events from
   completing without relighting the keyboard.
+- Effects/Idle: Release reactive pulse intensity gradually after the global
+  software-idle fade completes, avoiding a one-frame `10 -> 50` visual jump.
+- Build/Architecture: Reject new tray/effect primary-keyboard lighting writes
+  outside approved output owners or without lexical `kb_lock` protection.
 
 ## 0.34.0 (2026-08-31)
 

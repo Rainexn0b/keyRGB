@@ -371,6 +371,8 @@ def _make_controller_sleep_tray(*, sleep_at: float = 100.0):
     tray = make_owner_backed_simple_tray(
         config=SimpleNamespace(brightness=25),
         engine=SimpleNamespace(turn_off=lambda: None),
+        _start_current_effect=lambda **_kwargs: True,
+        _refresh_ui=lambda **_kwargs: None,
         is_off=True,
         controller_sleep_off=True,
         controller_sleep_off_at=sleep_at,
@@ -380,43 +382,48 @@ def _make_controller_sleep_tray(*, sleep_at: float = 100.0):
     return tray
 
 
-def test_controller_sleep_restore_on_new_evdev_input_edge(monkeypatch) -> None:
+def test_controller_sleep_restore_on_new_evdev_input_edge() -> None:
+    from keyrgb.tray.idle_power_state import set_idle_power_state_field
+
     tray = _make_controller_sleep_tray(sleep_at=100.0)
     loop_state = _runtime.IdlePollLoopState()
     loop_state.input_idle_tracker = SimpleNamespace(last_keyboard_activity_at=105.0)
     calls: list[object] = []
-    tray.engine.turn_off = lambda: calls.append("turn_off")
-    monkeypatch.setattr("keyrgb.tray.pollers.idle_power._actions.restore_from_idle", lambda t: calls.append(t))
+    refreshed: list[tuple[bool, bool]] = []
+    set_idle_power_state_field(tray, attr_name="_idle_forced_off", state_name="idle_forced_off", value=True)
+    tray.engine.turn_off = lambda: (_ for _ in ()).throw(AssertionError("must not force off native wake"))
+    tray._start_current_effect = lambda **kwargs: calls.append(kwargs) or True
+    tray._refresh_ui = lambda **_kwargs: refreshed.append(
+        (bool(tray.is_off), bool(tray.tray_idle_power_state.idle_forced_off))
+    )
 
     _runtime._maybe_restore_from_controller_sleep(tray, loop_state=loop_state, session_idle=None)
 
-    assert calls == ["turn_off", tray]
+    assert calls == [{"controller_brightness_handoff": 50}]
+    assert refreshed == [(False, False)]
 
 
-def test_controller_sleep_restore_stays_armed_when_hardware_rearm_fails(monkeypatch) -> None:
+def test_controller_sleep_restore_stays_armed_when_native_handoff_fails() -> None:
     tray = _make_controller_sleep_tray(sleep_at=100.0)
     loop_state = _runtime.IdlePollLoopState()
     loop_state.input_idle_tracker = SimpleNamespace(last_keyboard_activity_at=105.0)
     calls: list[object] = []
 
-    def fail_turn_off() -> None:
-        raise OSError("device unavailable")
-
-    tray.engine.turn_off = fail_turn_off
-    monkeypatch.setattr("keyrgb.tray.pollers.idle_power._actions.restore_from_idle", lambda t: calls.append(t))
+    tray.engine.turn_off = lambda: (_ for _ in ()).throw(AssertionError("must not force off native wake"))
+    tray._start_current_effect = lambda **kwargs: calls.append(kwargs) or False
 
     _runtime._maybe_restore_from_controller_sleep(tray, loop_state=loop_state, session_idle=None)
 
-    assert calls == []
+    assert calls == [{"controller_brightness_handoff": 50}]
     assert tray._controller_sleep_off is True
 
 
-def test_controller_sleep_restore_skipped_while_session_still_idle(monkeypatch) -> None:
+def test_controller_sleep_restore_skipped_while_session_still_idle() -> None:
     tray = _make_controller_sleep_tray(sleep_at=100.0)
     loop_state = _runtime.IdlePollLoopState()
     loop_state.input_idle_tracker = SimpleNamespace(last_keyboard_activity_at=95.0)
     calls: list[object] = []
-    monkeypatch.setattr(_runtime, "restore_from_idle", lambda t: calls.append(t))
+    tray._start_current_effect = lambda **kwargs: calls.append(kwargs) or True
 
     _maybe = _runtime._maybe_restore_from_controller_sleep
     _maybe(tray, loop_state=loop_state, session_idle=True)
@@ -424,7 +431,7 @@ def test_controller_sleep_restore_skipped_while_session_still_idle(monkeypatch) 
     assert calls == []
 
 
-def test_controller_sleep_restore_skipped_on_known_active_without_input_edge(monkeypatch) -> None:
+def test_controller_sleep_restore_skipped_on_known_active_without_input_edge() -> None:
     """Bare session-active must not soft-on restore (avoids random off→on blinks).
 
     Level-triggering on session_idle=False combined with transient zero
@@ -437,32 +444,32 @@ def test_controller_sleep_restore_skipped_on_known_active_without_input_edge(mon
     loop_state.input_idle_tracker = SimpleNamespace(last_keyboard_activity_at=95.0)
     loop_state.prev_session_idle = False
     calls: list[object] = []
-    monkeypatch.setattr(_runtime, "restore_from_idle", lambda t: calls.append(t))
+    tray._start_current_effect = lambda **kwargs: calls.append(kwargs) or True
 
     _runtime._maybe_restore_from_controller_sleep(tray, loop_state=loop_state, session_idle=False)
 
     assert calls == []
 
 
-def test_controller_sleep_restore_skipped_on_wayland_resume_edge(monkeypatch) -> None:
+def test_controller_sleep_restore_skipped_on_wayland_resume_edge() -> None:
     tray = _make_controller_sleep_tray(sleep_at=100.0)
     loop_state = _runtime.IdlePollLoopState()
     loop_state.prev_session_idle = True
     loop_state.input_idle_tracker = SimpleNamespace(last_keyboard_activity_at=95.0)
     calls: list[object] = []
-    monkeypatch.setattr(_runtime, "restore_from_idle", lambda t: calls.append(t))
+    tray._start_current_effect = lambda **kwargs: calls.append(kwargs) or True
 
     _runtime._maybe_restore_from_controller_sleep(tray, loop_state=loop_state, session_idle=False)
 
     assert calls == []
 
 
-def test_controller_sleep_polls_keyboard_tracker_alongside_wayland(monkeypatch) -> None:
+def test_controller_sleep_polls_keyboard_tracker_alongside_wayland() -> None:
     tray = _make_controller_sleep_tray(sleep_at=100.0)
     loop_state = _runtime.IdlePollLoopState(prev_session_idle=True)
     tracker = SimpleNamespace(last_keyboard_activity_at=0.0)
     calls: list[object] = []
-    monkeypatch.setattr("keyrgb.tray.pollers.idle_power._actions.restore_from_idle", lambda t: calls.append(t))
+    tray._start_current_effect = lambda **kwargs: calls.append(kwargs) or True
 
     def read_input(_tracker) -> float:
         _tracker.last_keyboard_activity_at = 105.0
@@ -477,10 +484,10 @@ def test_controller_sleep_polls_keyboard_tracker_alongside_wayland(monkeypatch) 
     )
 
     assert loop_state.input_idle_tracker is tracker
-    assert calls == [tray]
+    assert calls == [{"controller_brightness_handoff": 50}]
 
 
-def test_controller_sleep_evdev_restore_yields_to_firmware_wake_claim(monkeypatch) -> None:
+def test_controller_sleep_evdev_restore_yields_to_firmware_wake_claim() -> None:
     """Do not rearm if hardware polling already restored the firmware wake."""
 
     from keyrgb.tray.idle_power_state import set_idle_power_state_field
@@ -489,8 +496,7 @@ def test_controller_sleep_evdev_restore_yields_to_firmware_wake_claim(monkeypatc
     loop_state = _runtime.IdlePollLoopState()
     tracker = SimpleNamespace(last_keyboard_activity_at=0.0)
     calls: list[object] = []
-    tray.engine.turn_off = lambda: calls.append("turn_off")
-    monkeypatch.setattr(_runtime, "restore_from_idle", lambda t: calls.append(t))
+    tray._start_current_effect = lambda **kwargs: calls.append(kwargs) or True
 
     def read_input(_tracker) -> float:
         _tracker.last_keyboard_activity_at = 105.0

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from typing import cast
 
 from keyrgb.core.backends.policies.sleep_state import is_controller_sleep_state
@@ -12,6 +13,20 @@ from . import _recovery
 
 _HARDWARE_POLL_RECOVERY_EXCEPTIONS = _recovery._HARDWARE_POLL_RECOVERY_EXCEPTIONS
 _HARDWARE_POLL_RUNTIME_EXCEPTIONS = _recovery._HARDWARE_POLL_RUNTIME_EXCEPTIONS
+
+
+def _callback_accepts_controller_handoff(callback: object) -> bool:
+    """Preserve older tray callback facades that predate the handoff keyword."""
+
+    try:
+        parameters = inspect.signature(callback).parameters.values()
+    except (TypeError, ValueError):
+        return False
+    return any(
+        parameter.name == "controller_brightness_handoff"
+        or parameter.kind is inspect.Parameter.VAR_KEYWORD
+        for parameter in parameters
+    )
 
 
 def classify_polled_state(
@@ -71,12 +86,15 @@ def restart_effect_after_firmware_wake_best_effort(
     *,
     now: float,
     brightness_override: int | None = None,
+    controller_brightness_handoff: int | None = None,
 ) -> bool:
     """Restart the effect stopped while honoring controller-native sleep.
 
     A first keypress can wake ITE firmware before the idle-power evdev loop
-    claims the event. Since the deck is already physically on, restart at the
-    configured brightness instead of issuing another off/soft-on transition.
+    claims the event. Since the deck is already physically on, restart without
+    issuing another off/soft-on transition. When a controller handoff level is
+    supplied, the software renderer treats it as the physical baseline and
+    steps toward the active target without an initial mode prime.
 
     When ``brightness_override`` is supplied it is a temporary brightness policy
     (e.g. an active screen-dim target) rather than the user's full configured
@@ -100,13 +118,30 @@ def restart_effect_after_firmware_wake_best_effort(
     try:
         if callable(start_current_effect):
             # Older tray facades returned None after a successful start.
+            supports_handoff = _callback_accepts_controller_handoff(start_current_effect)
             if brightness_override is not None:
-                return start_current_effect(brightness_override=int(brightness_override)) is not False
-            return start_current_effect() is not False
+                if controller_brightness_handoff is None or not supports_handoff:
+                    return start_current_effect(brightness_override=int(brightness_override)) is not False
+                return (
+                    start_current_effect(
+                        brightness_override=int(brightness_override),
+                        controller_brightness_handoff=controller_brightness_handoff,
+                    )
+                    is not False
+                )
+            if controller_brightness_handoff is None or not supports_handoff:
+                return start_current_effect() is not False
+            return start_current_effect(controller_brightness_handoff=controller_brightness_handoff) is not False
 
         from keyrgb.tray.controllers.lighting_controller import start_current_effect as start_effect
 
-        return bool(start_effect(cast(LightingTrayProtocol, tray), brightness_override=brightness_override))
+        return bool(
+            start_effect(
+                cast(LightingTrayProtocol, tray),
+                brightness_override=brightness_override,
+                controller_brightness_handoff=controller_brightness_handoff,
+            )
+        )
     except _HARDWARE_POLL_RUNTIME_EXCEPTIONS as exc:
         _recovery._log_hardware_polling_error_best_effort(tray, exc)
         return False

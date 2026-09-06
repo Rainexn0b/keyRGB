@@ -9,6 +9,56 @@ from buildpython.steps import step_architecture_validation
 from buildpython.steps.architecture_validation import load_architecture_rules, scan_architecture
 
 
+def _call_rule_payload(
+    *,
+    allowed_files: list[str] | None = None,
+    exclude_globs: list[str] | None = None,
+) -> dict:
+    return {
+        "rules": [
+            {
+                "id": "primary-lighting-write-ownership",
+                "description": "Primary lighting writes",
+                "severity": "error",
+                "corpus": {
+                    "include": ["keyrgb/**/*.py"],
+                    "exclude": exclude_globs or [],
+                },
+                "calls": [
+                    {
+                        "receivers": ["kb", "keyboard"],
+                        "receiver_suffixes": [".kb", ".keyboard"],
+                        "methods": ["set_brightness", "set_color", "set_key_colors", "enable_user_mode", "turn_off", "set_effect"],
+                        "allowed_files": allowed_files or ["keyrgb/core/effects/fades.py"],
+                        "required_locks": ["kb_lock", "engine.kb_lock", "self.kb_lock", "tray.engine.kb_lock"],
+                        "message": "unapproved primary lighting owner",
+                        "lock_message": "unlocked primary lighting write",
+                    }
+                ],
+            }
+        ]
+    }
+
+
+def _scan_call_rule(
+    tmp_path,
+    source: str,
+    *,
+    relative_path: str = "keyrgb/core/effects/fades.py",
+    exclude_globs: list[str] | None = None,
+):
+    root = tmp_path / "repo"
+    target = root / relative_path
+    target.parent.mkdir(parents=True)
+    target.write_text(source, encoding="utf-8")
+    config_path = tmp_path / "architecture_rules.json"
+    config_path.write_text(
+        json.dumps(_call_rule_payload(exclude_globs=exclude_globs)),
+        encoding="utf-8",
+    )
+    return scan_architecture(root, load_architecture_rules(config_path))
+
+
 def test_load_architecture_rules_parses_flags_and_corpus(tmp_path) -> None:
     config_path = tmp_path / "architecture_rules.json"
     config_path.write_text(
@@ -119,6 +169,118 @@ def test_load_architecture_rules_parses_attribute_rules(tmp_path) -> None:
     assert len(rules[0].attributes) == 1
     assert rules[0].attributes[0].name == "_update_menu"
     assert rules[0].attributes[0].message == "Tray UI should not call private runtime menu refresh hooks directly"
+
+
+def test_load_architecture_rules_parses_call_rules_and_runner_serializes_them(monkeypatch, tmp_path) -> None:
+    config_path = tmp_path / "architecture_rules.json"
+    config_path.write_text(json.dumps(_call_rule_payload()), encoding="utf-8")
+
+    rules = load_architecture_rules(config_path)
+
+    assert len(rules[0].calls) == 1
+    assert rules[0].calls[0].receivers == ("kb", "keyboard")
+    assert rules[0].calls[0].receiver_suffixes == (".kb", ".keyboard")
+    assert rules[0].calls[0].methods == (
+        "set_brightness",
+        "set_color",
+        "set_key_colors",
+        "enable_user_mode",
+        "turn_off",
+        "set_effect",
+    )
+    assert rules[0].calls[0].required_locks == ("kb_lock", "engine.kb_lock", "self.kb_lock", "tray.engine.kb_lock")
+
+    (tmp_path / "keyrgb/core/effects").mkdir(parents=True)
+    (tmp_path / "keyrgb/core/effects/fades.py").write_text(
+        "with kb_lock:\n    kb.set_color((1, 2, 3), brightness=1)\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "buildpython/config").mkdir(parents=True)
+    (tmp_path / "buildpython/config/architecture_rules.json").write_text(
+        config_path.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    monkeypatch.setattr(step_architecture_validation, "repo_root", lambda: tmp_path)
+    monkeypatch.setattr(step_architecture_validation, "buildlog_dir", lambda: tmp_path / "buildlog")
+
+    result = step_architecture_validation.architecture_validation_runner()
+
+    assert result.exit_code == 0
+    report = json.loads((tmp_path / "buildlog/architecture-validation.json").read_text(encoding="utf-8"))
+    assert report["rules"][0]["calls"][0]["allowed_files"] == ["keyrgb/core/effects/fades.py"]
+    assert report["findings"] == []
+
+
+def test_scan_architecture_call_rule_reports_unapproved_owner(tmp_path) -> None:
+    result = _scan_call_rule(tmp_path, "engine.kb.set_color((1, 2, 3), brightness=1)\n", relative_path="keyrgb/core/other.py")
+
+    assert len(result.findings) == 1
+    assert result.findings[0].message == "unapproved primary lighting owner"
+    assert result.findings[0].regex == "call:engine.kb.set_color"
+
+
+def test_scan_architecture_call_rule_reports_approved_unlocked_write(tmp_path) -> None:
+    result = _scan_call_rule(tmp_path, "engine.kb.set_color((1, 2, 3), brightness=1)\n")
+
+    assert len(result.findings) == 1
+    assert result.findings[0].message == "unlocked primary lighting write"
+
+
+def test_scan_architecture_call_rule_accepts_approved_locked_write(tmp_path) -> None:
+    result = _scan_call_rule(tmp_path, "with engine.kb_lock:\n    engine.kb.set_color((1, 2, 3), brightness=1)\n")
+
+    assert result.findings == ()
+
+
+def test_scan_architecture_call_rule_is_selective_to_receivers_and_methods(tmp_path) -> None:
+    result = _scan_call_rule(
+        tmp_path,
+        """with engine.kb_lock:
+    engine.kb.get_brightness()
+    engine.set_color((1, 2, 3), brightness=1)
+    other.device.set_color((1, 2, 3), brightness=1)
+    engine.kb.set_color((1, 2, 3), brightness=1)
+""",
+    )
+
+    assert result.findings == ()
+
+
+def test_scan_architecture_call_rule_matches_keyboard_aliases(tmp_path) -> None:
+    result = _scan_call_rule(
+        tmp_path,
+        "with kb_lock:\n    tray.kb.set_brightness(5)\n    keyboard.set_color((1, 2, 3), brightness=5)\n",
+    )
+
+    assert result.findings == ()
+
+
+def test_scan_architecture_call_rule_tracks_async_and_nested_scope_locks(tmp_path) -> None:
+    result = _scan_call_rule(
+        tmp_path,
+        """async def apply():
+    async with kb_lock:
+        kb.set_brightness(5)
+        class Immediate:
+            kb.set_color((1, 2, 3), brightness=5)
+        def later(value=kb.set_effect(payload)):
+            kb.set_brightness(10)
+""",
+    )
+
+    assert len(result.findings) == 1
+    assert result.findings[0].regex == "call:kb.set_brightness"
+    assert result.findings[0].line == 7
+
+
+def test_scan_architecture_call_rule_exempts_backend_implementations(tmp_path) -> None:
+    result = _scan_call_rule(
+        tmp_path,
+        "self.kb.set_brightness(5)\n",
+        relative_path="keyrgb/core/backends/sysfs_leds/device.py",
+        exclude_globs=["keyrgb/core/backends/**/*.py"],
+    )
+
+    assert result.findings == ()
 
 
 def test_scan_architecture_reports_matches_and_respects_excludes(tmp_path) -> None:

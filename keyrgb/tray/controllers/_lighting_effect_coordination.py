@@ -7,14 +7,19 @@ start_current_effect() public facade.
 
 from __future__ import annotations
 
+import logging
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from operator import attrgetter
 
 from keyrgb.core.backends.base import normalize_backend_capabilities
-from keyrgb.core.effects.reactive import _render_brightness_support as _reactive_support
+from keyrgb.core.effects.reactive import _reactive_transition_atomic, _render_brightness_support as _reactive_support
 from keyrgb.core.lighting_layers import resolve_render_effect
 from keyrgb.tray.idle_power_state import read_idle_power_state_bool_field
 from keyrgb.tray.protocols import LightingTrayProtocol
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -24,6 +29,62 @@ class _FadeRampPlan:
     will_fade: bool
     is_loop_effect: bool
     apply_to_hardware: bool
+
+
+def _seed_post_fade_reactive_release(
+    tray: LightingTrayProtocol,
+    *,
+    from_brightness: int,
+    duration_s: float,
+) -> None:
+    """Release reactive/base brightness smoothly after an idle soft-on ramp."""
+
+    engine = tray.engine
+    try:
+        base_release_target = int(from_brightness)
+        if getattr(engine, "per_key_colors", None):
+            base_release_target = int(getattr(engine, "per_key_brightness", from_brightness))
+        release_target = max(
+            int(from_brightness),
+            int(getattr(engine, "reactive_brightness", from_brightness)),
+            base_release_target,
+        )
+        if release_target <= int(from_brightness):
+            return
+        started_at = float(time.monotonic())
+        duration = max(0.0, float(duration_s))
+        reactive_lock = getattr(engine, "reactive_lock", None)
+        if reactive_lock is not None:
+            _reactive_transition_atomic.seed_transition_atomic(
+                _reactive_support.ensure_reactive_state(engine),
+                reactive_lock,
+                from_brightness=int(from_brightness),
+                to_brightness=int(release_target),
+                started_at=started_at,
+                duration_s=duration,
+            )
+        else:
+            _reactive_support.set_engine_attr(
+                engine,
+                "_reactive_transition_from_brightness",
+                int(from_brightness),
+            )
+            _reactive_support.set_engine_attr(
+                engine,
+                "_reactive_transition_to_brightness",
+                int(release_target),
+            )
+            _reactive_support.set_engine_attr(engine, "_reactive_transition_started_at", started_at)
+            _reactive_support.set_engine_attr(engine, "_reactive_transition_duration_s", duration)
+    except (AttributeError, RuntimeError, TypeError, ValueError, OverflowError) as exc:
+        logger.warning("Failed to seed post-fade reactive release", exc_info=exc)
+
+
+def _effect_generation(engine: object) -> int | None:
+    try:
+        return int(attrgetter("_thread_generation")(engine))
+    except (AttributeError, TypeError, ValueError, OverflowError):
+        return None
 
 
 @dataclass(frozen=True)
@@ -189,7 +250,19 @@ def _apply_effect_fade_ramp(
         # Without this the per-key base stays at full brightness while only the
         # engine state fades, so the brightness guard staircases the visible
         # restore (+8/frame) and the configured fade duration has no effect.
-        _reactive_support.set_engine_attr(tray.engine, "_reactive_follow_global_brightness", True)
+        lifecycle_lock = getattr(tray.engine, "_start_lock", None)
+        if lifecycle_lock is not None:
+            with lifecycle_lock:
+                _reactive_support.set_engine_attr(
+                    tray.engine,
+                    "_reactive_follow_global_brightness",
+                    True,
+                )
+                fade_generation = _effect_generation(tray.engine)
+        else:
+            _reactive_support.set_engine_attr(tray.engine, "_reactive_follow_global_brightness", True)
+            fade_generation = _effect_generation(tray.engine)
+        fade_completed = False
         try:
             tray.engine.set_brightness(
                 target_brightness,
@@ -197,8 +270,31 @@ def _apply_effect_fade_ramp(
                 fade=True,
                 fade_duration_s=float(fade_in_duration_s),
             )
+            fade_completed = True
         finally:
-            _reactive_support.set_engine_attr(tray.engine, "_reactive_follow_global_brightness", False)
+            def _finalize_owned_fade() -> None:
+                fade_still_owned = (
+                    fade_generation is not None
+                    and _effect_generation(tray.engine) == fade_generation
+                )
+                if fade_completed and fade_still_owned:
+                    _seed_post_fade_reactive_release(
+                        tray,
+                        from_brightness=int(target_brightness),
+                        duration_s=float(fade_in_duration_s),
+                    )
+                if fade_still_owned:
+                    _reactive_support.set_engine_attr(
+                        tray.engine,
+                        "_reactive_follow_global_brightness",
+                        False,
+                    )
+
+            if lifecycle_lock is not None:
+                with lifecycle_lock:
+                    _finalize_owned_fade()
+            else:
+                _finalize_owned_fade()
         return
 
     follow_global_flag = False

@@ -7,6 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+CONFIG_BRIGHTNESS_MAX = 50
 _BRIGHTNESS_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
 
 DEFAULT_HARDWARE_POLL_INTERVAL_S = 2.0
@@ -112,7 +113,7 @@ def normalize_brightness_to_config_scale(brightness: object) -> int:
         b = int(brightness)  # type: ignore[call-overload]
     except _BRIGHTNESS_COERCION_ERRORS:
         return 0
-    return max(0, min(50, b))
+    return max(0, min(CONFIG_BRIGHTNESS_MAX, b))
 
 
 def power_source_recovery_window_active(

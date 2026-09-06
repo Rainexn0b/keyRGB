@@ -354,4 +354,4 @@ contract, but one restore must create exactly one seed.
 ## Related references
 
 - `docs/1-src/08-reactive-brightness-invariants.md`
-- `.github/agents/ReactiveTypingFlickerDebug.agent.md`
+- `.github/agents/Brightnessdebug.agent.md`

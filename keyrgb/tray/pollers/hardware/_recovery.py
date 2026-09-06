@@ -19,6 +19,7 @@ import time
 from collections.abc import Callable
 from typing import TypeVar
 
+from keyrgb.core.effects.reactive._render_brightness_support import ensure_reactive_state
 from keyrgb.tray.idle_power_state import (
     any_forced_off,
     clear_idle_power_state_field,
@@ -29,6 +30,7 @@ from keyrgb.tray.idle_power_state import (
     set_idle_power_state_field,
 )
 from keyrgb.tray.pollers.hardware._decisions import (
+    CONFIG_BRIGHTNESS_MAX,
     DEFAULT_HARDWARE_POLL_INTERVAL_S,
     FAST_HARDWARE_POLL_INTERVAL_S,
     POWER_SOURCE_POST_RESUME_SUPPRESSION_S,
@@ -49,6 +51,7 @@ _T = TypeVar("_T")
 _BRIGHTNESS_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
 _HARDWARE_POLL_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 _HARDWARE_POLL_RECOVERY_EXCEPTIONS = (OSError, RuntimeError, ValueError)
+_INVALID_HIGH_BRIGHTNESS_MAX_CONSECUTIVE_ATTEMPTS = 3
 
 
 # ---------------------------------------------------------------------------
@@ -319,8 +322,13 @@ def _effect_engine_is_running(tray: IdlePowerTrayProtocol) -> bool:
         return False
 
 
-def _reassert_user_mode_while_running_best_effort(tray: IdlePowerTrayProtocol) -> bool:
-    """Heal a mid-render blank via the render loop, not a poller brightness write.
+def _reassert_user_mode_while_running_best_effort(
+    tray: IdlePowerTrayProtocol,
+    *,
+    observed_brightness: int,
+    controller_handoff: bool = False,
+) -> bool:
+    """Heal invalid hardware brightness via the render loop, not the poller.
 
     A standalone poller ``set_brightness`` races the reactive render thread for
     ``kb_lock`` (frame overruns) and shows up as a visible off→on dip.  The
@@ -331,17 +339,18 @@ def _reassert_user_mode_while_running_best_effort(tray: IdlePowerTrayProtocol) -
     poller recovers it.
 
     Clearing the per-key frame signature and setting ``_last_hw_mode_brightness``
-    to the just-read ``0`` makes the very next frame (~33 ms away for a live
-    reactive effect) call ``apply_hw_brightness`` with ``prev=0`` — a plain
+    to the just-read value makes the very next frame (~33 ms away for a live
+    reactive effect) call ``apply_hw_brightness`` with that observation — a plain
     ``set_brightness(target)``.  That is the correct minimal heal: these ITE
     transient-zeros report ``is_off=False`` (user mode retained, only the
     brightness byte glitched), so no mode command / ``enable_user_mode`` is
     needed.  Using ``None`` here instead would force ``enable_user_mode_once
     (save=True)`` — a full user-mode reinit plus a persistent firmware save that
-    visibly flashes and wears flash on every transient.  ``_last_rendered_brightness``
-    is deliberately **preserved**: it is the anti-flicker step-guard baseline,
-    and resetting it would ramp the re-light 0→8→16→… over several frames (the
-    journaled flicker) instead of jumping straight back to the target.
+    visibly flashes and wears flash on every transient. For transient zero,
+    ``_last_rendered_brightness`` is deliberately preserved so recovery jumps
+    straight back to the target. For a confirmed invalid-high startup,
+    ``controller_handoff`` instead seeds the normalized physical maximum so the
+    normal frame guard deliberately fades downward to the active target.
     """
 
     if not _effect_engine_is_running(tray):
@@ -350,16 +359,45 @@ def _reassert_user_mode_while_running_best_effort(tray: IdlePowerTrayProtocol) -
     if engine is None:
         return False
     try:
-        # Record the hardware's actual (blanked) brightness so the next frame
-        # issues a plain set_brightness(target) rather than skipping (cache
-        # said 40) or doing a save/reinit (None).  Force a frame rewrite by
-        # dropping the signature; keep the step-guard baseline intact.
-        engine._last_hw_mode_brightness = 0
-        try:
+        render_generation = getattr(engine, "_thread_generation", None)
+        # Synchronize with the renderer's cache publication. Without this lock,
+        # a frame already in flight could restore its old signature after this
+        # invalidation and lose the corrective repaint.
+        with engine.kb_lock:
+            if not bool(getattr(engine, "running", False)):
+                return False
+            if getattr(engine, "_thread_generation", None) != render_generation:
+                return False
+            # Record the hardware's actual observed brightness so the next
+            # frame issues a plain set_brightness(target) rather than skipping
+            # or doing a save/reinit (None). Keep the step-guard baseline.
+            engine._last_hw_mode_brightness = int(observed_brightness)
             engine._last_reactive_per_key_frame_signature = None
-        except _HARDWARE_POLL_RECOVERY_EXCEPTIONS:
-            pass
-    except _HARDWARE_POLL_RECOVERY_EXCEPTIONS:
+            reactive_state = None
+            if controller_handoff:
+                # Use the normalized physical startup level as the visual
+                # baseline. The renderer then steps down to its current policy
+                # target instead of snapping from firmware-full to that target.
+                engine._last_rendered_brightness = min(
+                    CONFIG_BRIGHTNESS_MAX,
+                    max(0, int(observed_brightness)),
+                )
+                reactive_state = ensure_reactive_state(engine)
+                reactive_state._reactive_controller_brightness_handoff_active = True
+            # ``stop()`` publishes a new generation before clearing these
+            # caches. If it raced the assignments above, withdraw our cache
+            # claim so a later start cannot inherit stale recovery state.
+            if (
+                not bool(getattr(engine, "running", False))
+                or getattr(engine, "_thread_generation", None) != render_generation
+            ):
+                engine._last_hw_mode_brightness = None
+                engine._last_reactive_per_key_frame_signature = None
+                if reactive_state is not None:
+                    engine._last_rendered_brightness = None
+                    reactive_state._reactive_controller_brightness_handoff_active = False
+                return False
+    except _HARDWARE_POLL_RUNTIME_EXCEPTIONS:
         return False
     return True
 
@@ -393,7 +431,10 @@ def _execute_blank_recovery(
         # Prefer render-loop self-heal while a software effect is already
         # running — imperceptible single-frame re-light instead of a poller
         # brightness write that races the render thread (visible off→on dip).
-        if _reassert_user_mode_while_running_best_effort(tray):
+        if _reassert_user_mode_while_running_best_effort(
+            tray,
+            observed_brightness=int(current_brightness),
+        ):
             tray.is_off = False
             _log_polled_hardware_event(
                 tray,
@@ -468,6 +509,115 @@ def _recover_recent_power_source_blank_best_effort(
         recovery_stamp_state="last_power_source_blank_recovery_at",
         log_action="power_source_blank_recover",
     )
+
+
+def _recover_invalid_high_brightness_best_effort(
+    tray: IdlePowerTrayProtocol,
+    *,
+    current_brightness: int,
+) -> bool:
+    """Repaint an out-of-range controller value through the render owner."""
+
+    if int(current_brightness) <= CONFIG_BRIGHTNESS_MAX or any_forced_off(tray):
+        return False
+    if _configured_brightness_intent(tray) <= 0 or not _effect_engine_is_running(tray):
+        return False
+    engine = getattr(tray, "engine", None)
+    if engine is None:
+        return False
+    recovery_generation = getattr(engine, "_thread_generation", None)
+    try:
+        owner = ensure_tray_idle_power_state(tray)
+        if owner.invalid_high_brightness_recovery_generation != recovery_generation:
+            # Both successful latches and failed-attempt budgets belong only
+            # to the effect generation that created them.
+            owner.last_invalid_high_brightness_recovery_at = 0.0
+            owner.invalid_high_brightness_recovery_attempt_count = 0
+            owner.invalid_high_brightness_recovery_generation = recovery_generation
+        attempts = int(owner.invalid_high_brightness_recovery_attempt_count)
+        if float(owner.last_invalid_high_brightness_recovery_at) > 0.0:
+            return False
+        if attempts >= _INVALID_HIGH_BRIGHTNESS_MAX_CONSECUTIVE_ATTEMPTS:
+            return False
+    except (AttributeError, TypeError, ValueError):
+        return False
+
+    try:
+        if not _reassert_user_mode_while_running_best_effort(
+            tray,
+            observed_brightness=int(current_brightness),
+            controller_handoff=True,
+        ):
+            if (
+                _effect_engine_is_running(tray)
+                and getattr(engine, "_thread_generation", None) == recovery_generation
+            ):
+                owner.invalid_high_brightness_recovery_attempt_count = attempts + 1
+            return False
+        if (
+            not _effect_engine_is_running(tray)
+            or getattr(engine, "_thread_generation", None) != recovery_generation
+        ):
+            return False
+        owner.invalid_high_brightness_recovery_attempt_count = attempts + 1
+        owner.invalid_high_brightness_recovery_generation = recovery_generation
+        set_idle_power_state_field(
+            tray,
+            attr_name="_last_invalid_high_brightness_recovery_at",
+            state_name="last_invalid_high_brightness_recovery_at",
+            value=float(time.monotonic()),
+        )
+        if (
+            not _effect_engine_is_running(tray)
+            or getattr(engine, "_thread_generation", None) != recovery_generation
+        ):
+            # The render publication was superseded while its generation-bound
+            # latch was being recorded. Withdraw the latch so the replacement
+            # generation can retry rather than publishing stale lit state.
+            owner.invalid_high_brightness_recovery_attempt_count = 0
+            owner.invalid_high_brightness_recovery_generation = None
+            set_idle_power_state_field(
+                tray,
+                attr_name="_last_invalid_high_brightness_recovery_at",
+                state_name="last_invalid_high_brightness_recovery_at",
+                value=0.0,
+            )
+            return False
+        _log_polled_hardware_event(
+            tray,
+            "invalid_high_brightness_recover_render_heal",
+            brightness=int(current_brightness),
+        )
+    except _HARDWARE_POLL_RUNTIME_EXCEPTIONS as exc:
+        _log_hardware_polling_error_best_effort(tray, exc)
+        return False
+    return True
+
+
+def refresh_invalid_high_brightness_recovery_ui_best_effort(tray: IdlePowerTrayProtocol) -> None:
+    """Refresh only after the deck pipeline publishes the healed lit state."""
+
+    try:
+        _refresh_ui_without_icon_animation(tray)
+    except _HARDWARE_POLL_RUNTIME_EXCEPTIONS as exc:
+        _log_hardware_polling_error_best_effort(tray, exc)
+
+
+def reset_invalid_high_brightness_recovery_attempt_count(tray: IdlePowerTrayProtocol) -> None:
+    """Re-arm bounded invalid-high recovery after a valid hardware reading."""
+
+    try:
+        owner = ensure_tray_idle_power_state(tray)
+        owner.invalid_high_brightness_recovery_attempt_count = 0
+        owner.invalid_high_brightness_recovery_generation = None
+        set_idle_power_state_field(
+            tray,
+            attr_name="_last_invalid_high_brightness_recovery_at",
+            state_name="last_invalid_high_brightness_recovery_at",
+            value=0.0,
+        )
+    except (AttributeError, TypeError, ValueError):
+        return
 
 
 def _stable_zero_recovery_attempt_count(tray: IdlePowerTrayProtocol) -> int:

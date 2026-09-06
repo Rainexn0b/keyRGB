@@ -87,7 +87,8 @@ def apply_hw_brightness(engine: EffectsEngine, brightness_hw: int, *, force_rein
         return
 
     try:
-        engine.kb.set_brightness(int(brightness_hw))
+        with engine.kb_lock:
+            engine.kb.set_brightness(int(brightness_hw))
     except _RECOVERABLE_BRIGHTNESS_WRITE_EXCEPTIONS as exc:
         log_throttled(
             logger,

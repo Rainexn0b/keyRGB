@@ -463,6 +463,35 @@ def test_initial_perkey_sw_start_primes_single_frame_without_startup_fade(monkey
     engine.stop()
 
 
+def test_controller_native_wake_handoff_skips_initial_prime(monkeypatch) -> None:
+    engine = EffectsEngine()
+    engine.backend_caps = _backend_caps(per_key=True)
+    engine.kb = NullKeyboard()
+    engine.device_available = True
+    engine._ensure_device_available = lambda: True  # type: ignore[assignment]
+    engine.per_key_colors = {(0, 0): (0, 255, 255)}
+    engine.brightness = 40
+    engine._device_mode_off = True
+
+    calls: list[str] = []
+    monkeypatch.setattr(engine, "_prime_per_key_frame", lambda: calls.append("prime") or True)
+    monkeypatch.setattr(engine, "_fade_in_per_key", lambda **_kwargs: calls.append("fade"))
+
+    engine._start_sw_effect(
+        target=lambda: None,
+        prev_color=(0, 0, 0),
+        fade_to_color=(0, 255, 255),
+        controller_brightness_handoff=50,
+    )
+
+    assert calls == []
+    assert engine._device_mode_off is False
+    assert engine._last_hw_mode_brightness == 50
+    assert engine._last_rendered_brightness == 50
+    assert engine._reactive_state._reactive_controller_brightness_handoff_active is True
+    engine.stop()
+
+
 def test_soft_on_start_after_turn_off_primes_with_user_mode_reassert(monkeypatch) -> None:
     """Idle/menu soft-on starts at brightness=1 after turn_off must still prime.
 
