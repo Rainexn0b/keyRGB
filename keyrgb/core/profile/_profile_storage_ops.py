@@ -4,6 +4,7 @@ from collections.abc import Callable, Mapping
 from typing import cast
 
 from . import _profile_storage_payloads as storage_payloads
+from ._profile_color_ops import load_per_key_colors, save_per_key_colors  # noqa: F401
 
 KeyCell = tuple[int, int]
 KeyCells = tuple[KeyCell, ...]
@@ -324,31 +325,4 @@ def save_layout_slots(
     return save_layout_slot_overrides(  # type: ignore[return-value]
         physical_layout or "auto",
         normalize_layout_slot_overrides_fn(layout_slots, physical_layout=physical_layout),
-    )
-
-
-def load_per_key_colors(
-    *,
-    name: str | None,
-    paths_for: Callable[..., object],
-    read_json: Callable[..., object],
-    safe_profile_name: Callable[..., object],
-    default_colors: dict[tuple[int, int], tuple[int, int, int]],
-) -> dict[tuple[int, int], tuple[int, int, int]]:
-    raw = read_json(paths_for(name).per_key_colors)  # type: ignore[attr-defined]
-    if raw is None:
-        return default_colors.copy()
-    return storage_payloads.parse_per_key_colors(raw)
-
-
-def save_per_key_colors(
-    *,
-    colors: dict[tuple[int, int], tuple[int, int, int]],
-    name: str | None,
-    paths_for: Callable[..., object],
-    write_json_atomic: Callable[..., object],
-) -> None:
-    write_json_atomic(
-        paths_for(name).per_key_colors,  # type: ignore[attr-defined]
-        storage_payloads.encode_per_key_colors(colors or {}),
     )

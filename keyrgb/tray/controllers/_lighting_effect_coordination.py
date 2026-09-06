@@ -19,6 +19,8 @@ from keyrgb.core.lighting_layers import resolve_render_effect
 from keyrgb.tray.idle_power_state import read_idle_power_state_bool_field
 from keyrgb.tray.protocols import LightingTrayProtocol
 
+from ._lighting_effect_engine_state import prepare_effect_engine_state  # noqa: F401
+
 logger = logging.getLogger(__name__)
 
 
@@ -272,11 +274,9 @@ def _apply_effect_fade_ramp(
             )
             fade_completed = True
         finally:
+
             def _finalize_owned_fade() -> None:
-                fade_still_owned = (
-                    fade_generation is not None
-                    and _effect_generation(tray.engine) == fade_generation
-                )
+                fade_still_owned = fade_generation is not None and _effect_generation(tray.engine) == fade_generation
                 if fade_completed and fade_still_owned:
                     _seed_post_fade_reactive_release(
                         tray,
@@ -338,19 +338,3 @@ def _apply_effect_fade_ramp(
             tray.engine.per_key_brightness = int(saved_perkey_br)
         except (AttributeError, TypeError, ValueError, OverflowError):
             pass
-
-
-def prepare_effect_engine_state(
-    tray: LightingTrayProtocol,
-    *,
-    effect: str,
-    is_software_effect_fn: Callable[[str], bool],
-    set_engine_perkey_from_config_fn: Callable[[LightingTrayProtocol], None],
-    clear_engine_perkey_state_fn: Callable[[LightingTrayProtocol], None],
-) -> None:
-    """Prepare engine per-key state before starting an effect."""
-
-    if is_software_effect_fn(effect):
-        set_engine_perkey_from_config_fn(tray)
-    else:
-        clear_engine_perkey_state_fn(tray)
