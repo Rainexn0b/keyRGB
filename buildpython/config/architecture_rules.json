@@ -300,6 +300,67 @@
           "message": "Nested runtime lock acquisitions must follow _start_lock -> kb_lock -> _brightness_fade_lock order."
         }
       ]
+    },
+    {
+      "id": "no-blocking-under-keyboard-lock",
+      "description": "Blocking operations must not run while holding the primary keyboard lock.",
+      "severity": "error",
+      "corpus": {
+        "include": [
+          "keyrgb/**/*.py"
+        ]
+      },
+      "forbidden_under_locks": [
+        {
+          "receivers": [
+            "time"
+          ],
+          "methods": [
+            "sleep"
+          ],
+          "required_locks": [
+            "kb_lock",
+            "self.kb_lock",
+            "engine.kb_lock",
+            "tray.engine.kb_lock"
+          ],
+          "message": "time.sleep() must not run while holding the primary keyboard lock."
+        },
+        {
+          "methods": [
+            "join",
+            "wait",
+            "communicate"
+          ],
+          "match_any_receiver": true,
+          "required_locks": [
+            "kb_lock",
+            "self.kb_lock",
+            "engine.kb_lock",
+            "tray.engine.kb_lock"
+          ],
+          "message": "Blocking join(), wait(), and communicate() calls must not run while holding the primary keyboard lock."
+        },
+        {
+          "receivers": [
+            "subprocess"
+          ],
+          "methods": [
+            "run",
+            "call",
+            "check_call",
+            "check_output",
+            "Popen"
+          ],
+          "required_locks": [
+            "kb_lock",
+            "self.kb_lock",
+            "engine.kb_lock",
+            "tray.engine.kb_lock"
+          ],
+          "message": "subprocess operations must not run while holding the primary keyboard lock."
+        }
+      ]
     }
   ]
 }

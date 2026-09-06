@@ -67,6 +67,55 @@ def _scan_call_rule(
     return scan_architecture(root, load_architecture_rules(config_path))
 
 
+def _forbidden_under_lock_payload() -> dict:
+    return {
+        "rules": [
+            {
+                "id": "no-blocking-under-lock",
+                "description": "Blocking calls do not belong under the keyboard lock",
+                "severity": "error",
+                "corpus": {"include": ["keyrgb/**/*.py"]},
+                "forbidden_under_locks": [
+                    {
+                        "receivers": ["time"],
+                        "methods": ["sleep"],
+                        "required_locks": ["kb_lock", "self.kb_lock"],
+                        "message": "sleep under keyboard lock",
+                    },
+                    {
+                        "receiver_suffixes": [".process"],
+                        "methods": ["run"],
+                        "required_locks": ["kb_lock", "self.kb_lock"],
+                        "message": "process run under keyboard lock",
+                    },
+                    {
+                        "methods": ["join", "wait", "communicate"],
+                        "match_any_receiver": True,
+                        "required_locks": ["kb_lock", "self.kb_lock"],
+                        "message": "blocking method under keyboard lock",
+                    },
+                    {
+                        "receivers": ["subprocess"],
+                        "methods": ["run", "call", "check_call", "check_output", "Popen"],
+                        "required_locks": ["kb_lock", "self.kb_lock"],
+                        "message": "subprocess under keyboard lock",
+                    },
+                ],
+            }
+        ]
+    }
+
+
+def _scan_forbidden_under_lock(tmp_path, source: str):
+    root = tmp_path / "repo"
+    target = root / "keyrgb/runtime.py"
+    target.parent.mkdir(parents=True)
+    target.write_text(source, encoding="utf-8")
+    config_path = tmp_path / "architecture_rules.json"
+    config_path.write_text(json.dumps(_forbidden_under_lock_payload()), encoding="utf-8")
+    return scan_architecture(root, load_architecture_rules(config_path))
+
+
 def _lock_order_payload() -> dict:
     return {
         "rules": [
@@ -132,7 +181,7 @@ def _poller_engine_call_rule_payload() -> dict:
                         ],
                         "skip_if_keywords": [{"name": "apply_to_hardware", "equals": False}],
                         "message": "poller primary brightness mutation",
-                    }
+                    },
                 ],
             }
         ]
@@ -264,6 +313,30 @@ def test_load_architecture_rules_parses_attribute_rules(tmp_path) -> None:
     assert len(rules[0].attributes) == 1
     assert rules[0].attributes[0].name == "_update_menu"
     assert rules[0].attributes[0].message == "Tray UI should not call private runtime menu refresh hooks directly"
+
+
+def test_load_architecture_rules_parses_forbidden_under_lock_calls(tmp_path) -> None:
+    config_path = tmp_path / "architecture_rules.json"
+    config_path.write_text(json.dumps(_forbidden_under_lock_payload()), encoding="utf-8")
+
+    forbidden = load_architecture_rules(config_path)[0].forbidden_under_locks
+
+    assert len(forbidden) == 4
+    assert forbidden[0].receivers == ("time",)
+    assert forbidden[1].receiver_suffixes == (".process",)
+    assert forbidden[2].match_any_receiver is True
+    assert forbidden[2].methods == ("join", "wait", "communicate")
+    assert forbidden[3].methods == ("run", "call", "check_call", "check_output", "Popen")
+
+
+def test_load_architecture_rules_rejects_malformed_forbidden_under_lock_call(tmp_path) -> None:
+    config_path = tmp_path / "architecture_rules.json"
+    payload = _forbidden_under_lock_payload()
+    payload["rules"][0]["forbidden_under_locks"][0].pop("required_locks")
+    config_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="invalid forbidden-under-lock call entry"):
+        load_architecture_rules(config_path)
 
 
 def test_load_architecture_rules_rejects_malformed_lock_order(tmp_path) -> None:
@@ -527,6 +600,34 @@ def test_architecture_runner_serializes_keyword_exemptions(monkeypatch, tmp_path
     assert report["findings"] == []
 
 
+def test_architecture_validation_runner_serializes_forbidden_under_lock_rules_and_findings(
+    monkeypatch, tmp_path
+) -> None:
+    config_path = tmp_path / "architecture_rules.json"
+    config_path.write_text(json.dumps(_forbidden_under_lock_payload()), encoding="utf-8")
+    (tmp_path / "keyrgb").mkdir()
+    (tmp_path / "keyrgb/runtime.py").write_text(
+        "with self.kb_lock:\n    subprocess.run([])\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "buildpython/config").mkdir(parents=True)
+    (tmp_path / "buildpython/config/architecture_rules.json").write_text(
+        config_path.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    monkeypatch.setattr(step_architecture_validation, "repo_root", lambda: tmp_path)
+    monkeypatch.setattr(step_architecture_validation, "buildlog_dir", lambda: tmp_path / "buildlog")
+
+    result = step_architecture_validation.architecture_validation_runner()
+
+    assert result.exit_code == 1
+    report = json.loads((tmp_path / "buildlog/architecture-validation.json").read_text(encoding="utf-8"))
+    forbidden = report["rules"][0]["forbidden_under_locks"]
+    assert forbidden[2]["match_any_receiver"] is True
+    assert forbidden[3]["required_locks"] == ["kb_lock", "self.kb_lock"]
+    assert report["findings"][0]["regex"] == "forbidden-under-lock:subprocess.run"
+    assert report["findings"][0]["lock"] == "self.kb_lock"
+
+
 def test_current_repo_has_no_architecture_findings() -> None:
     root = Path(__file__).resolve().parents[2]
     rules = load_architecture_rules(root / "buildpython/config/architecture_rules.json")
@@ -604,6 +705,87 @@ def test_scan_architecture_call_rule_exempts_backend_implementations(tmp_path) -
         "self.kb.set_brightness(5)\n",
         relative_path="keyrgb/core/backends/sysfs_leds/device.py",
         exclude_globs=["keyrgb/core/backends/**/*.py"],
+    )
+
+    assert result.findings == ()
+
+
+@pytest.mark.parametrize(
+    ("source", "method"),
+    [
+        ("with kb_lock:\n    time.sleep(1)\n", "time.sleep"),
+        ("with self.kb_lock:\n    worker.join()\n", "worker.join"),
+        ("with kb_lock:\n    process.wait()\n", "process.wait"),
+        ("with kb_lock:\n    process.communicate()\n", "process.communicate"),
+        ("with kb_lock:\n    subprocess.run([])\n", "subprocess.run"),
+        ("with kb_lock:\n    subprocess.call([])\n", "subprocess.call"),
+        ("with kb_lock:\n    subprocess.check_call([])\n", "subprocess.check_call"),
+        ("with kb_lock:\n    subprocess.check_output([])\n", "subprocess.check_output"),
+        ("with kb_lock:\n    subprocess.Popen([])\n", "subprocess.Popen"),
+    ],
+)
+def test_forbidden_under_lock_reports_blocking_call(tmp_path, source: str, method: str) -> None:
+    result = _scan_forbidden_under_lock(tmp_path, source)
+
+    assert len(result.findings) == 1
+    assert result.findings[0].regex == f"forbidden-under-lock:{method}"
+    assert result.findings[0].lock in {"kb_lock", "self.kb_lock"}
+
+
+def test_forbidden_under_lock_supports_suffix_and_match_any_receivers(tmp_path) -> None:
+    result = _scan_forbidden_under_lock(
+        tmp_path,
+        """with kb_lock:
+    service.process.run([])
+    thread.join()
+    event.wait()
+    child.communicate()
+""",
+    )
+
+    assert [finding.regex for finding in result.findings] == [
+        "forbidden-under-lock:service.process.run",
+        "forbidden-under-lock:thread.join",
+        "forbidden-under-lock:event.wait",
+        "forbidden-under-lock:child.communicate",
+    ]
+
+
+def test_forbidden_under_lock_allows_outside_lock_and_nonblocking_calls(tmp_path) -> None:
+    result = _scan_forbidden_under_lock(
+        tmp_path,
+        """time.sleep(1)
+with kb_lock:
+    keyboard.set_color((1, 2, 3))
+    thread.start()
+""",
+    )
+
+    assert result.findings == ()
+
+
+def test_forbidden_under_lock_supports_async_with_and_nested_function_scope(tmp_path) -> None:
+    result = _scan_forbidden_under_lock(
+        tmp_path,
+        """async def apply():
+    async with self.kb_lock:
+        time.sleep(1)
+        def later():
+            time.sleep(1)
+""",
+    )
+
+    assert len(result.findings) == 1
+    assert result.findings[0].line == 3
+
+
+def test_forbidden_under_lock_does_not_include_bare_methods_or_arbitrary_callbacks(tmp_path) -> None:
+    result = _scan_forbidden_under_lock(
+        tmp_path,
+        """with kb_lock:
+    sleep(1)
+    callback()
+""",
     )
 
     assert result.findings == ()

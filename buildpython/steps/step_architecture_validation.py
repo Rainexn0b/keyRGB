@@ -88,6 +88,17 @@ def architecture_validation_runner() -> RunResult:
                     }
                     for item in rule.calls
                 ],
+                "forbidden_under_locks": [
+                    {
+                        "receivers": list(item.receivers),
+                        "receiver_suffixes": list(item.receiver_suffixes),
+                        "methods": list(item.methods),
+                        "match_any_receiver": item.match_any_receiver,
+                        "required_locks": list(item.required_locks),
+                        "message": item.message,
+                    }
+                    for item in rule.forbidden_under_locks
+                ],
                 "lock_orders": [
                     {
                         "locks": [{"name": lock.name, "aliases": list(lock.aliases)} for lock in item.locks],

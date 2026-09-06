@@ -23,6 +23,8 @@
   cache-only brightness bookkeeping is the sole keyword-exempt path.
 - Build/Architecture: Enforce the configured `_start_lock -> kb_lock ->
   _brightness_fade_lock` order for nested runtime lock acquisitions.
+- Build/Architecture: Reject configured blocking calls while the primary
+  keyboard lock is held, including sleeps, process launches, and waits.
 
 ## 0.34.0 (2026-08-31)
 

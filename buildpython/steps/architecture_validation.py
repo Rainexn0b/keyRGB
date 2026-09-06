@@ -61,6 +61,16 @@ class ArchitectureCallRule:
 
 
 @dataclass(frozen=True)
+class ArchitectureForbiddenUnderLockCallRule:
+    receivers: tuple[str, ...]
+    receiver_suffixes: tuple[str, ...]
+    methods: tuple[str, ...]
+    match_any_receiver: bool
+    required_locks: tuple[str, ...]
+    message: str
+
+
+@dataclass(frozen=True)
 class ArchitectureLock:
     name: str
     aliases: tuple[str, ...]
@@ -83,6 +93,7 @@ class ArchitectureRule:
     imports: tuple[ArchitectureImportRule, ...]
     attributes: tuple[ArchitectureAttributeRule, ...]
     calls: tuple[ArchitectureCallRule, ...] = ()
+    forbidden_under_locks: tuple[ArchitectureForbiddenUnderLockCallRule, ...] = ()
     lock_orders: tuple[ArchitectureLockOrderRule, ...] = ()
 
     @property
@@ -90,6 +101,18 @@ class ArchitectureRule:
         """Compatibility alias for callers that name the rule category explicitly."""
 
         return self.calls
+
+    @property
+    def forbidden_call_rules(self) -> tuple[ArchitectureForbiddenUnderLockCallRule, ...]:
+        """Compatibility alias for the forbidden-under-lock call category."""
+
+        return self.forbidden_under_locks
+
+    @property
+    def forbidden_calls(self) -> tuple[ArchitectureForbiddenUnderLockCallRule, ...]:
+        """Short compatibility alias for forbidden-under-lock calls."""
+
+        return self.forbidden_under_locks
 
 
 @dataclass(frozen=True)
@@ -218,10 +241,69 @@ def load_architecture_rules(config_path: Path) -> list[ArchitectureRule]:
                 )
             )
 
+        forbidden_under_locks: list[ArchitectureForbiddenUnderLockCallRule] = []
+        raw_forbidden = (
+            raw_rule.get(
+                "forbidden_under_locks",
+                raw_rule.get(
+                    "forbidden_calls_under_locks",
+                    raw_rule.get("forbidden_calls_under_lock", raw_rule.get("forbidden_calls", [])),
+                ),
+            )
+            or []
+        )
+        if not isinstance(raw_forbidden, list):
+            raise ValueError(  # noqa: TRY004
+                f"architecture rule {rule_id!r} has invalid forbidden-under-lock call rules"
+            )
+        for raw_forbidden_call in raw_forbidden:
+            if not isinstance(raw_forbidden_call, dict):
+                raise ValueError(  # noqa: TRY004
+                    f"architecture rule {rule_id!r} has an invalid forbidden-under-lock call entry"
+                )
+            receivers = _load_string_values(raw_forbidden_call.get("receivers", []), rule_id=rule_id, field="receivers")
+            receiver_suffixes = _load_string_values(
+                raw_forbidden_call.get("receiver_suffixes", []), rule_id=rule_id, field="receiver_suffixes"
+            )
+            methods = _load_string_values(raw_forbidden_call.get("methods", []), rule_id=rule_id, field="methods")
+            required_locks = _load_string_values(
+                raw_forbidden_call.get("required_locks", raw_forbidden_call.get("locks", [])),
+                rule_id=rule_id,
+                field="required_locks",
+            )
+            match_any_receiver = raw_forbidden_call.get("match_any_receiver", False)
+            message = str(raw_forbidden_call.get("message", "")).strip()
+            if (
+                (not receivers and not receiver_suffixes and match_any_receiver is not True)
+                or not methods
+                or not required_locks
+                or not message
+                or type(match_any_receiver) is not bool
+            ):
+                raise ValueError(f"architecture rule {rule_id!r} has an invalid forbidden-under-lock call entry")
+            forbidden_under_locks.append(
+                ArchitectureForbiddenUnderLockCallRule(
+                    receivers=receivers,
+                    receiver_suffixes=receiver_suffixes,
+                    methods=methods,
+                    match_any_receiver=match_any_receiver,
+                    required_locks=required_locks,
+                    message=message,
+                )
+            )
+
         lock_orders = _load_lock_order_rules(raw_rule=raw_rule, rule_id=rule_id)
-        if not patterns and not imports and not attributes and not calls and not lock_orders:
+        if (
+            not patterns
+            and not imports
+            and not attributes
+            and not calls
+            and not forbidden_under_locks
+            and not lock_orders
+        ):
             raise ValueError(
-                f"architecture rule {rule_id!r} has no patterns, import rules, attribute rules, call rules, or lock-order rules"
+                f"architecture rule {rule_id!r} has no patterns, import rules, attribute rules, call rules, "
+                "forbidden-under-lock call rules, or lock-order rules"
             )
 
         rules.append(
@@ -235,6 +317,7 @@ def load_architecture_rules(config_path: Path) -> list[ArchitectureRule]:
                 imports=tuple(imports),
                 attributes=tuple(attributes),
                 calls=tuple(calls),
+                forbidden_under_locks=tuple(forbidden_under_locks),
                 lock_orders=tuple(lock_orders),
             )
         )
@@ -289,7 +372,7 @@ def scan_architecture(root: Path, rules: Iterable[ArchitectureRule]) -> Architec
                 imports, attributes = signals
 
             calls: tuple[_ScannedCall, ...] = ()
-            if rule.calls:
+            if rule.calls or rule.forbidden_under_locks:
                 cached_calls = scanned_python_calls.get(rel)
                 if cached_calls is None:
                     cached_calls = _scan_python_calls(text)
@@ -434,6 +517,39 @@ def scan_architecture(root: Path, rules: Iterable[ArchitectureRule]) -> Architec
                         )
                     )
 
+            for forbidden_rule in rule.forbidden_under_locks:
+                for scanned_call in calls:
+                    receiver_matches = forbidden_rule.match_any_receiver or (
+                        scanned_call.receiver in forbidden_rule.receivers
+                        or any(scanned_call.receiver.endswith(suffix) for suffix in forbidden_rule.receiver_suffixes)
+                    )
+                    if not receiver_matches or scanned_call.method not in forbidden_rule.methods:
+                        continue
+                    matching_lock = next(
+                        (lock for lock in scanned_call.lexical_locks if lock in forbidden_rule.required_locks),
+                        None,
+                    )
+                    if matching_lock is None:
+                        continue
+
+                    finding_token = f"forbidden-under-lock:{scanned_call.receiver}.{scanned_call.method}"
+                    finding_key = (rule.rule_id, rel, scanned_call.line, forbidden_rule.message, finding_token)
+                    if finding_key in seen_findings:
+                        continue
+                    seen_findings.add(finding_key)
+                    findings.append(
+                        ArchitectureFinding(
+                            rule_id=rule.rule_id,
+                            severity=rule.severity,
+                            path=rel,
+                            line=scanned_call.line,
+                            message=forbidden_rule.message,
+                            snippet=_line_snippet(lines=lines, line=scanned_call.line),
+                            regex=finding_token,
+                            lock=matching_lock,
+                        )
+                    )
+
     findings.sort(key=lambda item: (item.severity != "error", item.path, item.line, item.rule_id))
     return ArchitectureScanResult(
         findings=tuple(findings),
@@ -458,6 +574,14 @@ def _literal_keyword_matches(*, actual: object, expected: object) -> bool:
     """Compare literal keyword values without treating ``False`` as ``0``."""
 
     return type(actual) is type(expected) and actual == expected
+
+
+def _load_string_values(raw_values: object, *, rule_id: str, field: str) -> tuple[str, ...]:
+    if raw_values is None:
+        return ()
+    if not isinstance(raw_values, list) or any(not isinstance(value, str) or not value.strip() for value in raw_values):
+        raise ValueError(f"architecture rule {rule_id!r} has invalid forbidden-under-lock {field}")
+    return tuple(value.strip() for value in raw_values)
 
 
 def _load_lock_order_rules(*, raw_rule: object, rule_id: str) -> list[ArchitectureLockOrderRule]:
