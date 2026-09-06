@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from pathlib import Path
 
+from ._architecture_validation_call_scan import _scan_python_calls
 from ._architecture_validation_helpers import (
     _iter_rule_files,
     _line_number,
@@ -10,7 +11,6 @@ from ._architecture_validation_helpers import (
     _module_matches_import_rule,
     _rel_path,
     _scan_python_assignments,
-    _scan_python_calls,
     _scan_python_lock_acquisitions,
     _scan_python_signals,
     _ScannedAssignment,
