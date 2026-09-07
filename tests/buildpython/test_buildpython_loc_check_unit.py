@@ -69,6 +69,8 @@ def test_loc_check_runner_uses_bucketed_thresholds_and_relaxed_test_limits(tmp_p
     markdown = (tmp_path / "buildlog" / "keyrgb" / "loc-check.md").read_text(encoding="utf-8")
     assert "Default file ranges: monitor=350-399, refactor=400-449, critical=450-549, severe=550+" in markdown
     assert "Test-file ranges: monitor=400-449, refactor=450-499, critical=500-600, severe=601+" in markdown
+    assert "| Bucket | Default | Tests | Total |" in markdown
+    assert "| Severe | 1 | 1 | 2 |" in markdown
     assert "| Lines | Bucket | Scope | Path |" in markdown
 
 
@@ -160,6 +162,6 @@ def test_terminal_loc_check_highlight_summarizes_buckets_and_top_file(tmp_path) 
     lines = build_terminal_loc_check_highlight(buildlog_dir)
 
     assert any(
-        "monitor 1" in line and "critical 1" in line and "severe 1" in line and "tests 1" in line for line in lines
+        "monitor 1" in line and "critical 1" in line and "severe 1 (0 default, 1 tests)" in line for line in lines
     )
     assert any("Top LOC" in line and "tests/test_big.py" in line and "SEVERE" in line for line in lines)

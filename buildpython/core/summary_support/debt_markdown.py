@@ -8,6 +8,7 @@ from .common import (
     file_size_structure_candidate_counts,
     loc_bucket_parts,
     loc_check_counts,
+    loc_severe_scope_part,
     read_json_if_exists,
 )
 
@@ -221,7 +222,10 @@ def append_debt_snapshot(lines: list[str], buildlog_dir: Path) -> None:
     if loc_check is not None:
         loc_counts, default_counts, test_counts = loc_check_counts(loc_check)
         files = loc_check.get("files", [])
-        bucket_parts = loc_bucket_parts(loc_counts, assignment=True)
+        bucket_parts = loc_bucket_parts({**loc_counts, "severe": 0}, assignment=True)
+        severe_part = loc_severe_scope_part(default_counts, test_counts, assignment=True)
+        if severe_part is not None:
+            bucket_parts.append(severe_part)
 
         lines.append("### LOC Check")
         lines.append(f"- File buckets: {', '.join(bucket_parts) if bucket_parts else 'none'}")

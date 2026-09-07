@@ -91,7 +91,13 @@ def _stdout_label(item: dict[str, Any]) -> str:
     return f"[{bucket}]"
 
 
-def _markdown_lines(*, thresholds: dict[str, str], rows: list[dict[str, Any]], counts: dict[str, int]) -> list[str]:
+def _markdown_lines(
+    *,
+    thresholds: dict[str, str],
+    rows: list[dict[str, Any]],
+    counts: dict[str, int],
+    counts_by_scope: dict[str, dict[str, int]],
+) -> list[str]:
     md_lines: list[str] = [
         "# LOC check",
         "",
@@ -102,14 +108,31 @@ def _markdown_lines(*, thresholds: dict[str, str], rows: list[dict[str, Any]], c
         "",
         "## Bucket counts",
         "",
-        "| Bucket | Count |",
-        "|---|---:|",
+        "| Bucket | Default | Tests | Total |",
+        "|---|---:|---:|---:|",
     ]
 
+    default_counts = counts_by_scope.get("default", {})
+    test_counts = counts_by_scope.get("tests", {})
     for bucket in DEFAULT_LOC_BUCKETS:
-        md_lines.append(f"| {bucket.label} | {counts.get(bucket.key, 0)} |")
+        md_lines.append(
+            "| "
+            f"{bucket.label} | "
+            f"{default_counts.get(bucket.key, 0)} | "
+            f"{test_counts.get(bucket.key, 0)} | "
+            f"{counts.get(bucket.key, 0)} |"
+        )
 
-    md_lines.extend(["", f"Count: {counts.get('total', 0)}", ""])
+    md_lines.extend(
+        [
+            "",
+            (
+                f"Count: {counts.get('total', 0)} "
+                f"(default {default_counts.get('total', 0)}, tests {test_counts.get('total', 0)})"
+            ),
+            "",
+        ]
+    )
 
     if not rows:
         md_lines.append("No files exceed configured LOC thresholds.")
@@ -184,7 +207,10 @@ def loc_check_runner() -> RunResult:
 
         write_json(report_json, data)
         write_csv(report_csv, ["lines", "bucket", "scope", "path"], [])
-        write_md(report_md, _markdown_lines(thresholds=thresholds, rows=hits, counts=counts))
+        write_md(
+            report_md,
+            _markdown_lines(thresholds=thresholds, rows=hits, counts=counts, counts_by_scope=counts_by_scope),
+        )
 
         return RunResult(
             command_str="(internal) loc check",
@@ -209,7 +235,10 @@ def loc_check_runner() -> RunResult:
         ["lines", "bucket", "scope", "path"],
         [[str(item["lines"]), str(item["bucket"]), str(item["scope"]), str(item["path"])] for item in hits],
     )
-    write_md(report_md, _markdown_lines(thresholds=thresholds, rows=hits, counts=counts))
+    write_md(
+        report_md,
+        _markdown_lines(thresholds=thresholds, rows=hits, counts=counts, counts_by_scope=counts_by_scope),
+    )
 
     # Informational by default; do not fail.
     return RunResult(

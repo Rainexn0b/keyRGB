@@ -887,16 +887,16 @@ def test_write_summary_and_debt_index_include_loc_check_snapshot(tmp_path) -> No
     terminal_lines = build_terminal_loc_check_highlight(buildlog_dir)
 
     assert "### LOC Check" in build_summary_md
-    assert "File buckets: monitor=1, refactor=1, severe=1" in build_summary_md
+    assert "File buckets: monitor=1, refactor=1, severe=1 (default 0, tests 1)" in build_summary_md
     assert "Test-scope hits: 1" in build_summary_md
     assert "Largest file: tests/test_big.py (620 lines, SEVERE)" in build_summary_md
 
     assert "## LOC check" in debt_index_md
-    assert "File buckets: monitor=1, refactor=1, severe=1" in debt_index_md
+    assert "File buckets: monitor=1, refactor=1, severe=1 (default 0, tests 1)" in debt_index_md
     assert "Default-scope hits: 2" in debt_index_md
     assert "Test-scope hits: 1" in debt_index_md
 
-    assert any("tests 1" in line for line in terminal_lines)
+    assert any("severe 1 (0 default, 1 tests)" in line for line in terminal_lines)
 
 
 def test_terminal_coverage_highlight_summarizes_total_and_prefixes(tmp_path) -> None:

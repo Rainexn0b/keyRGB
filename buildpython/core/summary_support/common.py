@@ -87,6 +87,22 @@ def loc_bucket_parts(counts: dict[str, Any], *, assignment: bool) -> list[str]:
     return parts
 
 
+def loc_severe_scope_part(
+    default_counts: dict[str, int],
+    test_counts: dict[str, int],
+    *,
+    assignment: bool,
+) -> str | None:
+    default_severe = default_counts.get("severe", 0)
+    test_severe = test_counts.get("severe", 0)
+    total = default_severe + test_severe
+    if not total:
+        return None
+    if assignment:
+        return f"severe={total} (default {default_severe}, tests {test_severe})"
+    return f"severe {total} ({default_severe} default, {test_severe} tests)"
+
+
 def _normalize_loc_counts(raw_counts: object) -> dict[str, int]:
     counts = {key: 0 for key, _label in _LOC_BUCKET_KEYS}
     counts["total"] = 0

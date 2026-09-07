@@ -7,6 +7,7 @@ from .common import (
     file_size_structure_candidate_counts,
     loc_bucket_parts,
     loc_check_counts,
+    loc_severe_scope_part,
     read_json_if_exists,
 )
 
@@ -206,10 +207,11 @@ def build_terminal_loc_check_highlight(buildlog_dir: Path) -> list[str]:
     if loc_check is None:
         return []
 
-    counts, _default_counts, test_counts = loc_check_counts(loc_check)
-    parts = loc_bucket_parts(counts, assignment=False)
-    if test_counts.get("total", 0):
-        parts.append(f"tests {test_counts['total']}")
+    counts, default_counts, test_counts = loc_check_counts(loc_check)
+    parts = loc_bucket_parts({**counts, "severe": 0}, assignment=False)
+    severe_part = loc_severe_scope_part(default_counts, test_counts, assignment=False)
+    if severe_part is not None:
+        parts.append(severe_part)
     if not parts:
         return []
 

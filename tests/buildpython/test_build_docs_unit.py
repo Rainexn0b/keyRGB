@@ -41,5 +41,5 @@ def test_contributing_doc_points_at_existing_backend_guides() -> None:
     assert "docs/developement/backends/" not in text
     assert "docs/B-backend-guides/" in text
     assert (_REPO_ROOT / "docs" / "B-backend-guides").is_dir()
-    assert (_REPO_ROOT / "docs" / "2-usage" / "04-hardware_tests.md").is_file()
+    assert (_REPO_ROOT / "docs" / "2-usage" / "validation.md").is_file()
     assert (_REPO_ROOT / "docs" / "3-contributing" / "01-build_runner.md").is_file()

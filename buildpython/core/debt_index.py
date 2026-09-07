@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .summary_support.common import loc_bucket_parts, loc_check_counts
+from .summary_support.common import loc_bucket_parts, loc_check_counts, loc_severe_scope_part
 
 
 def _read_json_if_exists(path: Path) -> dict[str, Any] | None:
@@ -266,7 +266,10 @@ def write_debt_index(buildlog_dir: Path) -> None:
         if isinstance(loc_check, dict):
             loc_counts, default_counts, test_counts = loc_check_counts(loc_check)
             files = loc_check.get("files", [])
-            bucket_parts = loc_bucket_parts(loc_counts, assignment=True)
+            bucket_parts = loc_bucket_parts({**loc_counts, "severe": 0}, assignment=True)
+            severe_part = loc_severe_scope_part(default_counts, test_counts, assignment=True)
+            if severe_part is not None:
+                bucket_parts.append(severe_part)
             lines.extend(["## LOC check", ""])
             lines.append(f"- File buckets: {', '.join(bucket_parts) if bucket_parts else 'none'}")
             if default_counts.get("total", 0):
