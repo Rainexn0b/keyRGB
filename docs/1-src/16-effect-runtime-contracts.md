@@ -68,7 +68,9 @@ dependencies relevant to the test.
 them. It does not inspect `__code__` / `__closure__`, and it does not parse
 `ValueError` text. Legacy or plugin callables without metadata still receive the
 historical common fields, but new in-tree hardware-effect builders must publish
-the explicit contract.
+the explicit contract. Enforced by architecture rule
+`hardware-effect-builders-no-introspection` in
+`buildpython/config/architecture_rules.json`.
 
 The current in-tree hardware-effect backends with builders all publish metadata:
 

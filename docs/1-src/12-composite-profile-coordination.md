@@ -60,7 +60,9 @@ this pattern. Neither does a controller with a proven zone-local patch command.
 
 `SecondaryDeviceRoute` remains the UI, profile, diagnostics, simulation, and
 software-target addressing surface. Tray code should not learn c197 packet
-layout or group ordering.
+layout or group ordering. Enforced by architecture rule
+`composite-coordinator-stays-backend-local` in
+`buildpython/config/architecture_rules.json`.
 
 The backend translates those independent logical operations into complete
 physical-controller commits.

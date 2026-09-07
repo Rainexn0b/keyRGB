@@ -321,6 +321,77 @@ submit_gui_work(self, self.root, work, on_done)
     assert helper.findings == ()
 
 
+def test_configured_composite_coordinator_rule_forbids_unrelated_imports(tmp_path) -> None:
+    result = scan_configured_rule(
+        tmp_path,
+        "from keyrgb.core.backends.ite8258_perkey_chassis.profile_coordinator import Ite8258ChassisProfileCoordinator\n",
+        rule_id="composite-coordinator-stays-backend-local",
+        relative_path="keyrgb/tray/controllers/secondary_device_controller.py",
+    )
+
+    assert result.findings
+    assert {finding.rule_id for finding in result.findings} == {"composite-coordinator-stays-backend-local"}
+
+
+def test_configured_composite_coordinator_rule_allows_owning_package(tmp_path) -> None:
+    result = scan_configured_rule(
+        tmp_path,
+        "from .profile_coordinator import Ite8258ChassisProfileCoordinator\nfrom .protocol import SAVE_PROFILE\n",
+        rule_id="composite-coordinator-stays-backend-local",
+        relative_path="keyrgb/core/backends/ite8258_perkey_chassis/device.py",
+    )
+
+    assert result.findings == ()
+
+
+def test_configured_poller_pystray_rule_forbids_direct_imports(tmp_path) -> None:
+    imported = scan_configured_rule(
+        tmp_path,
+        "import pystray\n",
+        rule_id="pollers-no-direct-pystray",
+        relative_path="keyrgb/tray/pollers/icon_color_polling.py",
+    )
+    loaded = scan_configured_rule(
+        tmp_path,
+        "import_module('pystray')\n",
+        rule_id="pollers-no-direct-pystray",
+        relative_path="keyrgb/tray/pollers/idle_power/polling.py",
+    )
+
+    assert {finding.rule_id for finding in imported.findings} == {"pollers-no-direct-pystray"}
+    assert {finding.rule_id for finding in loaded.findings} == {"pollers-no-direct-pystray"}
+
+
+def test_configured_core_profile_rule_forbids_tray_imports_and_private_getattr(tmp_path) -> None:
+    imported = scan_configured_rule(
+        tmp_path,
+        "from keyrgb.tray.app.application import KeyRGBTray\n",
+        rule_id="core-profile-no-private-tray-lookup",
+        relative_path="keyrgb/core/profile/runtime_activation.py",
+    )
+    private = scan_configured_rule(
+        tmp_path,
+        'getattr(tray, "_start_effect")\n',
+        rule_id="core-profile-no-private-tray-lookup",
+        relative_path="keyrgb/core/profile/runtime_activation.py",
+    )
+
+    assert {finding.rule_id for finding in imported.findings} == {"core-profile-no-private-tray-lookup"}
+    assert {finding.rule_id for finding in private.findings} == {"core-profile-no-private-tray-lookup"}
+
+
+def test_configured_hardware_effect_rule_forbids_code_introspection(tmp_path) -> None:
+    result = scan_configured_rule(
+        tmp_path,
+        "accepted = builder.__code__.co_varnames\n",
+        rule_id="hardware-effect-builders-no-introspection",
+        relative_path="keyrgb/core/effects/device/hw_payloads.py",
+    )
+
+    assert result.findings
+    assert {finding.rule_id for finding in result.findings} == {"hardware-effect-builders-no-introspection"}
+
+
 def test_current_repo_has_no_architecture_findings() -> None:
     assert scan_architecture(REPO_ROOT, production_architecture_rules()).findings == ()
 

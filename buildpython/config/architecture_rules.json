@@ -641,6 +641,92 @@
           "message": "subprocess operations must not run while holding the primary keyboard lock."
         }
       ]
+    },
+    {
+      "id": "composite-coordinator-stays-backend-local",
+      "description": "ITE 8258 chassis profile coordination and protocol stay backend-local. Tray, GUI, and unrelated core modules must not import packet layout or the coordinator.",
+      "severity": "error",
+      "corpus": {
+        "include": [
+          "keyrgb/**/*.py"
+        ],
+        "exclude": [
+          "keyrgb/core/backends/ite8258_perkey_chassis/**/*.py"
+        ]
+      },
+      "imports": [
+        {
+          "module": "keyrgb.core.backends.ite8258_perkey_chassis.profile_coordinator",
+          "message": "Profile coordination stays inside ite8258_perkey_chassis; tray/GUI/other core modules must not import the coordinator."
+        },
+        {
+          "module": "keyrgb.core.backends.ite8258_perkey_chassis.protocol",
+          "message": "ITE 8258 chassis packet layout stays inside ite8258_perkey_chassis; do not import protocol from tray, GUI, or unrelated core modules."
+        }
+      ]
+    },
+    {
+      "id": "pollers-no-direct-pystray",
+      "description": "Tray pollers request icon/menu refresh facades; they must not import or load pystray themselves.",
+      "severity": "error",
+      "corpus": {
+        "include": [
+          "keyrgb/tray/pollers/**/*.py"
+        ]
+      },
+      "imports": [
+        {
+          "module": "pystray",
+          "message": "Pollers must not import pystray; request refresh through tray UI facades."
+        }
+      ],
+      "patterns": [
+        {
+          "regex": "import_module\\(\\s*[\"']pystray[\"']",
+          "message": "Pollers must not load pystray via import_module; request refresh through tray UI facades."
+        }
+      ]
+    },
+    {
+      "id": "core-profile-no-private-tray-lookup",
+      "description": "Core profile activation accepts explicit hooks and must not resolve private tray methods or import tray packages.",
+      "severity": "error",
+      "corpus": {
+        "include": [
+          "keyrgb/core/profile/**/*.py"
+        ]
+      },
+      "patterns": [
+        {
+          "regex": "^\\s*(?:from|import)\\s+keyrgb\\.tray\\b",
+          "flags": "m",
+          "message": "Core profile modules must not import tray; callers inject runtime hooks."
+        },
+        {
+          "regex": "getattr\\([^,]+,\\s*['\\\"]_",
+          "message": "Core profile code must not look up private attributes by name; pass explicit hooks."
+        }
+      ]
+    },
+    {
+      "id": "hardware-effect-builders-no-introspection",
+      "description": "Hardware-effect payload building must not inspect __code__ or __closure__; builders publish accepted_kwargs.",
+      "severity": "error",
+      "corpus": {
+        "include": [
+          "keyrgb/core/**/*.py"
+        ]
+      },
+      "patterns": [
+        {
+          "regex": "__code__",
+          "message": "Hardware-effect builders must not inspect __code__; declare accepted_kwargs on hardware_effect_builder()."
+        },
+        {
+          "regex": "__closure__",
+          "message": "Hardware-effect builders must not inspect __closure__; declare accepted_kwargs on hardware_effect_builder()."
+        }
+      ]
     }
   ]
 }

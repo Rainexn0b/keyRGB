@@ -119,7 +119,8 @@ adapter contract:
 - KeyRGB mutations of the pystray image and menu are centralized in
   `keyrgb/tray/ui/refresh.py` and use only the public `Icon.icon` and `Icon.menu`
   properties. Pollers request those facades and must not access the pystray
-  surface directly.
+  surface directly. Enforced by architecture rule `pollers-no-direct-pystray`
+  in `buildpython/config/architecture_rules.json`.
 - In pystray 0.19.5, the GTK/AppIndicator implementations schedule native work
   with `GObject.idle_add`; the Xorg implementation rewrites update operations
   into messages handled by its mainloop thread. Current upstream retains those
@@ -136,7 +137,9 @@ adapter contract:
 
 Core profile activation (`keyrgb/core/profile/runtime_activation.py`) applies profile
 data to shared config through injected load/apply functions only. It does not
-resolve private tray methods or tray-owned attributes by name.
+resolve private tray methods or tray-owned attributes by name. Enforced by
+architecture rule `core-profile-no-private-tray-lookup` in
+`buildpython/config/architecture_rules.json`.
 
 Tray-owned runtime side effects are wired explicitly by callers:
 

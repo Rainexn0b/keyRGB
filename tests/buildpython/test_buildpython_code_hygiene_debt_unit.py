@@ -199,6 +199,27 @@ compat_layer = True
     )
 
 
+def test_text_scanners_allow_documented_legacy_snapshot_identifier(tmp_path) -> None:
+    root = tmp_path
+    target = root / "keyrgb" / "core" / "secondary_lighting_state.py"
+    target.parent.mkdir(parents=True)
+    target.write_text(
+        """
+def legacy_snapshot_from_config(config):
+    return config
+
+EXPORTS = ("legacy_snapshot_from_config",)
+legacy_alias = thing
+""".strip(),
+        encoding="utf-8",
+    )
+
+    cleanup_issues = text_scanners._detect_cleanup_hotspots(target, root)
+
+    assert [issue.line for issue in cleanup_issues] == [5]
+    assert cleanup_issues[0].snippet == "legacy_alias = thing"
+
+
 def test_text_scanners_do_not_self_flag_cleanup_or_defensive_patterns() -> None:
     scanner_path = Path(text_scanners.__file__).resolve()
     ast_helper_path = Path(file_size_ast_scan_helpers.__file__).resolve()

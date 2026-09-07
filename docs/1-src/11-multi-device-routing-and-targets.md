@@ -84,7 +84,7 @@ Two helpers with different jobs must not be confused:
 | Helper | Module | Role |
 |---|---|---|
 | `authoritative_payload_from_config` | `secondary_static_scene` | Is the config mirror a complete explicit profile scene? |
-| `legacy_snapshot_from_config` | `secondary_lighting_state` | Build a non-persistent compatibility snapshot from legacy accessors |
+| `legacy_snapshot_from_config` | `secondary_lighting_state` | Build a non-persistent compatibility snapshot from legacy accessors. This name is the supported compatibility helper, not leftover cleanup debt. |
 
 Authority uses the **registered** profile-capable route catalog, not current device
 availability. Reading legacy state never creates or rewrites profile files.

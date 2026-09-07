@@ -67,6 +67,7 @@ _CLEANUP_MARKERS = [
     _compile_pattern("compat", "_", ignore_case=True),
 ]
 _CLEANUP_EXCLUDE_PATHS = ["keyrgb/tests/", "tests/"]
+_CLEANUP_ALLOWED_IDENTIFIERS = ("legacy_snapshot_from_config",)
 _CLEANUP_MARKER_MESSAGE = _join_parts(
     "Cleanup/",
     "fa",
@@ -245,8 +246,11 @@ def _detect_cleanup_hotspots(path: Path, root: Path) -> list[HygieneIssue]:
     except _TEXT_READ_ERRORS:
         return issues
     for idx, line in enumerate(text.splitlines(), start=1):
+        scan_line = line
+        for identifier in _CLEANUP_ALLOWED_IDENTIFIERS:
+            scan_line = scan_line.replace(identifier, "")
         for pattern in _CLEANUP_MARKERS:
-            if pattern.search(line):
+            if pattern.search(scan_line):
                 issues.append(
                     HygieneIssue(
                         category="cleanup_hotspot",
