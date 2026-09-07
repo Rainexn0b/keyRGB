@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import shutil
 import time
 
@@ -15,8 +16,20 @@ def _is_module_available(module: str) -> bool:
     return importlib.util.find_spec(module) is not None
 
 
+def _is_ci_environment() -> bool:
+    false_values = {"", "0", "false", "no", "off"}
+    return any(str(os.environ.get(name, "")).strip().lower() not in false_values for name in ("CI", "GITHUB_ACTIONS"))
+
+
 def run_step(
-    step: Step, *, index: int, total_steps: int, name_width: int, label_width: int, verbose: bool
+    step: Step,
+    *,
+    index: int,
+    total_steps: int,
+    name_width: int,
+    label_width: int,
+    verbose: bool,
+    compact_ci: bool,
 ) -> StepOutcome:
     start = time.time()
     _ui._print_step_header(step, index=index, total_steps=total_steps, name_width=name_width, label_width=label_width)
@@ -37,8 +50,10 @@ def run_step(
             exit_code=0,
             duration_s=duration,
             message="ruff not installed",
+            highlights=("ruff not installed",),
         )
-        _ui._print_step_footer(outcome, ["ruff not installed"])
+        if not compact_ci:
+            _ui._print_step_footer(outcome, ["ruff not installed"])
         return outcome
 
     if step.name == "Black" and not _is_module_available("black"):
@@ -56,8 +71,10 @@ def run_step(
             exit_code=0,
             duration_s=duration,
             message="black not installed",
+            highlights=("black not installed",),
         )
-        _ui._print_step_footer(outcome, ["black not installed"])
+        if not compact_ci:
+            _ui._print_step_footer(outcome, ["black not installed"])
         return outcome
 
     if step.name == "Type Check" and not _is_module_available("mypy"):
@@ -75,8 +92,10 @@ def run_step(
             exit_code=0,
             duration_s=duration,
             message="mypy not installed",
+            highlights=("mypy not installed",),
         )
-        _ui._print_step_footer(outcome, ["mypy not installed"])
+        if not compact_ci:
+            _ui._print_step_footer(outcome, ["mypy not installed"])
         return outcome
 
     if step.name == "Coverage" and (not _is_module_available("coverage") or not _is_module_available("pytest")):
@@ -94,8 +113,10 @@ def run_step(
             exit_code=0,
             duration_s=duration,
             message="coverage or pytest not installed",
+            highlights=("coverage or pytest not installed",),
         )
-        _ui._print_step_footer(outcome, ["coverage or pytest not installed"])
+        if not compact_ci:
+            _ui._print_step_footer(outcome, ["coverage or pytest not installed"])
         return outcome
 
     if step.name == "Dead Code" and not _is_module_available("vulture"):
@@ -113,8 +134,10 @@ def run_step(
             exit_code=0,
             duration_s=duration,
             message="vulture not installed",
+            highlights=("vulture not installed",),
         )
-        _ui._print_step_footer(outcome, ["vulture not installed"])
+        if not compact_ci:
+            _ui._print_step_footer(outcome, ["vulture not installed"])
         return outcome
 
     if step.name == "ShellCheck" and shutil.which("shellcheck") is None:
@@ -132,8 +155,10 @@ def run_step(
             exit_code=0,
             duration_s=duration,
             message="shellcheck not installed",
+            highlights=("shellcheck not installed",),
         )
-        _ui._print_step_footer(outcome, ["shellcheck not installed"])
+        if not compact_ci:
+            _ui._print_step_footer(outcome, ["shellcheck not installed"])
         return outcome
 
     result = step.runner()
@@ -148,15 +173,17 @@ def run_step(
         duration,
     )
 
+    highlights = _ui._step_highlights(step, stdout=result.stdout, stderr=result.stderr)
     outcome = StepOutcome(
         status="success" if result.exit_code == 0 else "failure",
         exit_code=result.exit_code,
         duration_s=duration,
+        highlights=tuple(highlights),
     )
-    highlights = _ui._step_highlights(step, stdout=result.stdout, stderr=result.stderr)
-    _ui._print_step_footer(outcome, highlights)
+    if not compact_ci:
+        _ui._print_step_footer(outcome, highlights)
 
-    if verbose or result.exit_code != 0:
+    if verbose or (result.exit_code != 0 and not compact_ci):
         if result.stdout.strip():
             print(result.stdout.rstrip())
         if result.stderr.strip():
@@ -187,6 +214,7 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
 
     started = time.time()
     summaries: list[summary_module.StepSummary] = []
+    compact_ci = _is_ci_environment() and not verbose
 
     def _health_score() -> int:
         considered = [s for s in summaries if s.status != "skipped"]
@@ -197,7 +225,13 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
 
     for index, step in enumerate(steps, start=1):
         outcome = run_step(
-            step, index=index, total_steps=total_steps, name_width=name_width, label_width=label_width, verbose=verbose
+            step,
+            index=index,
+            total_steps=total_steps,
+            name_width=name_width,
+            label_width=label_width,
+            verbose=verbose,
+            compact_ci=compact_ci,
         )
 
         summaries.append(
@@ -209,6 +243,16 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
                 duration_s=outcome.duration_s,
             )
         )
+
+        if compact_ci:
+            _ui._print_ci_step_footer(
+                step,
+                outcome,
+                index=index,
+                total_steps=total_steps,
+                name_width=name_width,
+                health_score=_health_score(),
+            )
 
         if outcome.status == "failure" and not continue_on_error:
             _ui._print_failure_guidance(step, index=index, total_steps=total_steps)

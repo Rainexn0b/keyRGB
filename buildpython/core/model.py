@@ -22,3 +22,4 @@ class StepOutcome:
     exit_code: int
     duration_s: float
     message: str = ""
+    highlights: tuple[str, ...] = ()

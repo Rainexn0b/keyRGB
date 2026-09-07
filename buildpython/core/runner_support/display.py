@@ -77,6 +77,32 @@ def _print_step_footer(outcome: StepOutcome, highlights: list[str]) -> None:
         print(_color(f"    {line}", _DIM))
 
 
+def _health_bar(score: int, *, width: int = 20) -> str:
+    normalized = max(0, min(100, int(score)))
+    filled = max(0, min(width, round(normalized / 100 * width)))
+    bar_color = _GREEN if normalized >= 90 else _YELLOW if normalized >= 70 else _RED
+    return f"{_color('█' * filled, bar_color)}{_color('░' * (width - filled), _DIM)}"
+
+
+def _print_ci_step_footer(
+    step: Step,
+    outcome: StepOutcome,
+    *,
+    index: int,
+    total_steps: int,
+    name_width: int,
+    health_score: int,
+) -> None:
+    icon = _status_icon(outcome.status)
+    label = f"[{index}/{total_steps}]"
+    name = f"{step.name:<{name_width}}"
+    health = f"Build health {health_score}/100  [{_health_bar(health_score)}]"
+    duration = f"{outcome.duration_s:.1f}s"
+    print(_color(f"{icon}{label}  {name} : {health}  ·  {duration}", _status_color(outcome.status)))
+    for line in outcome.highlights:
+        print(_color(f"    {line}", _DIM))
+
+
 def _print_failure_guidance(step: Step, *, index: int, total_steps: int) -> None:
     print()
     print(_color(f"{_status_icon('failure')}Build stopped at [{index}/{total_steps}]: {step.name}", _RED))

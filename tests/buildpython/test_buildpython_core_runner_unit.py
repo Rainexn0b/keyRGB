@@ -7,6 +7,7 @@ import pytest
 
 from buildpython.core import runner
 from buildpython.core.model import Step, StepOutcome
+from buildpython.utils.subproc import RunResult
 
 
 def test_is_module_available_checks_module_spec(monkeypatch) -> None:
@@ -28,6 +29,19 @@ def test_is_module_available_propagates_unexpected_find_spec_failures(monkeypatc
 
     with pytest.raises(AssertionError, match="unexpected spec failure"):
         runner._is_module_available("ruff")
+
+
+def test_ci_environment_detection_honors_standard_flags(monkeypatch) -> None:
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    assert runner._is_ci_environment() is False
+
+    monkeypatch.setenv("CI", "true")
+    assert runner._is_ci_environment() is True
+
+    monkeypatch.setenv("CI", "0")
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    assert runner._is_ci_environment() is True
 
 
 def _steps(tmp_path: Path, *names: str) -> list[Step]:
@@ -147,3 +161,45 @@ def test_continue_on_error_normalizes_invalid_zero_failure_code(monkeypatch, tmp
     exit_code = runner.run(_steps(tmp_path, "one"), verbose=False, continue_on_error=True)
 
     assert exit_code == 1
+
+
+def test_ci_output_uses_healthbar_and_keeps_failure_details_in_step_log(monkeypatch, tmp_path: Path, capsys) -> None:
+    _capture_runner_summaries(monkeypatch, tmp_path)
+    monkeypatch.setenv("CI", "true")
+    raw_failure = "first diagnostic\nsecond diagnostic\n"
+    step = Step(
+        number=1,
+        name="Demo",
+        description="run demo",
+        log_file=tmp_path / "step-01-demo.log",
+        runner=lambda: RunResult(command_str="demo", stdout=raw_failure, stderr="", exit_code=7),
+    )
+
+    exit_code = runner.run([step], verbose=False, continue_on_error=False)
+
+    output = capsys.readouterr().out
+    assert exit_code == 7
+    assert "Build health 0/100" in output
+    assert "[░░░░░░░░░░░░░░░░░░░░]" in output
+    assert raw_failure.strip() not in output
+    assert f"→ See {step.log_file}" in output
+    assert "first diagnostic" in step.log_file.read_text(encoding="utf-8")
+
+
+def test_verbose_ci_output_still_prints_failure_details(monkeypatch, tmp_path: Path, capsys) -> None:
+    _capture_runner_summaries(monkeypatch, tmp_path)
+    monkeypatch.setenv("CI", "true")
+    step = Step(
+        number=1,
+        name="Demo",
+        description="run demo",
+        log_file=tmp_path / "step-01-demo.log",
+        runner=lambda: RunResult(command_str="demo", stdout="full diagnostic\n", stderr="", exit_code=2),
+    )
+
+    exit_code = runner.run([step], verbose=True, continue_on_error=False)
+
+    output = capsys.readouterr().out
+    assert exit_code == 2
+    assert "full diagnostic" in output
+    assert "Build health 0/100" not in output

@@ -78,6 +78,15 @@ jobs:
           print("wheel resource smoke ok")
           PY
 
+      - name: Upload quality build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: keyrgb-quality-buildlog
+          path: buildlog/keyrgb/
+          if-no-files-found: warn
+          retention-days: 7
+
   test:
     name: Runtime Matrix (Py${{ matrix.python-version }})
     runs-on: ubuntu-latest
@@ -108,3 +117,12 @@ jobs:
           KEYRGB_HW_TESTS: "0"
         run: |
           python -m buildpython --run-steps="Compile,Import Validation,Import Scan,Pip Check,Pytest,Coverage"
+
+      - name: Upload runtime build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: keyrgb-runtime-${{ matrix.python-version }}-buildlog
+          path: buildlog/keyrgb/
+          if-no-files-found: warn
+          retention-days: 7
