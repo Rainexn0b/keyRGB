@@ -53,10 +53,18 @@ def test_initial_perkey_sw_start_primes_single_frame_without_startup_fade(monkey
     engine.stop()
 
 
-def test_controller_native_wake_handoff_skips_initial_prime(monkeypatch) -> None:
+def test_controller_native_wake_handoff_reasserts_mode_without_initial_prime(monkeypatch) -> None:
+    class PerKeyKeyboard(NullKeyboard):
+        def __init__(self) -> None:
+            self.mode_calls: list[tuple[int | None, bool]] = []
+
+        def enable_user_mode(self, *, brightness: int | None = None, save: bool = False) -> None:
+            self.mode_calls.append((brightness, save))
+
     engine = EffectsEngine()
     engine.backend_caps = _backend_caps(per_key=True)
-    engine.kb = NullKeyboard()
+    keyboard = PerKeyKeyboard()
+    engine.kb = keyboard
     engine.device_available = True
     engine._ensure_device_available = lambda: True  # type: ignore[assignment]
     engine.per_key_colors = {(0, 0): (0, 255, 255)}
@@ -75,6 +83,7 @@ def test_controller_native_wake_handoff_skips_initial_prime(monkeypatch) -> None
     )
 
     assert calls == []
+    assert keyboard.mode_calls == [(50, False)]
     assert engine._device_mode_off is False
     assert engine._last_hw_mode_brightness == 50
     assert engine._last_rendered_brightness == 50

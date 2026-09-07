@@ -220,11 +220,20 @@ class _EngineStart:
 
         if controller_brightness_handoff is not None:
             # Native ITE sleep wakes the already-lit controller at its own
-            # brightness before userspace can write. Do not insert another
-            # mode prime (target snap) or explicit off. Publish that observed
-            # physical level as the first render baseline; the reactive frame
-            # guard owns the intentional up/down handoff to start_brightness.
+            # brightness before userspace can write. Reassert user mode at that
+            # physical level: some wakes keep reporting brightness zero and
+            # ignore row/brightness-only writes until the mode command lands.
+            # Avoid a normal prime at start_brightness because that would snap
+            # to the target before the reactive frame guard can own the smooth
+            # handoff from the controller's physical level.
             handoff_brightness = max(0, min(50, int(controller_brightness_handoff)))
+            from keyrgb.core.effects.perkey_animation import enable_user_mode_once
+
+            enable_user_mode_once(
+                kb=self.kb,
+                kb_lock=self.kb_lock,
+                brightness=max(1, handoff_brightness),
+            )
             self._last_hw_mode_brightness = handoff_brightness
             self._last_rendered_brightness = handoff_brightness
             ensure_reactive_state(self)._reactive_controller_brightness_handoff_active = True
