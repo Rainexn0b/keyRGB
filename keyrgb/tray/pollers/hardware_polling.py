@@ -122,6 +122,7 @@ def start_hardware_polling(tray: IdlePowerTrayProtocol) -> threading.Thread:
         last_off_state: object | None = None
         last_error_at = 0.0
         last_real_poll_at = time.monotonic()
+        last_real_controller_sleep_off = _controller_sleep_off_active(tray)
         poll_revision: int | None = None
 
         def _recover_polling_error(exc: Exception) -> None:
@@ -140,11 +141,17 @@ def start_hardware_polling(tray: IdlePowerTrayProtocol) -> threading.Thread:
 
         while not polling_lifecycle.shutdown_requested(tray):
             # While reactive pulses are mid-flight, synchronous USB reads would
-            # stall the render thread. Defer on a short retry cadence.
+            # stall the render thread. Defer on a short retry cadence, except
+            # after input clears controller-sleep ownership and the resulting
+            # wake still needs its first accepted hardware verification.
+            current_controller_sleep_off = _controller_sleep_off_active(tray)
             if _should_defer_poll_for_reactive_pulses(
                 reactive_pulse_mix=_reactive_pulse_mix_or_zero(tray),
                 now=time.monotonic(),
                 last_real_poll_at=last_real_poll_at,
+                controller_wake_verification_pending=(
+                    last_real_controller_sleep_off and not current_controller_sleep_off
+                ),
             ):
                 if polling_lifecycle.wait_for_shutdown(
                     tray,
@@ -182,6 +189,7 @@ def start_hardware_polling(tray: IdlePowerTrayProtocol) -> threading.Thread:
             last_real_poll_at = time.monotonic()
             if polled_state is not None:
                 last_brightness, last_off_state = polled_state
+                last_real_controller_sleep_off = _controller_sleep_off_active(tray)
 
             if polling_lifecycle.wait_for_shutdown(
                 tray,

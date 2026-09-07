@@ -37,9 +37,12 @@ def should_defer_poll_for_reactive_pulses(
     reactive_pulse_mix: float,
     now: float,
     last_real_poll_at: float,
+    controller_wake_verification_pending: bool = False,
     max_defer_s: float = REACTIVE_PULSE_POLL_DEFER_MAX_S,
 ) -> bool:
     """True when a hardware poll should wait for reactive pulses to drain."""
+    if controller_wake_verification_pending:
+        return False
     if float(reactive_pulse_mix) <= 0.0:
         return False
     return (float(now) - float(last_real_poll_at)) < float(max_defer_s)

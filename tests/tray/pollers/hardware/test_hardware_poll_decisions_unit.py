@@ -281,3 +281,10 @@ def test_should_defer_poll_for_reactive_pulses() -> None:
     assert not should_defer_poll_for_reactive_pulses(reactive_pulse_mix=0.5, now=106.0, last_real_poll_at=97.0)
     # Boundary: exactly at the cap -> poll anyway (defer window expired).
     assert not should_defer_poll_for_reactive_pulses(reactive_pulse_mix=0.5, now=102.0, last_real_poll_at=97.0)
+
+    assert not should_defer_poll_for_reactive_pulses(
+        reactive_pulse_mix=0.5,
+        now=100.0,
+        last_real_poll_at=97.0,
+        controller_wake_verification_pending=True,
+    )

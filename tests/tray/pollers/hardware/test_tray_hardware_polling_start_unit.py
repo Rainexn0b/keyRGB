@@ -16,7 +16,7 @@ class _FakeThread:
         self.started = True
 
 
-def test_start_hardware_polling_creates_daemon_thread_and_loop_runs_once(
+def test_start_hardware_polling_verifies_controller_wake_before_deferring(
     monkeypatch,
 ) -> None:
     import keyrgb.tray.pollers.hardware_polling as hp
@@ -34,12 +34,30 @@ def test_start_hardware_polling_creates_daemon_thread_and_loop_runs_once(
 
     def fake_apply(*_a, **_kw):
         calls["apply"] += 1
+        if calls["apply"] == 1:
+            return None
         return (1, False)
 
     monkeypatch.setattr(hp, "_apply_polled_hardware_state", fake_apply)
+    defer_checks: list[bool] = []
 
-    # Stop after the first loop iteration.
-    monkeypatch.setattr(hp.time, "sleep", lambda _s: (_ for _ in ()).throw(KeyboardInterrupt()))
+    def fake_should_defer(**kwargs):
+        defer_checks.append(bool(kwargs["controller_wake_verification_pending"]))
+        return False
+
+    monkeypatch.setattr(hp, "_should_defer_poll_for_reactive_pulses", fake_should_defer)
+    sleep_states = iter((True, False, False, False, False, False))
+    monkeypatch.setattr(hp, "_controller_sleep_off_active", lambda _tray: next(sleep_states))
+
+    sleep_calls = 0
+
+    def fake_sleep(_seconds: float) -> None:
+        nonlocal sleep_calls
+        sleep_calls += 1
+        if sleep_calls == 3:
+            raise KeyboardInterrupt()
+
+    monkeypatch.setattr(hp.time, "sleep", fake_sleep)
 
     class _Lock:
         def __enter__(self):
@@ -63,7 +81,10 @@ def test_start_hardware_polling_creates_daemon_thread_and_loop_runs_once(
     with pytest.raises(KeyboardInterrupt):
         t.target()
 
-    assert calls["apply"] == 1
+    assert calls["apply"] == 3
+    # A stale first poll does not consume the wake-verification edge. The first
+    # accepted poll does, so ordinary pulse deferral is eligible again.
+    assert defer_checks == [True, True, False]
 
 
 def test_stale_hardware_observation_is_rejected_after_newer_transition(monkeypatch) -> None:
