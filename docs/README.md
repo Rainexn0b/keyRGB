@@ -14,7 +14,7 @@ canonical documents instead of duplicating the project README.
 ## User guides
 
 - [Usage, setup, and troubleshooting](2-usage/README.md)
-- [Diagnostic sessions](2-usage/logs/diagnostic_sessions.md)
+- [Diagnostics](2-usage/diagnostics.md)
 
 ## Development and maintenance
 

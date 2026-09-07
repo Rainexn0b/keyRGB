@@ -175,7 +175,8 @@ If you use numeric step selectors, list steps first. Step numbers can move as th
 
 - `README.md`
 - `docs/3-contributing/01-build_runner.md`
-- `docs/2-usage/04-hardware_tests.md`
+- `docs/2-usage/setup.md`
+- `docs/2-usage/validation.md`
 - `docs/B-backend-guides/`
 - `keyrgb/core/backends/README.md`
 - `tests/conftest.py` for hardware-safety assumptions in normal test runs

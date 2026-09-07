@@ -1,19 +1,12 @@
-# 2-usage — User-facing usage and setup
+# 2-usage — Setup, validation, and diagnostics
 
-**Scope:** End-user guides for installing, running, troubleshooting, and
-operating KeyRGB.
+End-user and local-checkout guides. Product install stays in `README.md`.
 
-## Documents
+| Page | Use when |
+|---|---|
+| [setup.md](setup.md) | Create the venv and install system tray deps |
+| [validation.md](validation.md) | Run tests and `buildpython` gates |
+| [diagnostics.md](diagnostics.md) | Capture a shareable runtime bundle |
+| [artifacts.md](artifacts.md) | AppImage and Python package builds |
 
-- `venv/setup.md` — virtual environment and system dependency setup
-- `venv/local_environment.md` — local environment quick start
-- `04-hardware_tests.md` — opt-in hardware tests
-- `logs/diagnostic_sessions.md` — canonical runtime diagnostic bundles
-- `logs/brightness_logging.md` — brightness and runtime debug logging
-- `artifacts/appimage.md` — AppImage release artifact notes
-- `artifacts/package_build.md` — optional Python package build
-
-## See also
-
-- `docs/3-contributing/` — contributor workflow (build runner, commit/release
-  procedure, code hygiene)
+Contributor gates and release flow: `docs/3-contributing/`.

@@ -43,8 +43,8 @@ sudo dnf install ShellCheck
 
 # Full pipeline
 
-Run the full pipeline with no trailing path argument.
-
+Use the project venv, not distro `python`. Host numpy stubs on Python 3.14 can
+fail Type Check against the 3.10 mypy floor. See `docs/2-usage/setup.md`.
 
 ```bash
 .venv/bin/python -m buildpython

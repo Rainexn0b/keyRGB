@@ -14,5 +14,5 @@ procedures, code hygiene, and static analysis.
 
 ## See also
 
-- `docs/2-usage/` — end-user setup and troubleshooting
+- `docs/2-usage/` — venv setup, validation, diagnostics
 - `docs/1-buildpython/` — buildpython design and internals
