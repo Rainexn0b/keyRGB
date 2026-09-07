@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 # @quality-exception file-size-analysis: idle-power runtime state machine; policy/sensors/actions already live in sibling modules
+# @quality-exception loc-check: idle-power runtime state machine; policy/sensors/actions already live in sibling modules
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
