@@ -31,19 +31,6 @@ def test_is_module_available_propagates_unexpected_find_spec_failures(monkeypatc
         runner._is_module_available("ruff")
 
 
-def test_ci_environment_detection_honors_standard_flags(monkeypatch) -> None:
-    monkeypatch.delenv("CI", raising=False)
-    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
-    assert runner._is_ci_environment() is False
-
-    monkeypatch.setenv("CI", "true")
-    assert runner._is_ci_environment() is True
-
-    monkeypatch.setenv("CI", "0")
-    monkeypatch.setenv("GITHUB_ACTIONS", "true")
-    assert runner._is_ci_environment() is True
-
-
 def _steps(tmp_path: Path, *names: str) -> list[Step]:
     return [
         Step(
@@ -163,9 +150,10 @@ def test_continue_on_error_normalizes_invalid_zero_failure_code(monkeypatch, tmp
     assert exit_code == 1
 
 
-def test_ci_output_uses_healthbar_and_keeps_failure_details_in_step_log(monkeypatch, tmp_path: Path, capsys) -> None:
+def test_default_output_uses_healthbar_and_keeps_failure_details_in_step_log(
+    monkeypatch, tmp_path: Path, capsys
+) -> None:
     _capture_runner_summaries(monkeypatch, tmp_path)
-    monkeypatch.setenv("CI", "true")
     raw_failure = "first diagnostic\nsecond diagnostic\n"
     step = Step(
         number=1,
@@ -186,9 +174,8 @@ def test_ci_output_uses_healthbar_and_keeps_failure_details_in_step_log(monkeypa
     assert "first diagnostic" in step.log_file.read_text(encoding="utf-8")
 
 
-def test_verbose_ci_output_still_prints_failure_details(monkeypatch, tmp_path: Path, capsys) -> None:
+def test_verbose_output_still_prints_failure_details(monkeypatch, tmp_path: Path, capsys) -> None:
     _capture_runner_summaries(monkeypatch, tmp_path)
-    monkeypatch.setenv("CI", "true")
     step = Step(
         number=1,
         name="Demo",

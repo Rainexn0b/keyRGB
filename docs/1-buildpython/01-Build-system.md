@@ -106,10 +106,10 @@ Debt-focused steps write structured reports under the same directory when they r
 
 `build-summary.md` includes the overall build state plus a debt snapshot of available structured reports. `debt-index.md` is the combined report index for debt-oriented outputs. When present, both surfaces summarize file-size and LOC hotspots so debt-oriented size issues are visible without opening each standalone report.
 
-In CI, buildpython automatically replaces raw command dumps with cumulative
-build-health bars and concise structured highlights. Canonical per-step logs
-still retain complete stdout and stderr; CI workflows upload them on failure.
-Passing `--verbose` explicitly restores raw terminal output.
+By default, buildpython replaces raw command dumps with cumulative build-health
+bars and concise structured highlights in local terminals and CI. Canonical
+per-step logs still retain complete stdout and stderr; CI workflows upload them
+on failure. Passing `--verbose` explicitly restores raw terminal output.
 
 ## Related docs
 

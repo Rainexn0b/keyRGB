@@ -84,7 +84,7 @@ def _health_bar(score: int, *, width: int = 20) -> str:
     return f"{_color('█' * filled, bar_color)}{_color('░' * (width - filled), _DIM)}"
 
 
-def _print_ci_step_footer(
+def _print_step_health_footer(
     step: Step,
     outcome: StepOutcome,
     *,

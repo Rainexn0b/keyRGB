@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib.util
-import os
 import shutil
 import time
 
@@ -16,11 +15,6 @@ def _is_module_available(module: str) -> bool:
     return importlib.util.find_spec(module) is not None
 
 
-def _is_ci_environment() -> bool:
-    false_values = {"", "0", "false", "no", "off"}
-    return any(str(os.environ.get(name, "")).strip().lower() not in false_values for name in ("CI", "GITHUB_ACTIONS"))
-
-
 def run_step(
     step: Step,
     *,
@@ -29,7 +23,7 @@ def run_step(
     name_width: int,
     label_width: int,
     verbose: bool,
-    compact_ci: bool,
+    compact_output: bool,
 ) -> StepOutcome:
     start = time.time()
     _ui._print_step_header(step, index=index, total_steps=total_steps, name_width=name_width, label_width=label_width)
@@ -52,7 +46,7 @@ def run_step(
             message="ruff not installed",
             highlights=("ruff not installed",),
         )
-        if not compact_ci:
+        if not compact_output:
             _ui._print_step_footer(outcome, ["ruff not installed"])
         return outcome
 
@@ -73,7 +67,7 @@ def run_step(
             message="black not installed",
             highlights=("black not installed",),
         )
-        if not compact_ci:
+        if not compact_output:
             _ui._print_step_footer(outcome, ["black not installed"])
         return outcome
 
@@ -94,7 +88,7 @@ def run_step(
             message="mypy not installed",
             highlights=("mypy not installed",),
         )
-        if not compact_ci:
+        if not compact_output:
             _ui._print_step_footer(outcome, ["mypy not installed"])
         return outcome
 
@@ -115,7 +109,7 @@ def run_step(
             message="coverage or pytest not installed",
             highlights=("coverage or pytest not installed",),
         )
-        if not compact_ci:
+        if not compact_output:
             _ui._print_step_footer(outcome, ["coverage or pytest not installed"])
         return outcome
 
@@ -136,7 +130,7 @@ def run_step(
             message="vulture not installed",
             highlights=("vulture not installed",),
         )
-        if not compact_ci:
+        if not compact_output:
             _ui._print_step_footer(outcome, ["vulture not installed"])
         return outcome
 
@@ -157,7 +151,7 @@ def run_step(
             message="shellcheck not installed",
             highlights=("shellcheck not installed",),
         )
-        if not compact_ci:
+        if not compact_output:
             _ui._print_step_footer(outcome, ["shellcheck not installed"])
         return outcome
 
@@ -180,10 +174,10 @@ def run_step(
         duration_s=duration,
         highlights=tuple(highlights),
     )
-    if not compact_ci:
+    if not compact_output:
         _ui._print_step_footer(outcome, highlights)
 
-    if verbose or (result.exit_code != 0 and not compact_ci):
+    if verbose:
         if result.stdout.strip():
             print(result.stdout.rstrip())
         if result.stderr.strip():
@@ -214,7 +208,7 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
 
     started = time.time()
     summaries: list[summary_module.StepSummary] = []
-    compact_ci = _is_ci_environment() and not verbose
+    compact_output = not verbose
 
     def _health_score() -> int:
         considered = [s for s in summaries if s.status != "skipped"]
@@ -231,7 +225,7 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
             name_width=name_width,
             label_width=label_width,
             verbose=verbose,
-            compact_ci=compact_ci,
+            compact_output=compact_output,
         )
 
         summaries.append(
@@ -244,8 +238,8 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
             )
         )
 
-        if compact_ci:
-            _ui._print_ci_step_footer(
+        if compact_output:
+            _ui._print_step_health_footer(
                 step,
                 outcome,
                 index=index,
