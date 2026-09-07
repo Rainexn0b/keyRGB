@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 # @quality-exception file-size-analysis: PowerManager public facade after battery-saver extract; remaining methods are thin event/monitor delegates
+# @quality-exception loc-check: PowerManager facade after battery-saver extract; remaining methods are thin event/monitor delegates
 import logging
 import threading
 import time

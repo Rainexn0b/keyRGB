@@ -74,6 +74,43 @@ def test_loc_check_runner_uses_bucketed_thresholds_and_relaxed_test_limits(tmp_p
     assert "| Lines | Bucket | Scope | Path |" in markdown
 
 
+def test_loc_check_runner_honors_typed_quality_exception_waivers(tmp_path, monkeypatch) -> None:
+    waived = tmp_path / "keyrgb" / "protocol.py"
+    waived.parent.mkdir(parents=True)
+    waived.write_text(
+        "\n".join(
+            [
+                "# @quality-exception loc-check: cohesive protocol tables",
+                *[f"value_{index} = {index}" for index in range(560)],
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    _write_python_file(tmp_path / "tests" / "test_severe.py", total_lines=620)
+
+    monkeypatch.setattr(step_loc_check, "repo_root", lambda: tmp_path)
+
+    result = step_loc_check.loc_check_runner()
+    payload = json.loads((tmp_path / "buildlog" / "keyrgb" / "loc-check.json").read_text(encoding="utf-8"))
+    markdown = (tmp_path / "buildlog" / "keyrgb" / "loc-check.md").read_text(encoding="utf-8")
+
+    assert result.exit_code == 0
+    assert payload["counts"]["severe"] == 1
+    assert payload["counts_by_scope"]["default"]["severe"] == 0
+    assert payload["waivers"] == [
+        {
+            "lines": 561,
+            "path": "keyrgb/protocol.py",
+            "scope": "default",
+            "reason": "cohesive protocol tables",
+        }
+    ]
+    assert "Quality-exception waivers: 1" in result.stdout
+    assert "`@quality-exception loc-check`" in markdown
+    assert "keyrgb/protocol.py" in markdown
+
+
 def test_loc_check_runner_omits_zero_count_buckets_in_stdout(tmp_path, monkeypatch) -> None:
     _write_python_file(tmp_path / "keyrgb" / "severe_only.py", total_lines=560)
 

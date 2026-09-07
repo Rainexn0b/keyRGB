@@ -16,7 +16,28 @@ from .loc_check_constants import (
     threshold_descriptions,
     threshold_map,
 )
+from .quality_exceptions import explanation_for_quality_exception_step
 from .reports import write_csv, write_json, write_md
+
+_QUALITY_EXCEPTION_STEP_SLUG = "loc-check"
+
+
+def _comment_text(line: str) -> str | None:
+    comment_index = line.find("#")
+    if comment_index == -1:
+        return None
+    return line[comment_index + 1 :].strip()
+
+
+def loc_check_quality_exception_reason(lines: list[str]) -> str | None:
+    for line in lines:
+        explanation = explanation_for_quality_exception_step(
+            _comment_text(line),
+            step_slug=_QUALITY_EXCEPTION_STEP_SLUG,
+        )
+        if explanation:
+            return explanation
+    return None
 
 
 def _iter_py_files() -> list[Path]:
@@ -97,6 +118,7 @@ def _markdown_lines(
     rows: list[dict[str, Any]],
     counts: dict[str, int],
     counts_by_scope: dict[str, dict[str, int]],
+    waived_rows: list[dict[str, Any]],
 ) -> list[str]:
     md_lines: list[str] = [
         "# LOC check",
@@ -133,6 +155,18 @@ def _markdown_lines(
             "",
         ]
     )
+    if waived_rows:
+        md_lines.extend(
+            [
+                "## Quality-exception waivers (`@quality-exception loc-check`)",
+                "",
+                "| Lines | Scope | Path | Reason |",
+                "|---:|---|---|---|",
+            ]
+        )
+        for item in waived_rows:
+            md_lines.append(f"| {int(item['lines'])} | {item['scope']} | {item['path']} | {item['reason']} |")
+        md_lines.append("")
 
     if not rows:
         md_lines.append("No files exceed configured LOC thresholds.")
@@ -157,15 +191,28 @@ def loc_check_runner() -> RunResult:
     thresholds = threshold_descriptions()
 
     hits: list[dict[str, Any]] = []
+    waived_rows: list[dict[str, Any]] = []
     for p in files:
         try:
-            line_count = len(p.read_text(encoding="utf-8", errors="replace").splitlines())
+            source_lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
         except OSError:
             continue
 
+        line_count = len(source_lines)
         rel_path = p.relative_to(root)
         bucket = loc_bucket(line_count, rel_path=rel_path)
         if bucket is None:
+            continue
+        waiver_reason = loc_check_quality_exception_reason(source_lines)
+        if waiver_reason is not None:
+            waived_rows.append(
+                {
+                    "lines": line_count,
+                    "path": str(rel_path),
+                    "scope": loc_scope(rel_path),
+                    "reason": waiver_reason,
+                }
+            )
             continue
         hits.append(
             {
@@ -177,6 +224,7 @@ def loc_check_runner() -> RunResult:
         )
 
     hits.sort(key=lambda item: (int(item["lines"]), str(item["path"])), reverse=True)
+    waived_rows.sort(key=lambda item: (int(item["lines"]), str(item["path"])), reverse=True)
     counts = _bucket_counts(hits)
     counts_by_scope = _bucket_counts_by_scope(hits)
 
@@ -199,6 +247,7 @@ def loc_check_runner() -> RunResult:
         "counts": counts,
         "counts_by_scope": counts_by_scope,
         "files": hits,
+        "waivers": waived_rows,
     }
 
     if not hits:
@@ -209,7 +258,13 @@ def loc_check_runner() -> RunResult:
         write_csv(report_csv, ["lines", "bucket", "scope", "path"], [])
         write_md(
             report_md,
-            _markdown_lines(thresholds=thresholds, rows=hits, counts=counts, counts_by_scope=counts_by_scope),
+            _markdown_lines(
+                thresholds=thresholds,
+                rows=hits,
+                counts=counts,
+                counts_by_scope=counts_by_scope,
+                waived_rows=waived_rows,
+            ),
         )
 
         return RunResult(
@@ -224,6 +279,8 @@ def loc_check_runner() -> RunResult:
     bucket_summary = _bucket_summary_line(counts)
     if bucket_summary is not None:
         stdout_lines.append(bucket_summary)
+    if waived_rows:
+        stdout_lines.append(f"Quality-exception waivers: {len(waived_rows)}")
     stdout_lines.append("")
     stdout_lines.append("Largest files:")
     for item in hits[:80]:
@@ -237,7 +294,13 @@ def loc_check_runner() -> RunResult:
     )
     write_md(
         report_md,
-        _markdown_lines(thresholds=thresholds, rows=hits, counts=counts, counts_by_scope=counts_by_scope),
+        _markdown_lines(
+            thresholds=thresholds,
+            rows=hits,
+            counts=counts,
+            counts_by_scope=counts_by_scope,
+            waived_rows=waived_rows,
+        ),
     )
 
     # Informational by default; do not fail.

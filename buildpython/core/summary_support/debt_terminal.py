@@ -212,6 +212,9 @@ def build_terminal_loc_check_highlight(buildlog_dir: Path) -> list[str]:
     severe_part = loc_severe_scope_part(default_counts, test_counts, assignment=False)
     if severe_part is not None:
         parts.append(severe_part)
+    waivers = loc_check.get("waivers")
+    if isinstance(waivers, list) and waivers:
+        parts.append(f"waived {len(waivers)}")
     if not parts:
         return []
 

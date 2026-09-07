@@ -15,6 +15,7 @@ together keeps the import direction one-way (``hardware_polling`` →
 from __future__ import annotations
 
 # @quality-exception file-size-analysis: cohesive hardware blank-recovery + shared poll helpers; intentionally extracted as one ownership unit from hardware_polling
+# @quality-exception loc-check: cohesive hardware blank-recovery helpers kept with the poller ownership unit
 import time
 from collections.abc import Callable
 from operator import attrgetter
