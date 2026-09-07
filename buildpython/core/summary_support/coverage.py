@@ -11,6 +11,7 @@ _RESET = "\033[0m" if _USE_COLOR else ""
 _BOLD = "\033[1m" if _USE_COLOR else ""
 _DIM = "\033[2m" if _USE_COLOR else ""
 _GREEN = "\033[32m" if _USE_COLOR else ""
+_YELLOW = "\033[33m" if _USE_COLOR else ""
 _RED = "\033[31m" if _USE_COLOR else ""
 
 _SEP = "\u2500" * 60  # ────────────────────────────────────────────────────────────
@@ -63,7 +64,10 @@ def build_terminal_build_overview(buildlog_dir: Path, summary: BuildSummary) -> 
 
     bar_width = 20
     filled = max(0, min(bar_width, round(summary.health_score / 100 * bar_width)))
-    bar = "\u2588" * filled + "\u2591" * (bar_width - filled)  # █ and ░
+    bar_color = _GREEN if summary.health_score >= 90 else _YELLOW if summary.health_score >= 70 else _RED
+    filled_bar = _c("\u2588" * filled, bar_color)
+    empty_bar = _c("\u2591" * (bar_width - filled), _DIM)
+    bar = f"{filled_bar}{empty_bar}"
 
     status_icon = "\u2705  " if summary.passed else "\u274c  "  # ✅ or ❌
     status_label = _c("PASS", _BOLD + _GREEN) if summary.passed else _c("FAIL", _BOLD + _RED)

@@ -14,6 +14,10 @@ _RESET = "\033[0m" if _USE_COLOR else ""
 _BOLD = "\033[1m" if _USE_COLOR else ""
 _DIM = "\033[2m" if _USE_COLOR else ""
 _CYAN = "\033[36m" if _USE_COLOR else ""
+_BLUE = "\033[34m" if _USE_COLOR else ""
+_GREEN = "\033[32m" if _USE_COLOR else ""
+_YELLOW = "\033[33m" if _USE_COLOR else ""
+_RED = "\033[31m" if _USE_COLOR else ""
 
 _SEP = "\u2500" * 60  # ─────────────────────────────────────────────────────────────
 
@@ -27,34 +31,56 @@ def _color(text: str, code: str) -> str:
 def _status_icon(status: str) -> str:
     """Fixed-width status prefix. Emoji glyphs are 2 terminal columns wide."""
     if status == "running":
-        return "\u23f3  "  # ⏳
+        return "\U0001f504  "  # 🔄
     if status == "success":
         return "\u2705  "  # ✅
     if status == "failure":
         return "\u274c  "  # ❌
     if status == "skipped":
-        return "\u23ed\ufe0f  "  # ⏭️
+        return "\u2757  "  # ❗
     return "     "
+
+
+def _status_color(status: str) -> str:
+    if status == "running":
+        return _BLUE
+    if status == "success":
+        return _GREEN
+    if status == "failure":
+        return _RED
+    if status == "skipped":
+        return _YELLOW
+    return ""
 
 
 def _print_step_header(step: Step, *, index: int, total_steps: int, name_width: int, label_width: int) -> None:
     print(_color(_SEP, _DIM))
     label = f"[{index}/{total_steps}]".ljust(label_width)
     name = f"{step.name:<{name_width}}"
-    print(f"{_status_icon('running')}{label}  {name} : {step.description}", flush=True)
+    print(
+        _color(f"{_status_icon('running')}{label}  {name} : {step.description}", _status_color("running")),
+        flush=True,
+    )
 
 
 def _print_step_footer(outcome: StepOutcome, highlights: list[str]) -> None:
     icon = _status_icon(outcome.status)
     if outcome.status == "success":
-        print(f"{icon}Completed ({outcome.duration_s:.1f}s)")
+        text = f"{icon}Completed ({outcome.duration_s:.1f}s)"
     elif outcome.status == "skipped":
-        print(f"{icon}Skipped ({outcome.duration_s:.1f}s)")
+        text = f"{icon}Skipped ({outcome.duration_s:.1f}s)"
     else:
-        print(f"{icon}Failed ({outcome.duration_s:.1f}s)")
+        text = f"{icon}Failed ({outcome.duration_s:.1f}s)"
+    print(_color(text, _status_color(outcome.status)))
 
     for line in highlights:
-        print(f"    {line}")
+        print(_color(f"    {line}", _DIM))
+
+
+def _print_failure_guidance(step: Step, *, index: int, total_steps: int) -> None:
+    print()
+    print(_color(f"{_status_icon('failure')}Build stopped at [{index}/{total_steps}]: {step.name}", _RED))
+    print(_color(f"→ See {step.log_file}", _YELLOW))
 
 
 def _extract_pytest_highlight(stdout: str, stderr: str) -> str | None:

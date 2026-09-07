@@ -211,7 +211,7 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
         )
 
         if outcome.status == "failure" and not continue_on_error:
-            print(f"\n{_ui._status_icon('failure')}Build stopped at [{index}/{total_steps}]: {step.name}")
+            _ui._print_failure_guidance(step, index=index, total_steps=total_steps)
 
             score = _health_score()
 
