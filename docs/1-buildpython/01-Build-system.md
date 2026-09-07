@@ -36,13 +36,13 @@ Bare `python -m buildpython` is not a named profile. It selects the live step re
 ## Current profiles
 
 - `ci`: lint, typing, import/packaging checks, pytest, coverage, exception
-  transparency, code hygiene, file size, dead code, ShellCheck, architecture
-  validation, and repo validation.
+  transparency, code hygiene, code markers, file size, LOC, dead code,
+  ShellCheck, architecture validation, and repo validation.
 - `debt`: compile, import validation, pytest, then structured debt reports
   (code markers, file size, LOC, code hygiene, coverage, exception
   transparency, architecture, repo validation).
 - `quick`: compile, import/packaging checks, pytest, coverage, exception
-  transparency, plus lightweight debt reporting (code markers, file size,
+  transparency, plus lightweight debt reporting (code markers, file size, LOC,
   architecture, repo validation).
 - `full`: broader local quality gate including lint, typing, dead code,
   ShellCheck, LOC, and code hygiene. `Black` stays opt-in through `--with-black`.

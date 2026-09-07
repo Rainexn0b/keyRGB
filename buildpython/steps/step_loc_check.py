@@ -8,9 +8,12 @@ from ..utils.subproc import RunResult
 from .loc_check_constants import (
     DEFAULT_LOC_BUCKETS,
     DEFAULT_THRESHOLD_LINES,
+    GATED_LOC_BUCKET_KEYS,
     LOC_BUCKET_LABELS,
     LOC_BUCKET_ORDER,
     LOC_SCAN_ROOTS,
+    gated_loc_counts,
+    has_gated_loc_hits,
     loc_bucket,
     loc_scope,
     threshold_descriptions,
@@ -103,6 +106,17 @@ def _bucket_summary_line(counts: dict[str, int]) -> str | None:
     if not parts:
         return None
     return "Buckets: " + " | ".join(parts)
+
+
+def _gated_bucket_summary_line(counts: dict[str, int]) -> str | None:
+    parts: list[str] = []
+    for key in GATED_LOC_BUCKET_KEYS:
+        current = counts.get(key, 0)
+        if current:
+            parts.append(f"{LOC_BUCKET_LABELS[key]}={current}")
+    if not parts:
+        return None
+    return "Gated LOC buckets exceed zero: " + " | ".join(parts)
 
 
 def _stdout_label(item: dict[str, Any]) -> str:
@@ -239,6 +253,7 @@ def loc_check_runner() -> RunResult:
     report_csv = report_dir / "loc-check.csv"
     report_md = report_dir / "loc-check.md"
 
+    gated_counts = gated_loc_counts(counts)
     data = {
         "threshold": DEFAULT_THRESHOLD_LINES,
         "thresholds": threshold_map(),
@@ -246,6 +261,8 @@ def loc_check_runner() -> RunResult:
         "count": len(hits),
         "counts": counts,
         "counts_by_scope": counts_by_scope,
+        "gated_buckets": list(GATED_LOC_BUCKET_KEYS),
+        "gated_counts": gated_counts,
         "files": hits,
         "waivers": waived_rows,
     }
@@ -303,12 +320,18 @@ def loc_check_runner() -> RunResult:
         ),
     )
 
-    # Informational by default; do not fail.
+    if has_gated_loc_hits(counts):
+        gated_summary = _gated_bucket_summary_line(counts)
+        stdout_lines.append("")
+        if gated_summary is not None:
+            stdout_lines.append(gated_summary)
+        stdout_lines.append("Monitor remains informational; refactor/critical/severe fail the step.")
+
     return RunResult(
         command_str="(internal) loc check",
         stdout="\n".join(stdout_lines) + "\n",
         stderr="",
-        exit_code=0,
+        exit_code=1 if has_gated_loc_hits(counts) else 0,
     )
 
 

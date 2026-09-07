@@ -30,6 +30,7 @@ TEST_LOC_BUCKETS = (
 
 LOC_BUCKET_ORDER = tuple(bucket.key for bucket in DEFAULT_LOC_BUCKETS)
 LOC_BUCKET_LABELS = {bucket.key: bucket.label for bucket in DEFAULT_LOC_BUCKETS}
+GATED_LOC_BUCKET_KEYS = ("refactor", "critical", "severe")
 DEFAULT_THRESHOLD_LINES = DEFAULT_LOC_BUCKETS[0].minimum
 
 
@@ -70,6 +71,14 @@ def threshold_map() -> dict[str, dict[str, dict[str, int]]]:
         "default": _bucket_threshold_map(DEFAULT_LOC_BUCKETS),
         "tests": _bucket_threshold_map(TEST_LOC_BUCKETS),
     }
+
+
+def gated_loc_counts(counts: dict[str, int]) -> dict[str, int]:
+    return {key: int(counts.get(key, 0)) for key in GATED_LOC_BUCKET_KEYS}
+
+
+def has_gated_loc_hits(counts: dict[str, int]) -> bool:
+    return any(count > 0 for count in gated_loc_counts(counts).values())
 
 
 def _bucket_threshold_map(buckets: tuple[LocBucket, ...]) -> dict[str, dict[str, int]]:

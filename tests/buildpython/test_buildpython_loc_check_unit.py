@@ -31,9 +31,10 @@ def test_loc_check_runner_uses_bucketed_thresholds_and_relaxed_test_limits(tmp_p
 
     result = step_loc_check.loc_check_runner()
 
-    assert result.exit_code == 0
+    assert result.exit_code == 1
     assert "Monitor=2 | Refactor=2 | Critical=2 | Severe=2" in result.stdout
     assert "Files above configured ranges: 8" in result.stdout
+    assert "Gated LOC buckets exceed zero: Refactor=2 | Critical=2 | Severe=2" in result.stdout
 
     payload = json.loads((tmp_path / "buildlog" / "keyrgb" / "loc-check.json").read_text(encoding="utf-8"))
 
@@ -95,8 +96,9 @@ def test_loc_check_runner_honors_typed_quality_exception_waivers(tmp_path, monke
     payload = json.loads((tmp_path / "buildlog" / "keyrgb" / "loc-check.json").read_text(encoding="utf-8"))
     markdown = (tmp_path / "buildlog" / "keyrgb" / "loc-check.md").read_text(encoding="utf-8")
 
-    assert result.exit_code == 0
+    assert result.exit_code == 1
     assert payload["counts"]["severe"] == 1
+    assert payload["gated_counts"]["severe"] == 1
     assert payload["counts_by_scope"]["default"]["severe"] == 0
     assert payload["waivers"] == [
         {
@@ -118,8 +120,9 @@ def test_loc_check_runner_omits_zero_count_buckets_in_stdout(tmp_path, monkeypat
 
     result = step_loc_check.loc_check_runner()
 
-    assert result.exit_code == 0
+    assert result.exit_code == 1
     assert "Severe=1" in result.stdout
+    assert "Gated LOC buckets exceed zero: Severe=1" in result.stdout
     assert "Monitor=" not in result.stdout
     assert "Refactor=" not in result.stdout
     assert "Critical=" not in result.stdout
@@ -146,6 +149,47 @@ def test_loc_check_runner_writes_empty_report_when_no_files_exceed_thresholds(tm
         "total": 0,
     }
     assert payload["files"] == []
+    assert payload["gated_buckets"] == ["refactor", "critical", "severe"]
+    assert payload["gated_counts"] == {"refactor": 0, "critical": 0, "severe": 0}
+
+
+def test_loc_check_runner_keeps_monitor_hits_informational(tmp_path, monkeypatch) -> None:
+    _write_python_file(tmp_path / "keyrgb" / "monitor.py", total_lines=360)
+    _write_python_file(tmp_path / "tests" / "test_monitor.py", total_lines=420)
+
+    monkeypatch.setattr(step_loc_check, "repo_root", lambda: tmp_path)
+
+    result = step_loc_check.loc_check_runner()
+
+    assert result.exit_code == 0
+    assert "Monitor=2" in result.stdout
+    assert "Gated LOC buckets exceed zero" not in result.stdout
+
+
+def test_loc_check_runner_does_not_fail_when_gated_hits_are_waived(tmp_path, monkeypatch) -> None:
+    waived = tmp_path / "keyrgb" / "protocol.py"
+    waived.parent.mkdir(parents=True)
+    waived.write_text(
+        "\n".join(
+            [
+                "# @quality-exception loc-check: cohesive protocol tables",
+                *[f"value_{index} = {index}" for index in range(560)],
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    _write_python_file(tmp_path / "keyrgb" / "monitor.py", total_lines=360)
+
+    monkeypatch.setattr(step_loc_check, "repo_root", lambda: tmp_path)
+
+    result = step_loc_check.loc_check_runner()
+    payload = json.loads((tmp_path / "buildlog" / "keyrgb" / "loc-check.json").read_text(encoding="utf-8"))
+
+    assert result.exit_code == 0
+    assert payload["counts"]["monitor"] == 1
+    assert payload["gated_counts"] == {"refactor": 0, "critical": 0, "severe": 0}
+    assert payload["waivers"][0]["path"] == "keyrgb/protocol.py"
 
 
 def test_debt_index_preserves_richer_loc_check_payload(tmp_path) -> None:

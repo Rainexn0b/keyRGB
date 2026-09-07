@@ -35,8 +35,8 @@ If step 18 reports a missing coverage capture, generate it first:
 .venv/bin/python -m buildpython --run-steps=2,18
 ```
 
-All new code should pass these checks. See `buildpython/steps/step_code_hygiene.py` for details and thresholds.
-Some hygiene categories are currently report-first and do not fail the build until their thresholds are tightened.
+All new code should pass these checks. See `buildpython/steps/code_hygiene/` for details and thresholds.
+Gated hygiene categories fail when counts rise above `buildpython/config/debt_baselines.json`.
 
 The generated reports now include hotspot sections so debt is easier to track over time:
 
