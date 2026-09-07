@@ -111,6 +111,16 @@ warn_unused_ignores = true
 warn_redundant_casts = true
 no_implicit_optional = true
 
+# KeyRGB does not import numpy. Host environments (especially Python 3.13+
+# with current numpy stubs) may still pull those stubs in via Pillow. Keep
+# the 3.10 type-check floor and skip unrelated stub syntax.
+[[tool.mypy.overrides]]
+module = [
+    "numpy",
+    "numpy.*",
+]
+follow_imports = "skip"
+
 [tool.ruff.lint]
 per-file-ignores = { "tests/**/*.py" = ["E402"] }
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from buildpython.steps import step_type_check
 from buildpython.utils.subproc import RunResult
 
@@ -45,3 +47,20 @@ def test_mypy_runner_propagates_failure(monkeypatch) -> None:
     assert result.command_str == "mypy"
     assert result.stderr == "type error"
     assert result.exit_code == 1
+
+
+def test_mypy_config_skips_host_numpy_stubs() -> None:
+    text = Path("pyproject.toml").read_text(encoding="utf-8")
+
+    assert 'python_version = "3.10"' in text
+    assert (
+        """
+[[tool.mypy.overrides]]
+module = [
+    "numpy",
+    "numpy.*",
+]
+follow_imports = "skip"
+""".strip()
+        in text
+    )
