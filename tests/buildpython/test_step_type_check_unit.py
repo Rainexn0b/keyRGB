@@ -53,6 +53,7 @@ def test_mypy_config_skips_host_numpy_stubs() -> None:
     text = Path("pyproject.toml").read_text(encoding="utf-8")
 
     assert 'python_version = "3.10"' in text
+    assert "explicit_package_bases = true" in text
     assert (
         """
 [[tool.mypy.overrides]]
