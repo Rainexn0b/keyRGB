@@ -188,6 +188,21 @@ class TestApplyEffectSelection:
             apply_effect_selection(mock_tray, effect_name=effect)
             assert mock_tray.config.effect == "none", f"{effect} should be blocked"
 
+    def test_unknown_effect_uses_secondary_static_fallback(self, monkeypatch):
+        from keyrgb.tray.controllers import effect_selection
+
+        fallback = MagicMock()
+        monkeypatch.setattr(effect_selection, "apply_secondary_static_fallback", fallback)
+        mock_tray = MagicMock()
+        mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
+        mock_tray.backend = self._backend()
+        mock_tray.engine.kb_lock = MagicMock(__enter__=lambda s: None, __exit__=lambda s, *a: None)
+
+        effect_selection.apply_effect_selection(mock_tray, effect_name="unknown-effect")
+
+        fallback.assert_called_once_with(mock_tray)
+        assert mock_tray.config.effect == "none"
+
     def test_stop_sets_uniform_color(self):
         """Stopping an effect should set uniform color when no per-key colors."""
         from keyrgb.tray.controllers.effect_selection import apply_effect_selection

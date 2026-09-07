@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Mapping
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from keyrgb.core import secondary_lighting_state
 from keyrgb.core.secondary_device_routes import SecondaryDeviceRoute, iter_secondary_routes
@@ -19,6 +19,9 @@ from keyrgb.core.secondary_device_runtime import (
     iter_effective_secondary_routes,
 )
 from keyrgb.tray.idle_power_state import any_forced_off
+
+if TYPE_CHECKING:
+    from ._software_target_boundaries import _SoftwareTargetTrayProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +157,17 @@ def apply_secondary_static_scene(
     return applied
 
 
+def apply_secondary_static_fallback(tray: _SoftwareTargetTrayProtocol) -> bool:
+    """Restore software-routed auxiliaries, then apply profile-owned static state."""
+
+    # Local import avoids the controller cycle through _software_target_profile.
+    from . import software_target_controller
+
+    if software_target_controller.software_effect_target_routes_aux_devices(tray):
+        software_target_controller.restore_secondary_software_targets(tray)
+    return apply_secondary_static_scene(tray)
+
+
 def apply_secondary_static_route(
     tray: object,
     route: SecondaryDeviceRoute,
@@ -228,6 +242,7 @@ def turn_off_secondary_profile_areas(
 
 
 __all__ = [
+    "apply_secondary_static_fallback",
     "apply_secondary_static_route",
     "apply_secondary_static_scene",
     "authoritative_payload_from_config",

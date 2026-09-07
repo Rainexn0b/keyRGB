@@ -14,22 +14,12 @@ from collections.abc import Mapping
 from typing import Protocol, cast
 
 from keyrgb.core.backends.base import normalize_backend_capabilities
-from keyrgb.core.effects.catalog import (
-    SW_EFFECTS_SET as SW_EFFECTS,
-    is_backend_hardware_effect,
-    is_forced_hardware_effect,
-    normalize_effect_name,
-    strip_effect_namespace,
-)
+from keyrgb.core.effects import catalog as effects_catalog
 from keyrgb.core.lighting_layers import has_nonempty_per_key_base
 from keyrgb.core.utils.exceptions import is_permission_denied
 from keyrgb.core.utils.safe_attrs import safe_int_attr
 from keyrgb.tray.controllers._effect_selection_defer import defer_effect_selection as _defer_effect_selection
-from keyrgb.tray.controllers.secondary_static_scene import apply_secondary_static_scene
-from keyrgb.tray.controllers.software_target_controller import (
-    restore_secondary_software_targets,
-    software_effect_target_routes_aux_devices,
-)
+from keyrgb.tray.controllers.secondary_static_scene import apply_secondary_static_fallback
 from keyrgb.tray.protocols import LightingTrayProtocol
 
 logger = logging.getLogger(__name__)
@@ -179,11 +169,11 @@ def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> N
         hw_effects_supported = caps.hardware_effects
 
         try:
-            effect_name = normalize_effect_name(effect_name)
+            effect_name = effects_catalog.normalize_effect_name(effect_name)
         except (AttributeError, TypeError, ValueError):
             effect_name = "none"
 
-        base_effect_name = strip_effect_namespace(effect_name)
+        base_effect_name = effects_catalog.strip_effect_namespace(effect_name)
 
         from keyrgb.tray.deck_pipeline import hardware_apply_deferred
 
@@ -208,9 +198,7 @@ def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> N
             _ensure_hardware_mode(tray)
             with tray.engine.kb_lock:
                 tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
-            if software_effect_target_routes_aux_devices(tray):
-                restore_secondary_software_targets(tray)
-            apply_secondary_static_scene(tray)
+            apply_secondary_static_fallback(tray)
             tray.is_off = False
             return
 
@@ -229,9 +217,7 @@ def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> N
                 _ensure_hardware_mode(tray)
                 with tray.engine.kb_lock:
                     tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
-                if software_effect_target_routes_aux_devices(tray):
-                    restore_secondary_software_targets(tray)
-                apply_secondary_static_scene(tray)
+                apply_secondary_static_fallback(tray)
 
             tray.is_off = False
             return
@@ -244,9 +230,7 @@ def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> N
                 _ensure_hardware_mode(tray)
                 with tray.engine.kb_lock:
                     tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
-                if software_effect_target_routes_aux_devices(tray):
-                    restore_secondary_software_targets(tray)
-                apply_secondary_static_scene(tray)
+                apply_secondary_static_fallback(tray)
                 tray.is_off = False
                 return
 
@@ -261,28 +245,30 @@ def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> N
             return
 
         # === HARDWARE EFFECTS ===
-        if is_backend_hardware_effect(effect_name, getattr(effect_tray, "backend", None)):
+        if effects_catalog.is_backend_hardware_effect(effect_name, getattr(effect_tray, "backend", None)):
             if not hw_effects_supported:
                 tray.engine.stop()
                 tray.config.effect = "none"
                 _ensure_hardware_mode(tray)
                 with tray.engine.kb_lock:
                     tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
-                if software_effect_target_routes_aux_devices(tray):
-                    restore_secondary_software_targets(tray)
-                apply_secondary_static_scene(tray)
+                apply_secondary_static_fallback(tray)
                 tray.is_off = False
                 return
 
             _set_attr_best_effort(tray.config, "per_key_colors", {})
             _ensure_hardware_mode(tray)
-            tray.config.effect = effect_name if is_forced_hardware_effect(effect_name) else base_effect_name
+            tray.config.effect = (
+                effect_name if effects_catalog.is_forced_hardware_effect(effect_name) else base_effect_name
+            )
             effect_tray._start_current_effect()
             tray.is_off = False
             return
 
         # === SOFTWARE EFFECTS ===
-        if base_effect_name in SW_EFFECTS and not is_forced_hardware_effect(effect_name):
+        if base_effect_name in effects_catalog.SW_EFFECTS_SET and not effects_catalog.is_forced_hardware_effect(
+            effect_name
+        ):
             _ensure_software_mode(tray)
             tray.config.effect = base_effect_name
             effect_tray._start_current_effect()
@@ -295,7 +281,7 @@ def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> N
         tray.config.effect = "none"
         with tray.engine.kb_lock:
             tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
-        apply_secondary_static_scene(tray)
+        apply_secondary_static_fallback(tray)
         tray.is_off = False
     except _EFFECT_SELECTION_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: effect apply crosses device I/O and tray state; permission/disconnect are dispatched and remaining recoverable runtime errors are logged with traceback
         if is_permission_denied(exc):
