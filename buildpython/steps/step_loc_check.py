@@ -5,20 +5,7 @@ from typing import Any
 
 from ..utils.paths import repo_root
 from ..utils.subproc import RunResult
-from .loc_check_constants import (
-    DEFAULT_LOC_BUCKETS,
-    DEFAULT_THRESHOLD_LINES,
-    GATED_LOC_BUCKET_KEYS,
-    LOC_BUCKET_LABELS,
-    LOC_BUCKET_ORDER,
-    LOC_SCAN_ROOTS,
-    gated_loc_counts,
-    has_gated_loc_hits,
-    loc_bucket,
-    loc_scope,
-    threshold_descriptions,
-    threshold_map,
-)
+from . import loc_check_constants as _loc_consts
 from .quality_exceptions import explanation_for_quality_exception_step
 from .reports import write_csv, write_json, write_md
 
@@ -47,7 +34,7 @@ def _iter_py_files() -> list[Path]:
     root = repo_root()
 
     paths: list[Path] = []
-    for root_name in LOC_SCAN_ROOTS:
+    for root_name in _loc_consts.LOC_SCAN_ROOTS:
         folder = root / root_name
         if not folder.exists():
             continue
@@ -60,7 +47,7 @@ def _iter_py_files() -> list[Path]:
 
 
 def _empty_bucket_counts() -> dict[str, int]:
-    counts = {key: 0 for key in LOC_BUCKET_ORDER}
+    counts = {key: 0 for key in _loc_consts.LOC_BUCKET_ORDER}
     counts["total"] = 0
     return counts
 
@@ -99,10 +86,10 @@ def _bucket_counts_by_scope(rows: list[dict[str, Any]]) -> dict[str, dict[str, i
 
 def _bucket_summary_line(counts: dict[str, int]) -> str | None:
     parts: list[str] = []
-    for key in LOC_BUCKET_ORDER:
+    for key in _loc_consts.LOC_BUCKET_ORDER:
         current = counts.get(key, 0)
         if current:
-            parts.append(f"{LOC_BUCKET_LABELS[key]}={current}")
+            parts.append(f"{_loc_consts.LOC_BUCKET_LABELS[key]}={current}")
     if not parts:
         return None
     return "Buckets: " + " | ".join(parts)
@@ -110,10 +97,10 @@ def _bucket_summary_line(counts: dict[str, int]) -> str | None:
 
 def _gated_bucket_summary_line(counts: dict[str, int]) -> str | None:
     parts: list[str] = []
-    for key in GATED_LOC_BUCKET_KEYS:
+    for key in _loc_consts.GATED_LOC_BUCKET_KEYS:
         current = counts.get(key, 0)
         if current:
-            parts.append(f"{LOC_BUCKET_LABELS[key]}={current}")
+            parts.append(f"{_loc_consts.LOC_BUCKET_LABELS[key]}={current}")
     if not parts:
         return None
     return "Gated LOC buckets exceed zero: " + " | ".join(parts)
@@ -150,7 +137,7 @@ def _markdown_lines(
 
     default_counts = counts_by_scope.get("default", {})
     test_counts = counts_by_scope.get("tests", {})
-    for bucket in DEFAULT_LOC_BUCKETS:
+    for bucket in _loc_consts.DEFAULT_LOC_BUCKETS:
         md_lines.append(
             "| "
             f"{bucket.label} | "
@@ -202,7 +189,7 @@ def _markdown_lines(
 def loc_check_runner() -> RunResult:
     root = repo_root()
     files = _iter_py_files()
-    thresholds = threshold_descriptions()
+    thresholds = _loc_consts.threshold_descriptions()
 
     hits: list[dict[str, Any]] = []
     waived_rows: list[dict[str, Any]] = []
@@ -214,7 +201,7 @@ def loc_check_runner() -> RunResult:
 
         line_count = len(source_lines)
         rel_path = p.relative_to(root)
-        bucket = loc_bucket(line_count, rel_path=rel_path)
+        bucket = _loc_consts.loc_bucket(line_count, rel_path=rel_path)
         if bucket is None:
             continue
         waiver_reason = loc_check_quality_exception_reason(source_lines)
@@ -223,7 +210,7 @@ def loc_check_runner() -> RunResult:
                 {
                     "lines": line_count,
                     "path": str(rel_path),
-                    "scope": loc_scope(rel_path),
+                    "scope": _loc_consts.loc_scope(rel_path),
                     "reason": waiver_reason,
                 }
             )
@@ -233,7 +220,7 @@ def loc_check_runner() -> RunResult:
                 "lines": line_count,
                 "path": str(rel_path),
                 "bucket": bucket,
-                "scope": loc_scope(rel_path),
+                "scope": _loc_consts.loc_scope(rel_path),
             }
         )
 
@@ -253,15 +240,15 @@ def loc_check_runner() -> RunResult:
     report_csv = report_dir / "loc-check.csv"
     report_md = report_dir / "loc-check.md"
 
-    gated_counts = gated_loc_counts(counts)
+    gated_counts = _loc_consts.gated_loc_counts(counts)
     data = {
-        "threshold": DEFAULT_THRESHOLD_LINES,
-        "thresholds": threshold_map(),
-        "scan_roots": list(LOC_SCAN_ROOTS),
+        "threshold": _loc_consts.DEFAULT_THRESHOLD_LINES,
+        "thresholds": _loc_consts.threshold_map(),
+        "scan_roots": list(_loc_consts.LOC_SCAN_ROOTS),
         "count": len(hits),
         "counts": counts,
         "counts_by_scope": counts_by_scope,
-        "gated_buckets": list(GATED_LOC_BUCKET_KEYS),
+        "gated_buckets": list(_loc_consts.GATED_LOC_BUCKET_KEYS),
         "gated_counts": gated_counts,
         "files": hits,
         "waivers": waived_rows,
@@ -320,7 +307,7 @@ def loc_check_runner() -> RunResult:
         ),
     )
 
-    if has_gated_loc_hits(counts):
+    if _loc_consts.has_gated_loc_hits(counts):
         gated_summary = _gated_bucket_summary_line(counts)
         stdout_lines.append("")
         if gated_summary is not None:
@@ -331,7 +318,7 @@ def loc_check_runner() -> RunResult:
         command_str="(internal) loc check",
         stdout="\n".join(stdout_lines) + "\n",
         stderr="",
-        exit_code=1 if has_gated_loc_hits(counts) else 0,
+        exit_code=1 if _loc_consts.has_gated_loc_hits(counts) else 0,
     )
 
 

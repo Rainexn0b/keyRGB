@@ -565,7 +565,7 @@ Add coverage for:
 
 ### Route and state tests
 
-**Files:** `tests/core/config/test_secondary_device_accessors_unit.py`, `tests/tray/test_secondary_device_routes_unit.py` (new)
+**Files:** `tests/core/config/secondary/test_secondary_device_accessors_unit.py`, `tests/tray/test_secondary_device_routes_unit.py` (new)
 
 Add coverage for:
 
@@ -576,7 +576,7 @@ Add coverage for:
 
 ### Tray and controller tests
 
-**Files:** `tests/tray/ui/menu/test_menu_sections_unit.py`, `tests/tray/controllers/power/test_tray_secondary_device_controller_unit.py`, `tests/tray/controllers/power/test_tray_software_target_controller_unit.py`
+**Files:** `tests/tray/ui/menu/test_menu_sections_unit.py`, `tests/tray/controllers/power/test_tray_secondary_device_controller_unit.py`, `tests/tray/controllers/power/software_targets/test_tray_software_target_controller_unit.py`
 
 Add coverage for:
 

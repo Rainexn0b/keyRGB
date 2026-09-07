@@ -390,7 +390,7 @@ For `read_engine_attr` / `set_engine_attr`, `AttributeError` is genuinely recove
 **Priority:** P2 (medium — closes testing gap)
 
 **Files affected (new test files):**
-- `tests/tray/pollers/idle_power/runtime/test_idle_power_dim_undim_cycle_integration.py`
+- `tests/tray/pollers/idle_power/runtime/integration/test_idle_power_dim_undim_cycle_integration.py`
 - `tests/core/effects/reactive/test_reactive_transition_thread_safety.py`
 
 **Problem:**

@@ -71,7 +71,7 @@ Secondary device route identifiers (e.g., `ite8258-chassis-logo`) and the
 - `keyrgb/core/diagnostics/_classify.py` — classification strings use canonical names
 - `tests/core/backends/test_report_pacing_unit.py` — updated env key expectations
 - `tests/core/backends/ite/test_ite8291r3_native_backend_unit.py` — updated env key
-- `tests/core/backends/general/test_backend_registry_unit.py` — alias-resolution coverage
+- `tests/core/backends/general/registry/test_backend_registry_unit.py` — alias-resolution coverage
 - `docs/B-backend-audits/00-index.md` — canonical names in audit index
 - `docs/B-backend-audits/BACKEND_AUDIT_HANDOFF.md` — this file
 
@@ -152,5 +152,5 @@ Secondary device route identifiers (e.g., `ite8258-chassis-logo`) and the
 2. Add `"old_name": "canonical_name"` to `_BACKEND_NAME_ALIASES` in `registry.py`.
 3. Update imports, display names, diagnostics classification, and startup hints.
 4. Keep secondary route identifiers stable unless they are also user-visible.
-5. Add alias-resolution tests in `tests/core/backends/general/test_backend_registry_unit.py`.
+5. Add alias-resolution tests in `tests/core/backends/general/registry/test_backend_registry_unit.py`.
 6. After one release cycle, the alias can be removed if desired.

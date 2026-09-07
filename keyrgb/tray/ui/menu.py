@@ -6,18 +6,17 @@ from collections.abc import Callable
 from typing import Protocol, cast
 
 import keyrgb.core.effects.catalog as effects_catalog
-from keyrgb.core import secondary_lighting_state
 from keyrgb.core.backends.base import normalize_backend_capabilities
-from keyrgb.core.secondary_device_routes import (
-    BRIGHTNESS_POLICY_INDEPENDENT,
-    BRIGHTNESS_POLICY_PRIMARY_SHARED,
-    SecondaryDeviceRoute,
-    route_for_context_entry,
-)
-from keyrgb.tray import secondary_device_power
+from keyrgb.core.secondary_device_routes import route_for_context_entry
 from keyrgb.tray.controllers.view_snapshots import secondary_profile_routes_available
 
-from . import _menu_callbacks as menu_callbacks, _menu_sections_effects as menu_effects, menu_sections, menu_status
+from . import (
+    _menu_callbacks as menu_callbacks,
+    _menu_sections_effects as menu_effects,
+    _menu_sections_secondary as menu_secondary,
+    menu_sections,
+    menu_status,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -79,14 +78,6 @@ def normalize_effect_label(label: str) -> str:
     # Convert human label spacing to effect_key style.
     s = re.sub(r"\s+", "_", s)
     return effects_catalog.normalize_effect_name(s)
-
-
-def _selected_secondary_is_off(tray: object, route: SecondaryDeviceRoute | None) -> bool:
-    payload = vars(tray).get("_active_secondary_lighting")
-    entry = secondary_lighting_state.area_entry(payload, getattr(route, "state_key", ""))
-    if entry is not None and "enabled" in entry:
-        return not secondary_lighting_state.entry_enabled(entry)
-    return secondary_device_power.is_off(getattr(tray, "config", None), route)
 
 
 def build_menu_items(
@@ -198,48 +189,14 @@ def build_menu_items(
             )
     else:
         controls_available = menu_status.device_context_controls_available(tray, selected_context)
-        if selected_route is not None and selected_route.brightness_policy == BRIGHTNESS_POLICY_INDEPENDENT:
-            selected_brightness_menu = pystray.Menu(
-                *[
-                    item(
-                        str(level),
-                        tray_state._on_selected_device_brightness_clicked,
-                        checked=lambda _i, current=level, route=selected_route: (
-                            secondary_device_power.current_brightness(tray_state.config, route) == current * 5
-                        ),
-                        radio=True,
-                        enabled=controls_available,
-                    )
-                    for level in range(11)
-                ]
-            )
-            selected_brightness_item = item("Brightness Override", selected_brightness_menu)
-        elif selected_route is not None and selected_route.brightness_policy == BRIGHTNESS_POLICY_PRIMARY_SHARED:
-            selected_brightness_item = item("Brightness Override (follows Keyboard)", None, enabled=False)
-        else:
-            selected_brightness_item = item("Brightness Override (not supported)", None, enabled=False)
-
-        device_label = (
-            str(getattr(selected_route, "display_name", "") or "").strip()
-            or str(selected_context.get("device_type") or "device").replace("_", " ").title()
+        selected_brightness_item, hardware_mode_items = menu_secondary.build_selected_secondary_section(
+            cast(menu_secondary._SecondaryMenuTrayProtocol, tray_state),
+            pystray=pystray,
+            item=item,
+            selected_context=selected_context,
+            selected_route=selected_route,
+            controls_available=controls_available,
         )
-        selected_device_is_off = _selected_secondary_is_off(tray, selected_route)
-        hardware_mode_items = [
-            item(
-                "Static Color…",
-                tray_state._on_selected_device_color_clicked,
-                enabled=bool(selected_route and selected_route.supports_uniform_color and controls_available),
-            ),
-            item(
-                f"Turn {'On' if selected_device_is_off else 'Off'} {device_label}",
-                (
-                    tray_state._on_selected_device_turn_on_clicked
-                    if selected_device_is_off
-                    else tray_state._on_selected_device_turn_off_clicked
-                ),
-                enabled=controls_available,
-            ),
-        ]
 
     return [
         *header_items,

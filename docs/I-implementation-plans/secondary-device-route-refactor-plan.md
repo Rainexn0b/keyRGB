@@ -284,7 +284,7 @@ The dispatcher falls back to `"_uniform"` when `route.supports_uniform_color` is
 - `src/tray/controllers/software_target_controller.py` *(verify, likely no changes needed)*
 - `src/tray/controllers/_software_target_auxiliary.py` *(verify)*
 - `src/tray/controllers/secondary_device_controller.py` *(verify)*
-- `tests/tray/controllers/power/test_tray_software_target_controller_unit.py`
+- `tests/tray/controllers/power/software_targets/test_tray_software_target_controller_unit.py`
 - `tests/tray/controllers/power/test_tray_secondary_device_controller_unit.py`
 
 ### Phase 5
@@ -303,9 +303,9 @@ The dispatcher falls back to `"_uniform"` when `route.supports_uniform_color` is
 | Route table | Existing routes unchanged; virtual routes resolve correctly | `tests/tray/test_secondary_device_routes_unit.py` |
 | Tray entries | Virtual routes appear when parent available; absent when unavailable | `tests/tray/ui/menu/test_menu_sections_unit.py` |
 | Menu builders | Generic uniform builder renders Color/Brightness/Turn Off for unknown device types | `tests/tray/ui/menu/test_menu_sections_unit.py` |
-| Software targets | Virtual routes receive uniform color in "All Compatible Devices" mode | `tests/tray/controllers/power/test_tray_software_target_controller_unit.py` |
+| Software targets | Virtual routes receive uniform color in "All Compatible Devices" mode | `tests/tray/controllers/power/software_targets/test_tray_software_target_controller_unit.py` |
 | Power management | All zones turn off on lid close / suspend; restore on resume | `tests/tray/controllers/power/test_tray_secondary_device_controller_unit.py` |
-| Config | Brightness/color persistence for new state keys | `tests/core/config/test_secondary_device_accessors_unit.py` |
+| Config | Brightness/color persistence for new state keys | `tests/core/config/secondary/test_secondary_device_accessors_unit.py` |
 | Integration | Full buildpython release profile passes | CI / local `buildpython --profile=release` |
 
 ---

@@ -719,14 +719,14 @@ Run the existing and new tests covering:
 
 ```bash
 .venv/bin/python -m pytest -q \
-  tests/core/config/test_secondary_device_accessors_unit.py \
+  tests/core/config/secondary/test_secondary_device_accessors_unit.py \
   tests/core/diagnostics/devices/test_secondary_devices_snapshot_unit.py \
   tests/core/effects/rendering/test_effects_software_targets_unit.py \
   tests/core/profiles/core/test_profile_runtime_activation_unit.py \
   tests/gui/perkey/editor/core/test_perkey_profile_management_unit.py \
   tests/gui/perkey/editor/core/test_perkey_profile_actions_ui_unit.py \
   tests/tray/controllers/core/test_effect_selection_unit.py \
-  tests/tray/controllers/power/test_tray_software_target_virtual_routes_unit.py \
+  tests/tray/controllers/power/software_targets/test_tray_software_target_virtual_routes_unit.py \
   tests/tray/ui/menu/test_menu_sections_unit.py \
   tests/tray/ui/menu/test_menu_status_virtual_routes_unit.py
 ```
@@ -808,7 +808,7 @@ Expected new tests:
 Expected extensions:
 
 - `tests/conftest.py`
-- `tests/core/config/test_secondary_device_accessors_unit.py`
+- `tests/core/config/secondary/test_secondary_device_accessors_unit.py`
 - `tests/core/diagnostics/devices/test_secondary_devices_snapshot_unit.py`
 - `tests/core/effects/rendering/test_effects_software_targets_unit.py`
 - `tests/core/profiles/core/test_profile_runtime_activation_unit.py`
@@ -816,7 +816,7 @@ Expected extensions:
 - `tests/gui/perkey/editor/core/test_perkey_profile_actions_ui_unit.py`
 - config-polling state-builder and fast-path tests
 - `tests/tray/controllers/core/test_effect_selection_unit.py`
-- `tests/tray/controllers/power/test_tray_software_target_virtual_routes_unit.py`
+- `tests/tray/controllers/power/software_targets/test_tray_software_target_virtual_routes_unit.py`
 - `tests/tray/ui/menu/test_menu_sections_unit.py`
 - `tests/tray/ui/menu/test_menu_status_virtual_routes_unit.py`
 
