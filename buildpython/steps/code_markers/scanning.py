@@ -10,6 +10,7 @@ from .baseline import MARKERS, REF_EXTS
 COMMENTED_CODE_RE = re.compile(
     r"^\s*#\s*(def |class |import |from |if |elif |else:|for |while |try:|except |with |return |raise )"
 )
+_MARKER_RES = {marker: re.compile(rf"\b{re.escape(marker)}\b") for marker in MARKERS}
 
 
 def iter_source_files() -> list[Path]:
@@ -47,7 +48,7 @@ def scan_one_file(
     rel_str = str(rel)
     for idx, line in enumerate(text.splitlines(), start=1):
         for marker in MARKERS:
-            if marker not in line:
+            if _MARKER_RES[marker].search(line) is None:
                 continue
             counts[marker] += 1
             counts_by_file_marker[(rel_str, marker)] += 1
