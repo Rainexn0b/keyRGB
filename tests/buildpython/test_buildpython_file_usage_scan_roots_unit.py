@@ -1,0 +1,314 @@
+from __future__ import annotations
+
+import json
+import textwrap
+from pathlib import Path
+
+import buildpython.steps.file_size_analysis.step as step_size
+from buildpython.core.debt_index import build_debt_index, write_debt_index
+from buildpython.core.summary import BuildSummary, write_summary
+from buildpython.core.summary_support.debt_terminal import build_terminal_filesize_highlight
+from buildpython.steps.file_size_analysis.scanning import scan_unreferenced_file_candidates
+from buildpython.steps.file_size_analysis.usage_graph import build_usage_graph
+
+
+def _write_python_file(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(textwrap.dedent(content).strip() + "\n", encoding="utf-8")
+
+
+def _write_minimal_pyproject(root: Path) -> None:
+    (root / "pyproject.toml").write_text(
+        "\n".join(  # noqa: FLY002 - explicit generated fixture lines are easier to review
+            [
+                "[project]",
+                'name = "demo"',
+                'version = "0.0.1"',
+                "[project.scripts]",
+                'demo = "keyrgb.app:main"',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def test_unreferenced_scan_treats_backend_registration_markers_as_roots(tmp_path) -> None:
+    _write_minimal_pyproject(tmp_path)
+    _write_python_file(
+        tmp_path / "keyrgb" / "app.py",
+        """
+        def main() -> None:
+            return None
+        """,
+    )
+    _write_python_file(
+        tmp_path / "keyrgb" / "core" / "backends" / "demo" / "__init__.py",
+        """
+        from keyrgb.core.backends.demo.backend import DemoBackend
+
+        BACKEND_REGISTRATION = DemoBackend
+        """,
+    )
+    _write_python_file(
+        tmp_path / "keyrgb" / "core" / "backends" / "demo" / "backend.py",
+        """
+        class DemoBackend:
+            name = "demo"
+        """,
+    )
+
+    rows = scan_unreferenced_file_candidates(tmp_path, roots=("keyrgb",))
+
+    assert rows == []
+
+
+def test_unreferenced_scan_treats_effect_registration_markers_as_roots(tmp_path) -> None:
+    _write_minimal_pyproject(tmp_path)
+    _write_python_file(
+        tmp_path / "keyrgb" / "app.py",
+        """
+        def main() -> None:
+            return None
+        """,
+    )
+    _write_python_file(
+        tmp_path / "keyrgb" / "effects" / "pulse" / "__init__.py",
+        """
+        from keyrgb.effects.pulse.support import build_pulse
+
+        EFFECT_REGISTRATION = build_pulse
+        """,
+    )
+    _write_python_file(
+        tmp_path / "keyrgb" / "effects" / "pulse" / "support.py",
+        """
+        def build_pulse() -> int:
+            return 1
+        """,
+    )
+    _write_python_file(
+        tmp_path / "keyrgb" / "effects" / "wave" / "__init__.py",
+        """
+        from keyrgb.effects.wave.support import build_wave
+
+        EFFECT_REGISTRATIONS = [build_wave]
+        """,
+    )
+    _write_python_file(
+        tmp_path / "keyrgb" / "effects" / "wave" / "support.py",
+        """
+        def build_wave() -> int:
+            return 2
+        """,
+    )
+
+    rows = scan_unreferenced_file_candidates(tmp_path, roots=("keyrgb",))
+
+    assert rows == []
+
+
+def test_unreferenced_scan_treats_launch_module_subprocess_targets_as_roots(tmp_path) -> None:
+    _write_minimal_pyproject(tmp_path)
+    _write_python_file(
+        tmp_path / "keyrgb" / "app.py",
+        """
+        from keyrgb.gui_launch import launch_support
+
+
+        def main() -> None:
+            launch_support()
+        """,
+    )
+    _write_python_file(
+        tmp_path / "keyrgb" / "gui_launch.py",
+        """
+        from keyrgb.core.runtime.imports import launch_module_subprocess
+
+
+        def launch_support() -> None:
+            launch_module_subprocess("keyrgb.support")
+        """,
+    )
+    _write_python_file(
+        tmp_path / "keyrgb" / "support.py",
+        """
+        from keyrgb.support_impl import VALUE
+        """,
+    )
+    _write_python_file(
+        tmp_path / "keyrgb" / "support_impl.py",
+        """
+        VALUE = 1
+        """,
+    )
+    _write_python_file(
+        tmp_path / "keyrgb" / "core" / "runtime" / "imports.py",
+        """
+        def launch_module_subprocess(module_name: str) -> None:
+            pass
+        """,
+    )
+
+    rows = scan_unreferenced_file_candidates(tmp_path, roots=("keyrgb",))
+
+    assert rows == []
+
+
+def test_usage_graph_treats_package_relative_import_module_calls_as_roots(tmp_path) -> None:
+    _write_minimal_pyproject(tmp_path)
+    _write_python_file(
+        tmp_path / "keyrgb" / "app.py",
+        """
+        from keyrgb.pkg.helpers import VALUE
+
+
+        def main() -> int:
+            return VALUE
+        """,
+    )
+    _write_python_file(
+        tmp_path / "keyrgb" / "pkg" / "__init__.py",
+        "",
+    )
+    _write_python_file(
+        tmp_path / "keyrgb" / "pkg" / "helpers.py",
+        """
+        import importlib
+
+        _impl = importlib.import_module(f"{__package__}._impl")
+        VALUE = _impl.VALUE
+        """,
+    )
+    impl_path = tmp_path / "keyrgb" / "pkg" / "_impl.py"
+    _write_python_file(
+        impl_path,
+        """
+        VALUE = 1
+        """,
+    )
+
+    graph = build_usage_graph(tmp_path, roots=("keyrgb",))
+
+    assert impl_path in graph.reachable
+
+
+def test_file_size_runner_suppresses_middleman_and_unreferenced_for_waived_files(tmp_path, monkeypatch) -> None:
+    _write_minimal_pyproject(tmp_path)
+    _write_python_file(
+        tmp_path / "keyrgb" / "app.py",
+        """
+        from keyrgb.impl import exported_name
+        from keyrgb.used import helper
+
+
+        def main() -> int:
+            return helper() + exported_name()
+        """,
+    )
+    _write_python_file(
+        tmp_path / "keyrgb" / "used.py",
+        """
+        def helper() -> int:
+            return 1
+        """,
+    )
+    _write_python_file(
+        tmp_path / "keyrgb" / "impl.py",
+        """
+        def exported_name() -> int:
+            return 2
+        """,
+    )
+    _write_python_file(
+        tmp_path / "keyrgb" / "middleman.py",
+        """
+        # @quality-exception file-size-analysis: intentional export facade module
+        from keyrgb.impl import exported_name
+
+        __all__ = ["exported_name"]
+        """,
+    )
+    _write_python_file(
+        tmp_path / "keyrgb" / "dead.py",
+        """
+        # @quality-exception file-size-analysis: temporary standalone migration helper
+        VALUE = 5
+        """,
+    )
+
+    monkeypatch.setattr(step_size, "repo_root", lambda: tmp_path)
+
+    result = step_size.file_size_runner()
+    payload = json.loads((tmp_path / "buildlog" / "keyrgb" / "file-size-analysis.json").read_text(encoding="utf-8"))
+
+    assert result.exit_code == 0
+    assert payload["counts"]["middleman_modules"] == 0
+    assert payload["counts"]["unreferenced_files"] == 0
+    assert payload["counts"]["waived_files"] == 2
+    assert payload["middleman_modules"] == []
+    assert payload["unreferenced_files"] == []
+    assert {item["path"] for item in payload["waivers"]["files"]} == {"keyrgb/dead.py", "keyrgb/middleman.py"}
+    assert "[waived] keyrgb/middleman.py" in result.stdout
+    assert "[waived] keyrgb/dead.py" in result.stdout
+
+
+def test_file_size_debt_summaries_include_middleman_and_deadfile_candidates(tmp_path) -> None:
+    buildlog_dir = tmp_path / "buildlog"
+    buildlog_dir.mkdir()
+    (buildlog_dir / "file-size-analysis.json").write_text(
+        json.dumps(
+            {
+                "counts": {
+                    "file_lines": {"refactor": 0, "critical": 0, "severe": 0, "extreme": 0, "total": 0},
+                    "import_block_lines": {"warning": 0, "critical": 0, "severe": 0, "total": 0},
+                    "flat_directories": 0,
+                    "delegation_candidates": 1,
+                    "middleman_modules": 1,
+                    "unreferenced_files": 1,
+                },
+                "files": [],
+                "import_blocks": [],
+                "flat_directories": [],
+                "delegation_candidates": [{"path": "keyrgb/delegation.py", "score": 12}],
+                "middleman_modules": [{"path": "keyrgb/middleman.py", "exports": 3, "inbound_imports": 2}],
+                "unreferenced_files": [{"path": "keyrgb/dead.py", "lines": 12, "inbound_imports": 0}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    payload = build_debt_index(buildlog_dir)
+
+    assert payload["sections"]["file_size"]["middleman_modules"][0]["path"] == "keyrgb/middleman.py"
+    assert payload["sections"]["file_size"]["unreferenced_files"][0]["path"] == "keyrgb/dead.py"
+
+    write_debt_index(buildlog_dir)
+    write_summary(
+        buildlog_dir,
+        BuildSummary(
+            passed=True,
+            health_score=100,
+            total_duration_s=0.1,
+            steps=[],
+        ),
+    )
+
+    debt_markdown = (buildlog_dir / "debt-index.md").read_text(encoding="utf-8")
+    summary_markdown = (buildlog_dir / "build-summary.md").read_text(encoding="utf-8")
+    lines = build_terminal_filesize_highlight(buildlog_dir)
+
+    assert "Middle-man modules: 1" in debt_markdown
+    assert "Unreferenced file candidates: 1" in debt_markdown
+    assert "Top middle-man module: keyrgb/middleman.py (exports=3)" in debt_markdown
+    assert "Top dead-file candidate: keyrgb/dead.py (12 lines)" in debt_markdown
+
+    assert "Middle-man modules: 1" in summary_markdown
+    assert "Unreferenced file candidates: 1" in summary_markdown
+    assert "Top middle-man module: keyrgb/middleman.py (exports=3)" in summary_markdown
+    assert "Top dead-file candidate: keyrgb/dead.py (12 lines)" in summary_markdown
+
+    assert any("middlemen 1" in line for line in lines)
+    assert any("dead-files 1" in line for line in lines)
+    assert any("Top middleman" in line and "keyrgb/middleman.py" in line for line in lines)
+    assert any("Top dead-file" in line and "keyrgb/dead.py" in line for line in lines)

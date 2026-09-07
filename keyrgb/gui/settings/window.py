@@ -13,6 +13,7 @@ Settings are persisted in the shared `~/.config/keyrgb/config.json` via
 from __future__ import annotations
 
 # @quality-exception file-size-analysis: single Tk PowerSettingsGUI window class; panels already extracted to settings/panels/
+# @quality-exception loc-check: single Tk PowerSettingsGUI window class; panels already extracted to settings/panels/
 import tkinter as tk
 from dataclasses import replace
 from tkinter import ttk

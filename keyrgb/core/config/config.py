@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 # @quality-exception file-size-analysis: Config facade class; domain accessors live in sibling modules
+# @quality-exception loc-check: Config facade; domain accessors live in sibling modules
 import logging
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
