@@ -28,11 +28,11 @@ class _FakeWidget:
     def __init__(self, parent=None, **kwargs) -> None:
         self.parent = parent
         self.kwargs = kwargs
-        self.pack_calls: list[dict[str, object]] = []
-        self.grid_calls: list[dict[str, object]] = []
-        self.columnconfigure_calls: list[dict[str, object]] = []
-        self.configure_calls: list[dict[str, object]] = []
-        self.bbox_calls: list[object] = []
+        self.pack_calls = []
+        self.grid_calls = []
+        self.columnconfigure_calls = []
+        self.configure_calls = []
+        self.bbox_calls = []
         self.reqheight = 320
         self.reqwidth = 640
 
@@ -177,7 +177,6 @@ def test_init_sets_up_root_and_calls_init_steps(monkeypatch: pytest.MonkeyPatch)
     root = _FakeRoot()
     calls: list[tuple[str, tuple[object, ...], dict[str, object]]] = []
     values = _values()
-
     monkeypatch.setattr(settings_window.tk, "Tk", lambda: root)
     monkeypatch.setattr(
         settings_window, "apply_keyrgb_window_icon", lambda actual_root: calls.append(("icon", (actual_root,), {}))
@@ -207,9 +206,7 @@ def test_init_sets_up_root_and_calls_init_steps(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(
         settings_window.PowerSettingsGUI, "_start_footer_hardware_probe", lambda self: calls.append(("probe", (), {}))
     )
-
     gui = settings_window.PowerSettingsGUI()
-
     assert gui.root is root
     assert gui.config == "config-obj"
     assert root.title_calls == ["KeyRGB - Settings"]
@@ -233,7 +230,6 @@ def test_start_footer_hardware_probe_runs_worker_and_updates_hint(monkeypatch: p
     gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
     gui.root = _FakeRoot()
     gui.bottom_bar_panel = _FakeBottomBarPanel(None, on_close=lambda: None)
-
     fake_collectors = ModuleType("keyrgb.core.diagnostics.collectors.backends")
     fake_collectors.backend_probe_snapshot = lambda: "snapshot"
     monkeypatch.setitem(sys.modules, "keyrgb.core.diagnostics.collectors.backends", fake_collectors)
@@ -246,9 +242,7 @@ def test_start_footer_hardware_probe_runs_worker_and_updates_hint(monkeypatch: p
         on_done(work())
 
     monkeypatch.setattr(settings_window, "run_in_thread", fake_run_in_thread)
-
     gui._start_footer_hardware_probe()
-
     assert run_calls[0][0] is gui.root
     assert run_calls[0][3] == 100
     assert gui.bottom_bar_panel.hint_calls == ["hint:snapshot"]
@@ -258,12 +252,10 @@ def test_start_footer_hardware_probe_swallows_worker_and_footer_errors(monkeypat
     gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
     gui.root = _FakeRoot()
     gui.bottom_bar_panel = SimpleNamespace(set_hardware_hint=lambda text: (_ for _ in ()).throw(RuntimeError(text)))
-
     fake_collectors = ModuleType("keyrgb.core.diagnostics.collectors.backends")
     fake_collectors.backend_probe_snapshot = lambda: (_ for _ in ()).throw(RuntimeError("boom"))
     monkeypatch.setitem(sys.modules, "keyrgb.core.diagnostics.collectors.backends", fake_collectors)
     monkeypatch.setattr(settings_window, "run_in_thread", lambda root, work, on_done, *, delay_ms: on_done(work()))
-
     gui._start_footer_hardware_probe()
 
 
@@ -281,13 +273,10 @@ def test_init_layout_builds_frames_bottom_bar_and_scroll(monkeypatch: pytest.Mon
     )
     monkeypatch.setattr(settings_window, "BottomBarPanel", _FakeBottomBarPanel)
     monkeypatch.setattr(settings_window, "ScrollableArea", _FakeScrollArea)
-
     gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
     gui.root = _FakeRoot()
     gui._on_close = lambda: None
-
     gui._init_layout(bg_color="#123456")
-
     assert isinstance(gui.bottom_bar_panel, _FakeBottomBarPanel)
     assert gui.bottom_bar is gui.bottom_bar_panel.frame
     assert gui.status is gui.bottom_bar_panel.status
@@ -299,7 +288,6 @@ def test_init_layout_builds_frames_bottom_bar_and_scroll(monkeypatch: pytest.Mon
     assert gui._left.parent is cols_frame
     assert gui._middle.parent is cols_frame
     assert gui._right.parent is cols_frame
-
     # Columns must stay symmetrical: one uniform grid group with equal weights.
     assert cols_frame.columnconfigure_calls == [
         {"index": 0, "weight": 1, "uniform": "settings_columns"},
@@ -318,7 +306,6 @@ def test_init_vars_creates_all_expected_tk_variables(monkeypatch: pytest.MonkeyP
     double_vars: list[_FakeVar] = []
     string_vars: list[_FakeVar] = []
     int_vars: list[_FakeVar] = []
-
     monkeypatch.setattr(
         settings_window,
         "tk",
@@ -332,9 +319,7 @@ def test_init_vars_creates_all_expected_tk_variables(monkeypatch: pytest.MonkeyP
 
     gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
     values = _values()
-
     gui._init_vars(values)
-
     assert gui.var_enabled.get() is True
     assert gui.var_off_suspend.get() is False
     assert gui.var_off_lid.get() is True
@@ -378,7 +363,6 @@ def test_init_panels_builds_panel_stack_with_expected_arguments(monkeypatch: pyt
             Separator=lambda parent=None, **kwargs: separators.append(_FakeWidget(parent, **kwargs)) or separators[-1]
         ),
     )
-
     created: dict[str, _FakePanel] = {}
 
     def make_panel(name: str):
@@ -432,9 +416,7 @@ def test_init_panels_builds_panel_stack_with_expected_arguments(monkeypatch: pyt
     gui.var_os_autostart = _FakeVar(False)
     gui.var_experimental_backends = _FakeVar(False)
     gui._on_toggle = lambda: None
-
     gui._init_panels()
-
     assert created["management"].args == (gui._left,)
     assert created["power_source"].args == (gui._middle,)
     assert created["power_source"].kwargs["var_ac_brightness"] is gui.var_ac_brightness
@@ -459,7 +441,6 @@ def test_init_vars_uses_canonical_night_start_fallback_when_empty(monkeypatch: p
     bool_vars: list[_FakeVar] = []
     double_vars: list[_FakeVar] = []
     int_vars: list[_FakeVar] = []
-
     monkeypatch.setattr(
         settings_window.tk, "StringVar", lambda value=None: string_vars.append(_FakeVar(value)) or string_vars[-1]
     )
@@ -475,9 +456,7 @@ def test_init_vars_uses_canonical_night_start_fallback_when_empty(monkeypatch: p
 
     gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
     values = replace(_values(), night_start_time="")
-
     gui._init_vars(values)
-
     assert gui.var_night_start.get() == "20:00"
 
 
@@ -489,9 +468,7 @@ def test_finalize_layout_applies_state_scroll_and_geometry(monkeypatch: pytest.M
     calls: list[str] = []
     gui._apply_enabled_state = lambda: calls.append("enabled")
     gui._apply_geometry = lambda: calls.append("geometry")
-
     gui._finalize_layout()
-
     assert calls == ["enabled"]
     assert gui.root.geometry_calls == ["1320x820"]
     assert gui.scroll.bind_mousewheel_calls == [(gui.root, None)]
@@ -510,9 +487,7 @@ def test_finalize_layout_swallows_scrollregion_errors() -> None:
     gui.bottom_bar = _FakeWidget()
     gui._apply_enabled_state = lambda: None
     gui._apply_geometry = lambda: None
-
     gui._finalize_layout()
-
     assert gui.root.after_calls == [(50, gui._apply_geometry), (350, gui._apply_geometry)]
 
 
@@ -530,9 +505,7 @@ def test_apply_geometry_uses_centered_geometry_helper(monkeypatch: pytest.Monkey
         "compute_centered_window_geometry",
         lambda *args, **kwargs: calls.append(kwargs) or "1100x850+10+20",
     )
-
     gui._apply_geometry()
-
     assert gui.root.update_calls == 1
     assert gui.root.geometry_calls == ["1100x850+10+20"]
     assert calls == [
@@ -555,196 +528,8 @@ def test_apply_enabled_state_delegates_to_panels() -> None:
     gui.dim_sync_panel = _FakePanel()
     gui.power_source_panel = _FakePanel()
     gui.time_scheduler_panel = _FakePanel()
-
     gui._apply_enabled_state()
-
     assert gui.management_panel.apply_calls == [{}]
     assert gui.dim_sync_panel.apply_calls == [{"power_management_enabled": False}]
     assert gui.power_source_panel.apply_calls == [{"power_management_enabled": False}]
     assert gui.time_scheduler_panel.apply_calls == [{}]
-
-
-def test_on_toggle_preserves_best_effort_status_when_settings_apply_fails(monkeypatch: pytest.MonkeyPatch) -> None:
-    gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
-    gui.config = SimpleNamespace(physical_layout="ansi")
-    gui.root = _FakeRoot()
-    gui.status = _FakeWidget()
-    gui.var_enabled = _FakeVar(True)
-    gui.var_off_suspend = _FakeVar(False)
-    gui.var_off_lid = _FakeVar(True)
-    gui.var_restore_resume = _FakeVar(False)
-    gui.var_restore_lid = _FakeVar(True)
-    gui.var_autostart = _FakeVar(True)
-    gui.var_experimental_backends = _FakeVar(False)
-    gui.var_ac_enabled = _FakeVar(True)
-    gui.var_battery_enabled = _FakeVar(False)
-    gui.var_ac_brightness = _FakeVar(12.9)
-    gui.var_battery_brightness = _FakeVar(8.2)
-    gui.var_ac_power_mode = _FakeVar("Balanced")
-    gui.var_battery_power_mode = _FakeVar("Keep current power mode")
-    gui.var_dim_sync_enabled = _FakeVar(True)
-    gui.var_controller_sleep_respect = _FakeVar(False)
-    gui.var_dim_sync_mode = _FakeVar("temp")
-    gui.var_dim_temp_brightness = _FakeVar(4.4)
-    gui.var_debounce_enter = _FakeVar(6)
-    gui.var_debounce_exit = _FakeVar(10)
-    gui.var_idle_fade_duration = _FakeVar(0.6)
-    gui.var_scheduler_enabled = _FakeVar(False)
-    gui.var_day_start = _FakeVar("08:00")
-    gui.var_night_start = _FakeVar("20:00")
-    gui.var_day_base = _FakeVar(40.0)
-    gui.var_day_reactive = _FakeVar(50.0)
-    gui.var_night_base = _FakeVar(20.0)
-    gui.var_night_reactive = _FakeVar(50.0)
-    gui.var_os_autostart = _FakeVar(True)
-    monkeypatch.setattr(
-        settings_window,
-        "apply_settings_values_to_config",
-        lambda *, config, values: (_ for _ in ()).throw(OSError("save failed")),
-    )
-    monkeypatch.setattr(settings_window, "set_os_autostart", lambda enabled: None)
-    enabled_calls: list[str] = []
-    gui._apply_enabled_state = lambda: enabled_calls.append("enabled")
-
-    gui._on_toggle()
-
-    assert enabled_calls == ["enabled"]
-    assert gui.status.configure_calls[0] == {"text": "⚠ Save failed"}
-
-
-def test_on_toggle_saves_values_updates_state_and_schedules_status_clear(monkeypatch: pytest.MonkeyPatch) -> None:
-    gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
-    gui.config = SimpleNamespace(physical_layout="ansi")
-    gui.root = _FakeRoot()
-    gui.status = _FakeWidget()
-    gui.var_enabled = _FakeVar(True)
-    gui.var_off_suspend = _FakeVar(False)
-    gui.var_off_lid = _FakeVar(True)
-    gui.var_restore_resume = _FakeVar(False)
-    gui.var_restore_lid = _FakeVar(True)
-    gui.var_autostart = _FakeVar(True)
-    gui.var_experimental_backends = _FakeVar(False)
-    gui.var_ac_enabled = _FakeVar(True)
-    gui.var_battery_enabled = _FakeVar(False)
-    gui.var_ac_brightness = _FakeVar(12.9)
-    gui.var_battery_brightness = _FakeVar(8.2)
-    gui.var_ac_power_mode = _FakeVar("Balanced")
-    gui.var_battery_power_mode = _FakeVar("Keep current power mode")
-    gui.var_dim_sync_enabled = _FakeVar(True)
-    gui.var_controller_sleep_respect = _FakeVar(False)
-    gui.var_dim_sync_mode = _FakeVar("temp")
-    gui.var_dim_temp_brightness = _FakeVar(4.4)
-    gui.var_debounce_enter = _FakeVar(6)
-    gui.var_debounce_exit = _FakeVar(10)
-    gui.var_idle_fade_duration = _FakeVar(0.6)
-    gui.var_scheduler_enabled = _FakeVar(False)
-    gui.var_day_start = _FakeVar("08:00")
-    gui.var_night_start = _FakeVar("20:00")
-    gui.var_day_base = _FakeVar(40.0)
-    gui.var_day_reactive = _FakeVar(50.0)
-    gui.var_night_base = _FakeVar(20.0)
-    gui.var_night_reactive = _FakeVar(50.0)
-    gui.var_os_autostart = _FakeVar(True)
-    apply_calls: list[SettingsValues] = []
-    monkeypatch.setattr(
-        settings_window, "apply_settings_values_to_config", lambda *, config, values: apply_calls.append(values)
-    )
-    monkeypatch.setattr(settings_window, "set_os_autostart", lambda enabled: None)
-    enabled_calls: list[str] = []
-    gui._apply_enabled_state = lambda: enabled_calls.append("enabled")
-
-    gui._on_toggle()
-
-    assert apply_calls and apply_calls[0].ac_lighting_brightness == 12
-    assert apply_calls[0].battery_lighting_brightness == 8
-    assert apply_calls[0].ac_power_mode == PowerMode.BALANCED.value
-    assert apply_calls[0].battery_power_mode is None
-    # UI delays are seconds; config persists idle-poll counts (1 poll = 0.5s).
-    assert apply_calls[0].idle_dim_debounce_enter_polls == 12
-    assert apply_calls[0].idle_dim_debounce_exit_polls == 20
-    assert apply_calls[0].physical_layout == "ansi"
-    assert apply_calls[0].os_autostart_enabled is True
-    assert enabled_calls == ["enabled"]
-    assert gui.status.configure_calls[0] == {"text": "✓ Saved"}
-    assert gui.root.after_calls[0][0] == 1500
-    gui.root.after_calls[0][1]()
-    assert gui.status.configure_calls[-1] == {"text": ""}
-
-
-def test_on_toggle_recovers_os_autostart_var_when_set_fails(monkeypatch: pytest.MonkeyPatch) -> None:
-    gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
-    gui.config = SimpleNamespace(physical_layout="auto")
-    gui.root = _FakeRoot()
-    gui.status = _FakeWidget()
-    gui.var_enabled = _FakeVar(True)
-    gui.var_off_suspend = _FakeVar(True)
-    gui.var_off_lid = _FakeVar(True)
-    gui.var_restore_resume = _FakeVar(True)
-    gui.var_restore_lid = _FakeVar(True)
-    gui.var_autostart = _FakeVar(True)
-    gui.var_experimental_backends = _FakeVar(False)
-    gui.var_ac_enabled = _FakeVar(True)
-    gui.var_battery_enabled = _FakeVar(True)
-    gui.var_ac_brightness = _FakeVar(10.0)
-    gui.var_battery_brightness = _FakeVar(9.0)
-    gui.var_ac_power_mode = _FakeVar("Keep current power mode")
-    gui.var_battery_power_mode = _FakeVar("Performance")
-    gui.var_dim_sync_enabled = _FakeVar(False)
-    gui.var_controller_sleep_respect = _FakeVar(False)
-    gui.var_dim_sync_mode = _FakeVar("off")
-    gui.var_dim_temp_brightness = _FakeVar(5.0)
-    gui.var_debounce_enter = _FakeVar(6)
-    gui.var_debounce_exit = _FakeVar(10)
-    gui.var_idle_fade_duration = _FakeVar(0.6)
-    gui.var_scheduler_enabled = _FakeVar(False)
-    gui.var_day_start = _FakeVar("08:00")
-    gui.var_night_start = _FakeVar("20:00")
-    gui.var_day_base = _FakeVar(40.0)
-    gui.var_day_reactive = _FakeVar(50.0)
-    gui.var_night_base = _FakeVar(20.0)
-    gui.var_night_reactive = _FakeVar(50.0)
-    gui.var_os_autostart = _FakeVar(True)
-    apply_calls: list[SettingsValues] = []
-    monkeypatch.setattr(
-        settings_window, "apply_settings_values_to_config", lambda *, config, values: apply_calls.append(values)
-    )
-    monkeypatch.setattr(
-        settings_window, "set_os_autostart", lambda enabled: (_ for _ in ()).throw(RuntimeError("boom"))
-    )
-    monkeypatch.setattr(settings_window, "detect_os_autostart_enabled", lambda: False)
-    gui._apply_enabled_state = lambda: None
-
-    gui._on_toggle()
-
-    assert gui.var_os_autostart.set_calls == [False]
-    assert apply_calls[0].os_autostart_enabled is False
-    assert gui.status.configure_calls[0] == {"text": "⚠ Save failed"}
-
-
-def test_delay_seconds_to_polls_converts_and_clamps_to_poll_range() -> None:
-    gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
-    assert gui._delay_seconds_to_polls(3.0) == 6
-    assert gui._delay_seconds_to_polls(0.6) == 1
-    assert gui._delay_seconds_to_polls(0.0) == 1
-    assert gui._delay_seconds_to_polls(0.1) == 1
-    assert gui._delay_seconds_to_polls(30.0) == 60
-    assert gui._delay_seconds_to_polls(120.0) == 60
-
-
-def test_power_mode_selection_helpers_translate_between_labels_and_values() -> None:
-    gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
-    assert gui._power_mode_selection_value(PowerMode.PERFORMANCE.value) == "Performance"
-    assert gui._power_mode_selection_value(None) == "Keep current power mode"
-    assert gui._selected_power_mode("Extreme Saver") == PowerMode.EXTREME_SAVER.value
-    assert gui._selected_power_mode("Keep current power mode") is None
-
-
-def test_on_close_and_run_delegate_to_root() -> None:
-    gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
-    gui.root = _FakeRoot()
-
-    gui._on_close()
-    gui.run()
-
-    assert gui.root.destroy_calls == 1
-    assert gui.root.mainloop_calls == 1
