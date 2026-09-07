@@ -106,10 +106,23 @@ Debt-focused steps write structured reports under the same directory when they r
 
 `build-summary.md` includes the overall build state plus a debt snapshot of available structured reports. `debt-index.md` is the combined report index for debt-oriented outputs. When present, both surfaces summarize file-size and LOC hotspots so debt-oriented size issues are visible without opening each standalone report.
 
-By default, buildpython replaces raw command dumps with cumulative build-health
-bars and concise structured highlights in local terminals and CI. Canonical
-per-step logs still retain complete stdout and stderr; CI workflows upload them
-on failure. Passing `--verbose` explicitly restores raw terminal output.
+By default, buildpython replaces raw command dumps with concise structured
+highlights in local terminals and CI. Ordinary binary checks print only their
+completion state. Metric-bearing steps print scored health bars:
+
+- Pytest uses the pass rate.
+- Code Markers scores only gated marker debt.
+- File Size and LOC use weighted severity and structural penalties.
+- Code Hygiene and Exception Transparency weight unsafe categories more heavily.
+- Architecture weights errors above warnings.
+- Coverage shows the measured total percentage.
+- Dead Code scores actionable findings only.
+
+Any failed scored gate is capped at 49 so a red build cannot retain a green
+health bar. Advisory data such as `NOTE`, waived exceptions, and non-actionable
+vulture findings does not receive a false penalty. Canonical per-step logs retain
+complete stdout and stderr; CI workflows upload them on failure. Passing
+`--verbose` explicitly restores raw terminal output.
 
 ## Related docs
 

@@ -1,16 +1,12 @@
 from __future__ import annotations
 
 import ast
-import logging
 import sys
 from pathlib import Path
 
 from ..utils.import_probe import probe_module_import
 from ..utils.paths import repo_root
 from ..utils.subproc import RunResult
-
-logger = logging.getLogger(__name__)
-
 
 OPTIONAL_TOPLEVEL = {
     "gi",  # optional desktop integration / icon rasterization support
@@ -119,6 +115,7 @@ def import_scan_runner() -> RunResult:
     missing: list[str] = []
     optional_missing: list[str] = []
     ok: list[str] = []
+    probe_diagnostics: list[str] = []
 
     for name in candidates:
         probe = probe_module_import(name, cwd=root)
@@ -126,11 +123,8 @@ def import_scan_runner() -> RunResult:
             ok.append(name)
             continue
 
-        logger.error(
-            "Import scan failed for candidate module '%s'\n%s",
-            name,
-            probe.stderr.rstrip(),
-        )
+        if probe.stderr.strip():
+            probe_diagnostics.append(f"--- {name} ---\n{probe.stderr.rstrip()}")
         detail = f"{name} ({probe.failure_detail})"
         if name in OPTIONAL_TOPLEVEL:
             optional_missing.append(detail)
@@ -161,6 +155,6 @@ def import_scan_runner() -> RunResult:
     return RunResult(
         command_str="(internal) import scan",
         stdout="\n".join(stdout_lines) + "\n",
-        stderr="",
+        stderr="\n\n".join(probe_diagnostics) + ("\n" if probe_diagnostics else ""),
         exit_code=exit_code,
     )

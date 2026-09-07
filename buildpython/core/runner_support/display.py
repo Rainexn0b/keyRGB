@@ -6,7 +6,7 @@ import sys
 from ...utils.log_format import StepLogRecord, format_standard_log
 from ...utils.paths import buildlog_dir
 from .. import summary as summary_module
-from ..model import Step, StepOutcome
+from ..model import Step, StepHealth, StepOutcome
 from ..summary_support import debt_terminal
 
 _USE_COLOR = sys.stdout.isatty()
@@ -77,29 +77,28 @@ def _print_step_footer(outcome: StepOutcome, highlights: list[str]) -> None:
         print(_color(f"    {line}", _DIM))
 
 
-def _health_bar(score: int, *, width: int = 20) -> str:
+def _health_bar(score: int, *, width: int = 25) -> str:
     normalized = max(0, min(100, int(score)))
     filled = max(0, min(width, round(normalized / 100 * width)))
     bar_color = _GREEN if normalized >= 90 else _YELLOW if normalized >= 70 else _RED
     return f"{_color('█' * filled, bar_color)}{_color('░' * (width - filled), _DIM)}"
 
 
-def _print_step_health_footer(
-    step: Step,
-    outcome: StepOutcome,
-    *,
-    index: int,
-    total_steps: int,
-    name_width: int,
-    health_score: int,
-) -> None:
-    icon = _status_icon(outcome.status)
-    label = f"[{index}/{total_steps}]"
-    name = f"{step.name:<{name_width}}"
-    health = f"Build health {health_score}/100  [{_health_bar(health_score)}]"
-    duration = f"{outcome.duration_s:.1f}s"
-    print(_color(f"{icon}{label}  {name} : {health}  ·  {duration}", _status_color(outcome.status)))
-    for line in outcome.highlights:
+def _health_status(health: StepHealth) -> tuple[str, str]:
+    if health.score >= 90:
+        return "✅", _GREEN
+    if health.score >= 70:
+        return "⚠️", _YELLOW
+    return "❌", _RED
+
+
+def _print_compact_step_footer(outcome: StepOutcome) -> None:
+    _print_step_footer(outcome, [])
+    if outcome.health is not None:
+        icon, color = _health_status(outcome.health)
+        line = f"{icon} {outcome.health.label}: [{_health_bar(outcome.health.score)}] {outcome.health.score}%"
+        print(_color(line, color))
+    for line in outcome.highlights[:2]:
         print(_color(f"    {line}", _DIM))
 
 
@@ -122,12 +121,42 @@ def _extract_pytest_highlight(stdout: str, stderr: str) -> str | None:
     return None
 
 
+def _extract_import_scan_highlight(stdout: str) -> str | None:
+    section: str | None = None
+    required: list[str] = []
+    optional: list[str] = []
+    for raw_line in stdout.splitlines():
+        line = raw_line.strip()
+        if line == "Missing required imports:":
+            section = "required"
+            continue
+        if line == "Missing optional imports:":
+            section = "optional"
+            continue
+        if line.endswith(":") or not line:
+            section = None
+            continue
+        if not line.startswith("- ") or section is None:
+            continue
+        module = line[2:].split(" ", 1)[0]
+        (required if section == "required" else optional).append(module)
+    if required:
+        return f"Missing required imports: {', '.join(required)}"
+    if optional:
+        return f"Optional imports unavailable: {', '.join(optional)}"
+    return None
+
+
 def _step_highlights(step: Step, *, stdout: str, stderr: str) -> list[str]:
     highlights: list[str] = []
     if step.name == "Pytest":
         pytest_line = _extract_pytest_highlight(stdout, stderr)
         if pytest_line is not None:
             highlights.append(pytest_line)
+    elif step.name == "Import Scan":
+        import_line = _extract_import_scan_highlight(stdout)
+        if import_line is not None:
+            highlights.append(import_line)
     elif step.name == "Code Markers":
         highlights.extend(debt_terminal.build_terminal_markers_highlight(buildlog_dir()))
     elif step.name == "File Size":

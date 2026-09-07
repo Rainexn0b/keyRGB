@@ -108,6 +108,7 @@ def test_continue_on_error_runs_later_steps_and_writes_failed_summary(monkeypatc
     assert exit_code == 3
     assert calls == ["one", "two"]
     assert summaries[-1].passed is False  # type: ignore[attr-defined]
+    assert summaries[-1].health_score == 49  # type: ignore[attr-defined]
     assert [step.status for step in summaries[-1].steps] == ["failure", "success"]  # type: ignore[attr-defined]
 
 
@@ -150,28 +151,45 @@ def test_continue_on_error_normalizes_invalid_zero_failure_code(monkeypatch, tmp
     assert exit_code == 1
 
 
-def test_default_output_uses_healthbar_and_keeps_failure_details_in_step_log(
+def test_default_output_uses_metric_healthbar_and_keeps_failure_details_in_step_log(
     monkeypatch, tmp_path: Path, capsys
 ) -> None:
     _capture_runner_summaries(monkeypatch, tmp_path)
-    raw_failure = "first diagnostic\nsecond diagnostic\n"
+    raw_failure = "8 passed, 2 failed in 0.50s\nfirst diagnostic\nsecond diagnostic\n"
     step = Step(
-        number=1,
-        name="Demo",
-        description="run demo",
-        log_file=tmp_path / "step-01-demo.log",
-        runner=lambda: RunResult(command_str="demo", stdout=raw_failure, stderr="", exit_code=7),
+        number=2,
+        name="Pytest",
+        description="run tests",
+        log_file=tmp_path / "step-02-pytest.log",
+        runner=lambda: RunResult(command_str="pytest", stdout=raw_failure, stderr="", exit_code=7),
     )
 
     exit_code = runner.run([step], verbose=False, continue_on_error=False)
 
     output = capsys.readouterr().out
     assert exit_code == 7
-    assert "Build health 0/100" in output
-    assert "[░░░░░░░░░░░░░░░░░░░░]" in output
+    assert "Test Health:" in output
+    assert "49%" in output
     assert raw_failure.strip() not in output
     assert f"→ See {step.log_file}" in output
     assert "first diagnostic" in step.log_file.read_text(encoding="utf-8")
+
+
+def test_default_output_does_not_invent_healthbar_for_unscored_step(monkeypatch, tmp_path: Path, capsys) -> None:
+    _capture_runner_summaries(monkeypatch, tmp_path)
+    step = Step(
+        number=1,
+        name="Compile",
+        description="compile",
+        log_file=tmp_path / "step-01-compile.log",
+        runner=lambda: RunResult(command_str="compile", stdout="", stderr="", exit_code=0),
+    )
+
+    assert runner.run([step], verbose=False, continue_on_error=False) == 0
+
+    output = capsys.readouterr().out
+    assert "Completed" in output
+    assert "Health:" not in output
 
 
 def test_verbose_output_still_prints_failure_details(monkeypatch, tmp_path: Path, capsys) -> None:
@@ -189,4 +207,4 @@ def test_verbose_output_still_prints_failure_details(monkeypatch, tmp_path: Path
     output = capsys.readouterr().out
     assert exit_code == 2
     assert "full diagnostic" in output
-    assert "Build health 0/100" not in output
+    assert "Health:" not in output

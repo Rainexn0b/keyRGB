@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import logging
-
 import pytest
 
 from buildpython.steps import step_import_scan
@@ -12,7 +10,7 @@ def test_parse_imports_skips_unreadable_files(tmp_path) -> None:
     assert step_import_scan._parse_imports(tmp_path / "missing.py") == set()
 
 
-def test_import_scan_runner_logs_import_failures_and_continues(monkeypatch, tmp_path, caplog) -> None:
+def test_import_scan_runner_captures_import_failures_and_continues(monkeypatch, tmp_path, capsys) -> None:
     scan_file = tmp_path / "scan.py"
     scan_file.write_text("import required_mod\n", encoding="utf-8")
 
@@ -43,8 +41,7 @@ def test_import_scan_runner_logs_import_failures_and_continues(monkeypatch, tmp_
 
     monkeypatch.setattr(step_import_scan, "probe_module_import", fake_probe)
 
-    with caplog.at_level(logging.ERROR, logger=step_import_scan.__name__):
-        result = step_import_scan.import_scan_runner()
+    result = step_import_scan.import_scan_runner()
 
     assert result.exit_code == 1
     assert "Modules seen: 3" in result.stdout
@@ -52,14 +49,14 @@ def test_import_scan_runner_logs_import_failures_and_continues(monkeypatch, tmp_
     assert "gi (RuntimeError: optional boom)" in result.stdout
     assert "  - ok_mod" in result.stdout
 
-    records = [record for record in caplog.records if "Import scan failed for candidate module" in record.getMessage()]
-    assert len(records) == 2
-    assert any("gi" in record.getMessage() for record in records)
-    assert any("required_mod" in record.getMessage() for record in records)
-    assert all(record.exc_info is None for record in records)
+    assert "--- gi ---" in result.stderr
+    assert "RuntimeError: optional boom" in result.stderr
+    assert "--- required_mod ---" in result.stderr
+    assert "ImportError: required boom" in result.stderr
+    assert capsys.readouterr().err == ""
 
 
-def test_import_scan_runner_treats_gi_as_optional(monkeypatch, tmp_path, caplog) -> None:
+def test_import_scan_runner_treats_gi_as_optional_without_live_traceback(monkeypatch, tmp_path, capsys) -> None:
     scan_file = tmp_path / "scan.py"
     scan_file.write_text("import gi\n", encoding="utf-8")
 
@@ -82,8 +79,7 @@ def test_import_scan_runner_treats_gi_as_optional(monkeypatch, tmp_path, caplog)
 
     monkeypatch.setattr(step_import_scan, "probe_module_import", fake_probe)
 
-    with caplog.at_level(logging.ERROR, logger=step_import_scan.__name__):
-        result = step_import_scan.import_scan_runner()
+    result = step_import_scan.import_scan_runner()
 
     assert result.exit_code == 0
     assert "Missing required imports:" not in result.stdout
@@ -91,10 +87,10 @@ def test_import_scan_runner_treats_gi_as_optional(monkeypatch, tmp_path, caplog)
     assert "gi (ModuleNotFoundError: No module named 'gi')" in result.stdout
     assert "  - ok_mod" in result.stdout
 
-    records = [record for record in caplog.records if "Import scan failed for candidate module" in record.getMessage()]
-    assert len(records) == 1
-    assert "gi" in records[0].getMessage()
-    assert records[0].exc_info is None
+    assert "ModuleNotFoundError: No module named 'gi'" in result.stderr
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == ""
 
 
 def test_import_scan_runner_propagates_unexpected_probe_failures(monkeypatch, tmp_path) -> None:

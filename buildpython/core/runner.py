@@ -9,6 +9,7 @@ from . import summary as summary_module
 from .debt_index import write_debt_index
 from .model import Step, StepOutcome
 from .runner_support import display as _ui
+from .runner_support.health import build_step_health
 
 
 def _is_module_available(module: str) -> bool:
@@ -168,11 +169,20 @@ def run_step(
     )
 
     highlights = _ui._step_highlights(step, stdout=result.stdout, stderr=result.stderr)
+    health = build_step_health(
+        step.name,
+        stdout=result.stdout,
+        stderr=result.stderr,
+        report_dir=buildlog_dir(),
+        failed=result.exit_code != 0,
+        started_at=start,
+    )
     outcome = StepOutcome(
         status="success" if result.exit_code == 0 else "failure",
         exit_code=result.exit_code,
         duration_s=duration,
         highlights=tuple(highlights),
+        health=health,
     )
     if not compact_output:
         _ui._print_step_footer(outcome, highlights)
@@ -215,7 +225,8 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
         if not considered:
             return 100
         successes = sum(1 for s in considered if s.status == "success")
-        return round(100 * successes / len(considered))
+        score = round(100 * successes / len(considered))
+        return min(score, 49) if any(s.status == "failure" for s in considered) else score
 
     for index, step in enumerate(steps, start=1):
         outcome = run_step(
@@ -239,14 +250,7 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
         )
 
         if compact_output:
-            _ui._print_step_health_footer(
-                step,
-                outcome,
-                index=index,
-                total_steps=total_steps,
-                name_width=name_width,
-                health_score=_health_score(),
-            )
+            _ui._print_compact_step_footer(outcome)
 
         if outcome.status == "failure" and not continue_on_error:
             _ui._print_failure_guidance(step, index=index, total_steps=total_steps)

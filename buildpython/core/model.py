@@ -8,6 +8,12 @@ from ..utils.subproc import RunResult
 
 
 @dataclass(frozen=True)
+class StepHealth:
+    label: str
+    score: int
+
+
+@dataclass(frozen=True)
 class Step:
     number: int
     name: str
@@ -23,3 +29,4 @@ class StepOutcome:
     duration_s: float
     message: str = ""
     highlights: tuple[str, ...] = ()
+    health: StepHealth | None = None
