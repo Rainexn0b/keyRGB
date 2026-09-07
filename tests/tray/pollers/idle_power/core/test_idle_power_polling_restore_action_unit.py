@@ -1,0 +1,336 @@
+from __future__ import annotations
+
+from contextlib import AbstractContextManager
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+
+import pytest
+
+from keyrgb.tray.controllers._power._transition_constants import DEFAULT_IDLE_FADE_DURATION_S
+from keyrgb.tray.pollers.idle_power.polling import _apply_idle_action
+
+
+def _mk_tray(*, effect: str = "rainbow_wave", brightness: int = 25) -> MagicMock:
+    from tests.tray.fakes import make_owner_backed_mock_tray
+
+    tray = make_owner_backed_mock_tray(
+        is_off=False,
+        idle_forced_off=False,
+        user_forced_off=False,
+        power_forced_off=False,
+        dim_temp_active=False,
+        dim_temp_target_brightness=None,
+    )
+    tray.config = SimpleNamespace(effect=effect, brightness=brightness)
+    return tray
+
+
+def test_restore_brightness_clears_dim_temp_and_updates_engine_for_running_sw_effect_without_hw_write() -> None:
+    tray = _mk_tray(effect="rainbow_wave", brightness=30)
+    tray._dim_temp_active = True
+    tray._dim_temp_target_brightness = 5
+
+    _apply_idle_action(tray, action="restore_brightness", dim_temp_brightness=5)
+
+    assert tray._dim_temp_active is False
+    assert tray._dim_temp_target_brightness is None
+    tray.engine.set_brightness.assert_called_once_with(30, apply_to_hardware=False, fade=True, fade_duration_s=0.25)
+
+
+def test_restore_brightness_keeps_dim_temp_active_until_write_completes() -> None:
+    tray = _mk_tray(effect="rainbow_wave", brightness=30)
+    tray._dim_temp_active = True
+    tray._dim_temp_target_brightness = 5
+    state_during_write: list[bool] = []
+
+    def capture_set_brightness(*_args, **_kwargs) -> None:
+        state_during_write.append(bool(tray._dim_temp_active))
+
+    tray.engine.set_brightness.side_effect = capture_set_brightness
+
+    _apply_idle_action(tray, action="restore_brightness", dim_temp_brightness=5)
+
+    assert state_during_write == [True]
+    assert tray._dim_temp_active is False
+    assert tray._dim_temp_target_brightness is None
+
+
+def test_restore_brightness_for_reactive_effect_restores_perkey_brightness() -> None:
+    tray = _mk_tray(effect="reactive_ripple", brightness=30)
+    tray.config.perkey_brightness = 55
+    tray._dim_temp_active = True
+    tray._dim_temp_target_brightness = 5
+
+    _apply_idle_action(tray, action="restore_brightness", dim_temp_brightness=5)
+
+    assert tray._dim_temp_active is False
+    assert tray._dim_temp_target_brightness is None
+    # Reactive restore uses instant (no-fade) updates.
+    tray.engine.set_brightness.assert_called_once_with(30, apply_to_hardware=False, fade=False, fade_duration_s=0.0)
+    assert tray.engine.per_key_brightness == 55
+
+
+def test_restore_brightness_for_reactive_effect_seeds_longer_visual_damp_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from keyrgb.core.effects.reactive import _render_brightness_support as reactive_support
+
+    tray = _mk_tray(effect="reactive_ripple", brightness=30)
+    tray.config.perkey_brightness = 55
+    tray._dim_temp_active = True
+    tray._dim_temp_target_brightness = 5
+
+    monkeypatch.setattr("keyrgb.tray.pollers.idle_power._transition_actions.time.monotonic", lambda: 100.0)
+
+    _apply_idle_action(tray, action="restore_brightness", dim_temp_brightness=5)
+
+    expected_hw_lift_until = 100.0 + max(2.0, float(DEFAULT_IDLE_FADE_DURATION_S) + 0.75)
+    expected_visual_damp_until = 100.0 + max(4.0, float(DEFAULT_IDLE_FADE_DURATION_S) + 2.75)
+    state = reactive_support.ensure_reactive_state(tray.engine)
+
+    assert state._reactive_disable_pulse_hw_lift_until == pytest.approx(expected_hw_lift_until)
+    assert state._reactive_restore_damp_until == pytest.approx(expected_visual_damp_until)
+    assert state._reactive_restore_damp_until > state._reactive_disable_pulse_hw_lift_until
+    assert state._reactive_restore_phase is reactive_support.ReactiveRestorePhase.FIRST_PULSE_PENDING
+
+
+def test_restore_brightness_does_nothing_if_tray_is_off() -> None:
+    tray = _mk_tray(effect="wave", brightness=30)
+    tray.is_off = True
+    tray._dim_temp_active = True
+    tray._dim_temp_target_brightness = 5
+
+    _apply_idle_action(tray, action="restore_brightness", dim_temp_brightness=5)
+
+    # Still clears dim-temp bookkeeping, but should not turn lights on.
+    assert tray._dim_temp_active is False
+    assert tray._dim_temp_target_brightness is None
+    tray.engine.set_brightness.assert_not_called()
+
+
+def test_restore_does_not_restore_when_user_forced_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from keyrgb.tray.idle_power_state import set_idle_power_state_field
+
+    tray = _mk_tray(effect="wave", brightness=25)
+    set_idle_power_state_field(tray, attr_name="_user_forced_off", state_name="user_forced_off", value=True)
+
+    restore = MagicMock()
+    monkeypatch.setattr("keyrgb.tray.pollers.idle_power._actions.restore_from_idle", restore)
+
+    _apply_idle_action(tray, action="restore", dim_temp_brightness=5)
+
+    restore.assert_not_called()
+
+
+def test_restore_does_not_restore_when_owner_user_forced_off_and_legacy_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from keyrgb.tray.idle_power_state import TrayIdlePowerState
+
+    tray = SimpleNamespace(
+        engine=MagicMock(),
+        config=SimpleNamespace(effect="wave", brightness=25),
+        is_off=False,
+        _dim_temp_active=True,
+        _dim_temp_target_brightness=5,
+        tray_idle_power_state=TrayIdlePowerState(
+            user_forced_off=True,
+            power_forced_off=False,
+            dim_temp_active=True,
+            dim_temp_target_brightness=5,
+        ),
+        _refresh_ui=MagicMock(),
+        _start_current_effect=MagicMock(),
+    )
+
+    restore = MagicMock()
+    monkeypatch.setattr("keyrgb.tray.pollers.idle_power._actions.restore_from_idle", restore)
+
+    _apply_idle_action(tray, action="restore", dim_temp_brightness=5)
+
+    restore.assert_not_called()
+    assert tray.tray_idle_power_state.user_forced_off is True
+    assert tray.tray_idle_power_state.power_forced_off is False
+
+
+def test_restore_does_restore_when_not_forced_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from keyrgb.tray.idle_power_state import set_idle_power_state_field
+
+    tray = _mk_tray(effect="wave", brightness=25)
+    tray.is_off = True
+    set_idle_power_state_field(tray, attr_name="_idle_forced_off", state_name="idle_forced_off", value=True)
+
+    restore = MagicMock()
+    monkeypatch.setattr("keyrgb.tray.pollers.idle_power._actions.restore_from_idle", restore)
+
+    _apply_idle_action(tray, action="restore", dim_temp_brightness=5)
+
+    restore.assert_called_once_with(tray)
+
+
+class _CountingLock(AbstractContextManager[None]):
+    def __init__(self) -> None:
+        self.enter_count = 0
+        self.held = False
+
+    def __enter__(self) -> None:
+        self.enter_count += 1
+        self.held = True
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.held = False
+
+
+class _StrictEngine:
+    """Engine stub that enforces 'atomic under kb_lock' updates.
+
+    This is intentionally strict: it will fail if dim-sync code starts
+    manipulating reactive brightness, introducing custom ramps, or calling
+    set_brightness outside the kb_lock for reactive effects.
+    """
+
+    def __init__(self) -> None:
+        self.kb_lock = _CountingLock()
+        self.brightness = 25
+        self.per_key_brightness = 25
+        self.reactive_brightness = 50
+        self.set_brightness_calls: list[tuple[int, bool, bool, float]] = []
+
+    def set_brightness(self, brightness: int, *, apply_to_hardware: bool, fade: bool, fade_duration_s: float) -> None:
+        # For reactive dim-sync we require atomic updates under kb_lock.
+        assert self.kb_lock.held is True
+        self.set_brightness_calls.append((int(brightness), bool(apply_to_hardware), bool(fade), float(fade_duration_s)))
+        self.brightness = int(brightness)
+
+
+def test_dim_sync_reactive_lock_in_no_flashy_side_effects() -> None:
+    from keyrgb.core.effects.reactive._render_brightness_support import ensure_reactive_state
+    from tests.tray.fakes import make_owner_backed_simple_tray
+
+    engine = _StrictEngine()
+    tray = make_owner_backed_simple_tray(
+        is_off=False,
+        idle_forced_off=False,
+        user_forced_off=False,
+        power_forced_off=False,
+        dim_temp_active=False,
+        dim_temp_target_brightness=None,
+        config=SimpleNamespace(effect="reactive_ripple", brightness=5, perkey_brightness=5),
+        engine=engine,
+    )
+
+    # Dim to temp must be atomic + instant (no sleeping fade under lock), and
+    # must not tamper with reactive_brightness.
+    _apply_idle_action(tray, action="dim_to_temp", dim_temp_brightness=3)
+    assert tray._dim_temp_active is True
+    assert tray._dim_temp_target_brightness == 3
+    assert engine.kb_lock.enter_count == 1
+    assert engine.per_key_brightness == 3
+    assert engine.reactive_brightness == 50
+    # Reactive dim no longer sets _hw_brightness_cap — the transition +
+    # dim_temp_active is sufficient.  The cap would override the transition
+    # animation and cause a single-frame flash-to-dark.
+    assert not hasattr(engine, "_hw_brightness_cap") or getattr(engine, "_hw_brightness_cap", None) is None
+    # _dim_temp_active is propagated directly to the engine so
+    # _resolve_brightness() can see it.
+    assert getattr(engine, "_dim_temp_active", None) is True
+    assert engine.set_brightness_calls == [(3, False, False, 0.0)]
+    state = ensure_reactive_state(engine)
+    assert state._reactive_transition_from_brightness == 25
+    assert state._reactive_transition_to_brightness == 3
+    assert state._reactive_transition_duration_s == DEFAULT_IDLE_FADE_DURATION_S
+
+    # Restore must also be atomic + instant, keep reactive_brightness intact.
+    tray._dim_temp_active = True
+    tray._dim_temp_target_brightness = 3
+    _apply_idle_action(tray, action="restore_brightness", dim_temp_brightness=3)
+    assert tray._dim_temp_active is False
+    assert tray._dim_temp_target_brightness is None
+    assert engine.kb_lock.enter_count == 2
+    assert engine.per_key_brightness == 5
+    assert engine.reactive_brightness == 50
+    # Cap cleared and _dim_temp_active reset on engine.
+    assert getattr(engine, "_hw_brightness_cap", "MISSING") is None
+    assert getattr(engine, "_dim_temp_active", None) is False
+    assert engine.set_brightness_calls[-1] == (5, False, False, 0.0)
+    state = ensure_reactive_state(engine)
+    assert state._reactive_transition_from_brightness == 3
+    # restore_target_hw = max(config.brightness=5, perkey=5) = 5
+    # reactive_brightness is excluded from the target because _resolve_brightness
+    # no longer raises hw above global_hw.  Targeting reactive_brightness=50 would
+    # overshoot steady-state hw=5 and produce a visible flash on every undim.
+    assert state._reactive_transition_to_brightness == 5
+    assert state._reactive_transition_duration_s == DEFAULT_IDLE_FADE_DURATION_S
+
+
+class _SequencingLock(AbstractContextManager[None]):
+    def __init__(self, events: list[str]) -> None:
+        self._events = events
+        self.held = False
+
+    def __enter__(self) -> None:
+        self.held = True
+        self._events.append("lock_enter")
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self._events.append("lock_exit")
+        self.held = False
+
+
+class _OrderingEngine:
+    def __init__(self) -> None:
+        self.events: list[str] = []
+        self.kb_lock = _SequencingLock(self.events)
+        self.brightness = 25
+        self._per_key_brightness = 25
+
+    @property
+    def per_key_brightness(self) -> int:
+        return int(self._per_key_brightness)
+
+    @per_key_brightness.setter
+    def per_key_brightness(self, value: int) -> None:
+        assert self.kb_lock.held is True
+        self.events.append("set_per_key_brightness")
+        self._per_key_brightness = int(value)
+
+    def set_brightness(self, brightness: int, *, apply_to_hardware: bool, fade: bool, fade_duration_s: float) -> None:
+        assert self.kb_lock.held is True
+        self.events.append("set_brightness")
+        self.brightness = int(brightness)
+        assert apply_to_hardware is False
+        # Reactive dim-sync now uses instant (no-fade) updates.
+        assert fade is False
+        assert float(fade_duration_s) == 0.0
+
+
+def test_dim_sync_reactive_ordering_under_lock() -> None:
+    from keyrgb.tray.idle_power_state import set_idle_power_state_field
+    from tests.tray.fakes import make_owner_backed_simple_tray
+
+    engine = _OrderingEngine()
+    tray = make_owner_backed_simple_tray(
+        is_off=False,
+        idle_forced_off=False,
+        user_forced_off=False,
+        power_forced_off=False,
+        dim_temp_active=False,
+        dim_temp_target_brightness=None,
+        config=SimpleNamespace(effect="reactive_ripple", brightness=5, perkey_brightness=5),
+        engine=engine,
+    )
+
+    _apply_idle_action(tray, action="dim_to_temp", dim_temp_brightness=3)
+    assert engine.events == ["lock_enter", "set_per_key_brightness", "set_brightness", "lock_exit"]
+
+    engine.events.clear()
+    set_idle_power_state_field(tray, attr_name="_dim_temp_active", state_name="dim_temp_active", value=True)
+    set_idle_power_state_field(
+        tray, attr_name="_dim_temp_target_brightness", state_name="dim_temp_target_brightness", value=3
+    )
+    _apply_idle_action(tray, action="restore_brightness", dim_temp_brightness=3)
+    assert engine.events == ["lock_enter", "set_per_key_brightness", "set_brightness", "lock_exit"]
