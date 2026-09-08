@@ -5,6 +5,7 @@ import shutil
 
 from ...utils.paths import repo_root
 from ...utils.subproc import RunResult, run
+from .tkinter_bundle import runtime_script_env_exports
 
 
 def _is_truthy(value: str | None) -> bool:
@@ -58,7 +59,8 @@ def appimage_smoke_runner() -> RunResult:
 
     image = os.environ.get("KEYRGB_APPIMAGE_SMOKE_IMAGE", "ubuntu:24.04")
 
-    script = "\n".join(  # noqa: FLY002 - container smoke script lines are clearer as an explicit list
+    tcl_export, tk_export = runtime_script_env_exports("$HERE")
+    script = "\n".join(
         [
             "set -euo pipefail",
             "export DEBIAN_FRONTEND=noninteractive",
@@ -72,8 +74,8 @@ def appimage_smoke_runner() -> RunResult:
             'export PYTHONNOUSERSITE="1"',
             'export PYTHONPATH="$HERE/usr/lib/keyrgb:$HERE/usr/lib/keyrgb/site-packages"',
             'export LD_LIBRARY_PATH="$HERE/usr/lib:$HERE/usr/lib64:$HERE/usr/lib/x86_64-linux-gnu:$HERE/usr/lib64/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"',
-            'export TCL_LIBRARY="$HERE/usr/lib/tcl8.6"',
-            'export TK_LIBRARY="$HERE/usr/lib/tk8.6"',
+            tcl_export,
+            tk_export,
             'PY="$HERE/usr/bin/python3"',
             "\"$PY\" -c \"import tkinter as tk; t=tk.Tcl(); t.eval('info patchlevel'); print('tcl-ok')\"",
             '"$PY" -c "import _tkinter; print(\'_tkinter-ok\')"',

@@ -18,6 +18,7 @@ from . import (
     run_checked,
     write_text,
 )
+from .tkinter_bundle import runtime_script_env_exports
 
 # Pin appimagetool to a versioned upstream release with an immutable digest.
 # Do not use AppImageKit/continuous: that asset is mutable and unsigned by URL alone.
@@ -155,6 +156,7 @@ def build_appimage() -> Path:
         _appimage_desktop_entry(),
     )
 
+    tcl_export, tk_export = runtime_script_env_exports("$HERE")
     apprun = "\n".join(  # noqa: FLY002 - shell bootstrap lines are clearer as an explicit list
         [
             "#!/bin/sh",
@@ -165,8 +167,8 @@ def build_appimage() -> Path:
             'export PYTHONPATH="$HERE/usr/lib/keyrgb:$HERE/usr/lib/keyrgb/site-packages"',
             'export LD_LIBRARY_PATH="$HERE/usr/lib:$HERE/usr/lib64:$HERE/usr/lib/x86_64-linux-gnu:$HERE/usr/lib64/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"',
             'export GI_TYPELIB_PATH="$HERE/usr/lib/girepository-1.0${GI_TYPELIB_PATH:+:$GI_TYPELIB_PATH}"',
-            'export TCL_LIBRARY="$HERE/usr/lib/tcl8.6"',
-            'export TK_LIBRARY="$HERE/usr/lib/tk8.6"',
+            tcl_export,
+            tk_export,
             'exec "$HERE/usr/bin/python3" -B -m keyrgb.tray "$@"',
             "",
         ]

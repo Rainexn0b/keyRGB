@@ -1,13 +1,96 @@
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
+from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
+from ...utils.paths import repo_root
+from ...utils.subproc import python_exe
 
-def _ldd_deps(binary: Path) -> dict[str, Path]:
-    """Return DT_NEEDED libs resolved by ldd as {soname: path}."""
+#: Stable AppDir directory names for the Tcl/Tk script trees. These carry no
+#: version suffix so AppRun and container smoke exports never hardcode one.
+TCL_APPDIR_DIRNAME = "tcl"
+TK_APPDIR_DIRNAME = "tk"
+
+
+@dataclass(frozen=True)
+class TkinterManifest:
+    """Build-interpreter Tkinter facts derived from the interpreter itself."""
+
+    extension: Path
+    tcl_version: str
+    tk_version: str
+    base_prefix: Path
+
+
+_TKINTER_MANIFEST_CODE = (
+    "import json, sys, tkinter, _tkinter\n"
+    "out = {'extension': _tkinter.__file__, 'tcl_version': str(tkinter.TclVersion),"
+    " 'tk_version': str(tkinter.TkVersion), 'base_prefix': sys.base_prefix}\n"
+    "print(json.dumps(out))\n"
+)
+
+
+def _parse_tkinter_manifest(payload: str) -> TkinterManifest:
+    try:
+        data = json.loads(payload)
+    except json.JSONDecodeError:
+        raise SystemExit(f"Failed to parse tkinter manifest: {payload}") from None
+
+    if not isinstance(data, dict):
+        raise SystemExit(f"Invalid tkinter manifest: {payload!r}")
+
+    fields = {key: str(data.get(key, "")) for key in ("extension", "tcl_version", "tk_version", "base_prefix")}
+    if not all(fields.values()):
+        raise SystemExit(f"Invalid tkinter manifest (missing fields): {payload!r}")
+
+    return TkinterManifest(
+        extension=Path(fields["extension"]),
+        tcl_version=fields["tcl_version"],
+        tk_version=fields["tk_version"],
+        base_prefix=Path(fields["base_prefix"]),
+    )
+
+
+def _tkinter_manifest() -> TkinterManifest:
+    proc = subprocess.run(
+        [python_exe(), "-c", _TKINTER_MANIFEST_CODE],
+        cwd=str(repo_root()),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        raise SystemExit(f"Cannot query tkinter manifest from {python_exe()}: {proc.stderr}")
+    return _parse_tkinter_manifest(proc.stdout)
+
+
+def runtime_script_env_exports(here: str = "$HERE") -> tuple[str, str]:
+    """Return canonical TCL_LIBRARY/TK_LIBRARY export lines for ``here``."""
+    return (
+        f'export TCL_LIBRARY="{here}/usr/lib/{TCL_APPDIR_DIRNAME}"',
+        f'export TK_LIBRARY="{here}/usr/lib/{TK_APPDIR_DIRNAME}"',
+    )
+
+
+def _ldd_deps(binary: Path, *, lib_dirs: Sequence[Path] = ()) -> dict[str, Path]:
+    """Return DT_NEEDED libs resolved by ldd as {soname: path}.
+
+    ``lib_dirs`` are prepended to ``LD_LIBRARY_PATH`` for ldd so extension deps
+    that only resolve via the interpreter layout (e.g. standalone Tcl 9 libs)
+    are reported instead of ``not found``.
+    """
+    search = [str(item) for item in lib_dirs if str(item)]
+    env: dict[str, str] | None = None
+    if search:
+        existing = os.environ.get("LD_LIBRARY_PATH", "")
+        combined = [*search, existing] if existing else search
+        env = {**os.environ, "LD_LIBRARY_PATH": os.pathsep.join(combined)}
+
     try:
         proc = subprocess.run(
             ["ldd", str(binary)],
@@ -15,6 +98,7 @@ def _ldd_deps(binary: Path) -> dict[str, Path]:
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             check=False,
+            env=env,
         )
     except OSError:
         return {}
@@ -48,90 +132,147 @@ def _ldd_deps(binary: Path) -> dict[str, Path]:
     return out
 
 
-def bundle_tkinter(*, appdir: Path) -> None:
-    """Bundle Tkinter native libraries and Tcl/Tk script libraries into the AppImage.
+def _ordered_existing_dirs(candidates: Sequence[Path]) -> list[Path]:
+    seen: set[str] = set()
+    dirs: list[Path] = []
+    for candidate in candidates:
+        key = str(candidate)
+        if key in seen or not candidate.exists():
+            continue
+        seen.add(key)
+        dirs.append(candidate)
+    return dirs
 
-    Tkinter needs both native .so files AND the Tcl/Tk script directories
-    (containing init.tcl, tk.tcl, and other support scripts) to work.
+
+def _native_lib_dirs(manifest: TkinterManifest) -> list[Path]:
+    """Library dirs to search, interpreter base prefix first (exact matches only)."""
+    base = manifest.base_prefix
+    return _ordered_existing_dirs(
+        [
+            base / "lib",
+            base / "lib64",
+            base / "lib" / "x86_64-linux-gnu",
+            base / "lib64" / "x86_64-linux-gnu",
+            Path("/usr/lib/x86_64-linux-gnu"),
+            Path("/usr/lib64"),
+            Path("/usr/lib"),
+        ]
+    )
+
+
+def _script_search_dirs(manifest: TkinterManifest) -> list[Path]:
+    """Script-tree dirs to search, interpreter base prefix first (exact matches only)."""
+    base = manifest.base_prefix
+    return _ordered_existing_dirs(
+        [
+            base / "lib",
+            base / "lib64",
+            Path("/usr/share/tcltk"),
+            Path("/usr/share"),
+            Path("/usr/lib/x86_64-linux-gnu"),
+            Path("/usr/lib64"),
+            Path("/usr/lib"),
+        ]
+    )
+
+
+def _find_exact_lib(search_dirs: Sequence[Path], *, stem: str) -> Path | None:
+    """Find ``stem`` + ``.so*`` exactly; never fall back to another version."""
+    for search_path in search_dirs:
+        matches = sorted(search_path.glob(f"{stem}.so*"))
+        # Prefer versioned .so files (not symlinks ending in just .so).
+        for candidate in matches:
+            if candidate.is_file() and not candidate.is_symlink():
+                return candidate
+        # Fallback: use any match including symlinks.
+        if matches:
+            return matches[0]
+    return None
+
+
+def _find_native_libs(manifest: TkinterManifest, search_dirs: Sequence[Path]) -> tuple[Path, Path]:
+    """Locate exact Tcl/Tk native libs: separate ``libtcl<V>`` + ``libtk<V>`` or standalone combined ``libtcl<major>tk<V>``."""
+    tcl_lib = _find_exact_lib(search_dirs, stem=f"libtcl{manifest.tcl_version}")
+
+    tk_lib = _find_exact_lib(search_dirs, stem=f"libtk{manifest.tk_version}")
+    if tk_lib is None:
+        major = manifest.tk_version.split(".")[0]
+        tk_lib = _find_exact_lib(search_dirs, stem=f"libtcl{major}tk{manifest.tk_version}")
+
+    if tcl_lib is None or tk_lib is None:
+        raise SystemExit(
+            "Cannot bundle tkinter: no exact native library match for "
+            f"Tcl {manifest.tcl_version} / Tk {manifest.tk_version} "
+            f"(base_prefix={manifest.base_prefix}). KeyRGB requires tkinter."
+        )
+    assert tcl_lib is not None and tk_lib is not None
+    return (tcl_lib, tk_lib)
+
+
+def _find_script_dir(search_dirs: Sequence[Path], *, name: str) -> Path | None:
+    for search_root in search_dirs:
+        candidate = search_root / name
+        if candidate.exists() and candidate.is_dir():
+            return candidate
+    return None
+
+
+def bundle_tkinter(*, appdir: Path) -> None:
+    """Bundle Tkinter native libs + Tcl/Tk script trees into the AppImage.
+
+    Versions come from the build interpreter's own ``_tkinter`` manifest, never
+    from host distro Tcl packages. Script trees land at stable ``usr/lib/tcl``
+    / ``usr/lib/tk`` paths so runtime exports carry no hardcoded version.
     """
+    manifest = _tkinter_manifest()
+    lib_dirs = _native_lib_dirs(manifest)
+    tcl_lib, tk_lib = _find_native_libs(manifest, lib_dirs)
 
     usr_lib = appdir / "usr" / "lib"
     usr_lib.mkdir(parents=True, exist_ok=True)
 
-    # Common system library paths for tk/tcl shared libraries.
-    lib_search_paths = [
-        Path("/usr/lib/x86_64-linux-gnu"),
-        Path("/usr/lib64"),
-        Path("/usr/lib"),
-    ]
-
-    # Look for libtk and libtcl (we need both for tkinter to work).
-    # Prefer versioned .so files (e.g., libtk8.6.so) over unversioned symlinks.
-    tk_patterns = ["libtk8.*.so*", "libtk.so*"]
-    tcl_patterns = ["libtcl8.*.so*", "libtcl.so*"]
-
-    def find_lib(patterns: list[str]) -> Path | None:
-        for search_path in lib_search_paths:
-            if not search_path.exists():
-                continue
-            for pattern in patterns:
-                matches = list(search_path.glob(pattern))
-                # Prefer versioned .so files (not symlinks ending in just .so)
-                for candidate in matches:
-                    if candidate.is_file() and not candidate.is_symlink():
-                        return candidate
-                # Fallback: use any match including symlinks
-                if matches:
-                    return matches[0]
-        return None
-
-    tk_lib = find_lib(tk_patterns)
-    tcl_lib = find_lib(tcl_patterns)
-
-    if tk_lib is None or tcl_lib is None:
-        # Tkinter libraries not found; AppImage will require system tk/tcl.
-        return
-
     # Copy both libraries into the AppImage usr/lib.
-    shutil.copy2(tk_lib, usr_lib / tk_lib.name)
     shutil.copy2(tcl_lib, usr_lib / tcl_lib.name)
+    shutil.copy2(tk_lib, usr_lib / tk_lib.name)
 
     # Also handle any immediate symlink dependencies (e.g., libtk8.6.so -> libtk8.6.so.0)
-    for lib in [tk_lib, tcl_lib]:
+    for lib in [tcl_lib, tk_lib]:
         if lib.is_symlink():
             real = lib.resolve()
             if real.exists() and real != lib:
                 shutil.copy2(real, usr_lib / real.name)
 
-    # Bundle Tcl/Tk script libraries (init.tcl and support files).
-    # These are required for tkinter to initialize properly.
-    script_search_paths = [
-        Path("/usr/share/tcltk"),
-        Path("/usr/share"),
-        Path("/usr/lib/x86_64-linux-gnu"),
-        Path("/usr/lib64"),
-        Path("/usr/lib"),
-    ]
+    # Bundle Tcl/Tk script libraries (init.tcl and support files) under stable
+    # version-free names. These are required for tkinter to initialize properly.
+    script_dirs = _script_search_dirs(manifest)
+    for dirname, version in (
+        (TCL_APPDIR_DIRNAME, manifest.tcl_version),
+        (TK_APPDIR_DIRNAME, manifest.tk_version),
+    ):
+        src = _find_script_dir(script_dirs, name=f"{dirname}{version}")
+        if src is None:
+            raise SystemExit(
+                f"Cannot bundle tkinter: missing {dirname}{version} script tree "
+                f"(base_prefix={manifest.base_prefix}). KeyRGB requires tkinter."
+            )
+        dst = usr_lib / dirname
+        if dst.exists():
+            shutil.rmtree(dst)
+        shutil.copytree(src, dst, symlinks=False)
+        print(f"Bundled {dirname}{version} scripts: {src} -> {dst}")
 
-    for search_root in script_search_paths:
-        if not search_root.exists():
-            continue
-
-        # Look for tcl8.6 and tk8.6 directories
-        for script_dir_name in ["tcl8.6", "tk8.6"]:
-            script_dir = search_root / script_dir_name
-            if script_dir.exists() and script_dir.is_dir():
-                dst = usr_lib / script_dir_name
-                if not dst.exists():
-                    shutil.copytree(script_dir, dst, symlinks=False)
-                    print(f"Bundled {script_dir_name} scripts: {script_dir} -> {dst}")
-
-    _bundle_tk_shared_lib_deps(appdir=appdir, usr_lib=usr_lib, tk_lib=tk_lib, tcl_lib=tcl_lib)
+    _bundle_tk_shared_lib_deps(appdir=appdir, usr_lib=usr_lib, tk_lib=tk_lib, tcl_lib=tcl_lib, lib_dirs=lib_dirs)
 
 
-def _bundle_tk_shared_lib_deps(*, appdir: Path, usr_lib: Path, tk_lib: Path, tcl_lib: Path) -> None:
-    # Bundle shared library deps needed by Tk / _tkinter (e.g. libXft.so.2) so the
-    # AppImage works on minimal systems without X11/font libs installed.
+def _bundle_tk_shared_lib_deps(
+    *,
+    appdir: Path,
+    usr_lib: Path,
+    tk_lib: Path,
+    tcl_lib: Path,
+    lib_dirs: Sequence[Path] = (),
+) -> None:
+    # Bundle shared lib deps needed by Tk / _tkinter (e.g. libXft.so.2) for minimal systems.
 
     def bundle_symlink_chain(src: Path) -> None:
         """Copy a library and its symlink chain into usr/lib."""
@@ -172,23 +313,24 @@ def _bundle_tk_shared_lib_deps(*, appdir: Path, usr_lib: Path, tk_lib: Path, tcl
             "libutil.so.1",
             "libgcc_s.so.1",
             "libstdc++.so.6",
-            # These are commonly provided by every distro and are frequently
-            # consumed by system GTK/Pango stacks. Bundling older copies can
-            # cause hard-to-debug symbol/version mismatches (notably breaking
-            # PyGObject/AppIndicator tray startup on Fedora-like distros).
+            # libfontconfig/freetype come from every distro's GTK/Pango stack;
+            # bundling older copies breaks tray startup on Fedora-like distros.
             "libfontconfig.so.1",
             "libfreetype.so.6",
         }
 
-        for soname, src in _ldd_deps(binary).items():
+        allowed_roots = ("/usr/lib", "/usr/lib64", "/lib", "/lib64", *(str(item) for item in lib_dirs))
+        for soname, src in _ldd_deps(binary, lib_dirs=lib_dirs).items():
             if soname.startswith(("libfontconfig.so", "libfreetype.so")):
                 continue
             if soname in skip_names:
                 continue
             if not src.exists():
                 continue
-            # Only pull from system library locations.
-            if not str(src).startswith(("/usr/lib", "/usr/lib64", "/lib", "/lib64")):
+            # Only pull from known library locations (system dirs or the
+            # interpreter base-prefix lib dirs); the Tcl/Tk libs themselves
+            # are already copied explicitly above.
+            if not str(src).startswith(allowed_roots):
                 continue
             # If we already have this soname in the AppDir, skip.
             if (usr_lib / soname).exists() or (usr_lib / soname).is_symlink():
