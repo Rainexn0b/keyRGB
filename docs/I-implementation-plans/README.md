@@ -7,6 +7,10 @@ specs for larger changes.
 
 ### Active sprint
 
+- `2026-09-08/0.35.1-review-remediation-plan.md` — **0.35.1 review remediation
+  tracker** covering the confirmed ITE 8297 privileged-helper mismatch, helper
+  quality-gate coverage, Python support alignment, supply-chain/checksum
+  hardening, and bounded maintainability follow-ups
 - `2026-07-19/0.30.x-maintainability-sprint.md` — **0.30.x sprint umbrella**.
   Refactor-only patch series. The planned 0.30.2 work is complete: WS1, WS3,
   and WS4 are done, WS2 is monitoring after its highest-ROI slices, and WS5
