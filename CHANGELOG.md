@@ -4,74 +4,30 @@
 
 ## 0.35.0 (2026-09-08)
 
-Wake/brightness ownership and release-quality hardening. Public entrypoints and
-on-disk config stay compatible; controller-native sleep remains opt-in and is
-now identified in Settings as recommended for supported ITE controllers.
+Wake/brightness ownership and release-quality hardening. Public entrypoints and on-disk config stay compatible; controller-native sleep remains opt-in and is now identified in Settings as recommended for supported ITE controllers.
 
-- Effects/Idle: Make the reactive whole-frame wake envelope monotonic and
-  independent of first-pulse phase, and consume one pre-start restore seed so
-  typing cannot produce a `0.62 → 1.0 → 0.62` scale reversal.
-- Tray/Runtime: Route menu and power off/restore through the deck intent
-  pipeline, coalesce restores, and defer scheduler/menu brightness, speed, and
-  effect changes while an off-family owner keeps the keyboard dark.
-- Core/Power: Feed successful power-mode application back to the source policy
-  so heuristic observation mismatches do not retry every 30 seconds. Preserve
-  retries for real failures and surface non-fatal EPP failures from direct and
-  privileged-helper paths.
-- Core/Power: Keep saved lit intent retryable when overlapping resume and
-  lid-open events supersede a delayed restore, preventing both events from
-  completing without relighting the keyboard.
-- Effects/Idle: Release reactive pulse intensity gradually after the global
-  software-idle fade completes, avoiding a one-frame `10 -> 50` visual jump.
-- Build/Architecture: Reject new tray/effect primary-keyboard lighting writes
-  outside approved output owners or without lexical `kb_lock` protection.
-- Build/Architecture: Reject primary-keyboard mutations from secondary/auxiliary
-  tray modules while allowing their explicitly routed secondary targets.
-- Build/Architecture: Add config-driven AST assignment rules so hardware
-  observation modules cannot directly mutate desired lighting config or forced-off
-  policy fields; recovery-leaf `tray.is_off` assignments remain permitted.
-- Build/Architecture: Keep pollers observation-only for primary engine mutations;
-  cache-only brightness bookkeeping is the sole keyword-exempt path.
-- Build/Architecture: Enforce the configured `_start_lock -> kb_lock ->
-  _brightness_fade_lock` order for nested runtime lock acquisitions.
-- Build/Architecture: Reject configured blocking calls while the primary
-  keyboard lock is held, including sleeps, process launches, and waits.
-- Build/Architecture: Keep poller `engine.stop()` ownership explicit, validate
-  architecture keyword exemptions, cover auxiliary tray modules and exact
-  tray-engine receivers, and canonicalize ordinary time/subprocess import
-  aliases without inferring dynamic object aliases.
-- Core/Backends: Add a backend-declared controller wake-settle policy with a
-  conservative 2.5-second fallback and an explicit numeric-zero opt-out;
-  ITE8291r3 declares the validated 2.5-second window directly.
-- Tray/Sleep-Wake: Keep effects stopped and perform no hardware reads or writes
-  during controller wake settling, then complete one restart from the
-  post-delay hardware state. Duplicate wake evidence cannot extend the
-  deadline, while forced-off, manual, and power intents cancel stale settling.
-- Core/Power: Retry an AC/battery brightness action that was suppressed while
-  controller sleep or wake settling held the deck dark instead of recording the
-  unissued write as complete.
-- Core/Effects: Put per-key user-mode reassert/save operations under `kb_lock`,
-  and move config-poll reassertion into the approved output owner so recovery
-  no longer depends on implicit caller locking.
-- GUI/Settings: Clarify that letting firmware keep the deck asleep is
-  recommended for supported ITE controllers while retaining the existing
-  opt-in default for unvalidated backends.
-- Build/Runner: Scope reports and debt snapshots to the current invocation,
-  checkpoint incomplete runs, reject concurrent build-log writers, refresh
-  step logs before execution, and fail report-producing steps when their
-  expected fresh JSON is missing.
-- Build/CLI: Make the bare command select the documented full profile, validate
-  multiword and skipped step selectors, force hardware tests off in validation,
-  and prevent AppImage smoke from consuming a stale or skipped build.
-- Build/Health: Restore metric-based health penalties independently of pass/fail
-  status, preserve measured coverage on gate failure, report factual counts,
-  and leave skipped or invalid data unscored.
-- Build/Architecture: Resolve relative imports, strengthen AST call, alias,
-  lock, glob, and corpus analysis, and reject malformed, duplicate, empty, or
-  unreadable architecture-rule inputs instead of silently passing them.
-- Build/Packaging: Report staging-only AppImage work and smoke-test opt-outs as
-  structured skips, with refreshed architecture, CLI-output, health-scoring,
-  policy-ownership, and Tk-async documentation.
+- Effects/Idle: Make the reactive whole-frame wake envelope monotonic and independent of first-pulse phase, and consume one pre-start restore seed so typing cannot produce a `0.62 → 1.0 → 0.62` scale reversal.
+- Tray/Runtime: Route menu and power off/restore through the deck intent pipeline, coalesce restores, and defer scheduler/menu brightness, speed, and effect changes while an off-family owner keeps the keyboard dark.
+- Core/Power: Feed successful power-mode application back to the source policy so heuristic observation mismatches do not retry every 30 seconds. Preserve retries for real failures and surface non-fatal EPP failures from direct and privileged-helper paths.
+- Core/Power: Keep saved lit intent retryable when overlapping resume and lid-open events supersede a delayed restore, preventing both events from completing without relighting the keyboard.
+- Effects/Idle: Release reactive pulse intensity gradually after the global software-idle fade completes, avoiding a one-frame `10 -> 50` visual jump.
+- Build/Architecture: Reject new tray/effect primary-keyboard lighting writes outside approved output owners or without lexical `kb_lock` protection.
+- Build/Architecture: Reject primary-keyboard mutations from secondary/auxiliary tray modules while allowing their explicitly routed secondary targets.
+- Build/Architecture: Add config-driven AST assignment rules so hardware observation modules cannot directly mutate desired lighting config or forced-off policy fields; recovery-leaf `tray.is_off` assignments remain permitted.
+- Build/Architecture: Keep pollers observation-only for primary engine mutations; cache-only brightness bookkeeping is the sole keyword-exempt path.
+- Build/Architecture: Enforce the configured `_start_lock -> kb_lock -> _brightness_fade_lock` order for nested runtime lock acquisitions.
+- Build/Architecture: Reject configured blocking calls while the primary keyboard lock is held, including sleeps, process launches, and waits.
+- Build/Architecture: Keep poller `engine.stop()` ownership explicit, validate architecture keyword exemptions, cover auxiliary tray modules and exact tray-engine receivers, and canonicalize ordinary time/subprocess import aliases without inferring dynamic object aliases.
+- Core/Backends: Add a backend-declared controller wake-settle policy with a conservative 2.5-second fallback and an explicit numeric-zero opt-out; ITE8291r3 declares the validated 2.5-second window directly.
+- Tray/Sleep-Wake: Keep effects stopped and perform no hardware reads or writes during controller wake settling, then complete one restart from the post-delay hardware state. Duplicate wake evidence cannot extend the deadline, while forced-off, manual, and power intents cancel stale settling.
+- Core/Power: Retry an AC/battery brightness action that was suppressed while controller sleep or wake settling held the deck dark instead of recording the unissued write as complete.
+- Core/Effects: Put per-key user-mode reassert/save operations under `kb_lock`, and move config-poll reassertion into the approved output owner so recovery no longer depends on implicit caller locking.
+- GUI/Settings: Clarify that letting firmware keep the deck asleep is recommended for supported ITE controllers while retaining the existing opt-in default for unvalidated backends.
+- Build/Runner: Scope reports and debt snapshots to the current invocation, checkpoint incomplete runs, reject concurrent build-log writers, refresh step logs before execution, and fail report-producing steps when their expected fresh JSON is missing.
+- Build/CLI: Make the bare command select the documented full profile, validate multiword and skipped step selectors, force hardware tests off in validation, and prevent AppImage smoke from consuming a stale or skipped build.
+- Build/Health: Restore metric-based health penalties independently of pass/fail status, preserve measured coverage on gate failure, report factual counts, and leave skipped or invalid data unscored.
+- Build/Architecture: Resolve relative imports, strengthen AST call, alias, lock, glob, and corpus analysis, and reject malformed, duplicate, empty, or unreadable architecture-rule inputs instead of silently passing them.
+- Build/Packaging: Report staging-only AppImage work and smoke-test opt-outs as structured skips, with refreshed architecture, CLI-output, health-scoring, policy-ownership, and Tk-async documentation.
 
 ## 0.34.0 (2026-08-31)
 
