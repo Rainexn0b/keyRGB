@@ -125,6 +125,50 @@ def build_coverage_report(payload: dict[str, Any], baseline: CoverageBaseline) -
             }
         )
 
+    per_file_rows: list[dict[str, Any]] = []
+    for rel_path, minimum_percent in baseline.per_file_minimums.items():
+        file_summary = files.get(rel_path)
+        if file_summary is None:
+            regressions.append(
+                CoverageRegression(
+                    kind="per_file_missing",
+                    target=rel_path,
+                    current=0.0,
+                    baseline=float(minimum_percent),
+                )
+            )
+            per_file_rows.append(
+                {
+                    "path": rel_path,
+                    "percent": None,
+                    "baseline": round(float(minimum_percent), 2),
+                    "covered_lines": 0,
+                    "num_statements": 0,
+                    "status": "missing",
+                }
+            )
+            continue
+        current_percent = float(file_summary.get("percent", 0.0))
+        if current_percent < float(minimum_percent):
+            regressions.append(
+                CoverageRegression(
+                    kind="per_file",
+                    target=rel_path,
+                    current=current_percent,
+                    baseline=float(minimum_percent),
+                )
+            )
+        per_file_rows.append(
+            {
+                "path": rel_path,
+                "percent": round(current_percent, 2),
+                "baseline": round(float(minimum_percent), 2),
+                "covered_lines": int(file_summary.get("covered_lines", 0)),
+                "num_statements": int(file_summary.get("num_statements", 0)),
+                "status": "fail" if current_percent < float(minimum_percent) else "ok",
+            }
+        )
+
     lowest_covered_rows: list[dict[str, Any]] = []
     for rel_path, item in files.items():
         num_statements = _coerce_int(item.get("num_statements", 0))
@@ -153,6 +197,7 @@ def build_coverage_report(payload: dict[str, Any], baseline: CoverageBaseline) -
             "minimum_watch_file_percent": round(minimum_watch_file, 2),
             "delta_total_percent": None if minimum_total is None else round(total_percent - float(minimum_total), 2),
             "tracked_prefixes": {prefix: round(float(value), 2) for prefix, value in baseline.tracked_prefixes.items()},
+            "per_file_minimums": {path: round(float(value), 2) for path, value in baseline.per_file_minimums.items()},
             "regressions": [
                 {
                     "kind": item.kind,
@@ -165,6 +210,7 @@ def build_coverage_report(payload: dict[str, Any], baseline: CoverageBaseline) -
         },
         "tracked_prefixes": tracked_prefixes,
         "watch_files": watch_file_rows,
+        "per_file_minimums": per_file_rows,
         "lowest_covered_files": lowest_covered,
     }
 
@@ -191,11 +237,18 @@ def _load_coverage_baseline(root: Path) -> CoverageBaseline:
 
     watch_files = tuple(str(path) for path in section.get("watch_files", []) if isinstance(path, str))
     minimum_watch_file = _coerce_float(section.get("minimum_watch_file_percent"), 0.0)
+    per_file_minimums_raw = section.get("per_file_minimums", {})
+    per_file_minimums = {
+        str(path): float(value)
+        for path, value in per_file_minimums_raw.items()
+        if isinstance(path, str) and isinstance(value, int | float)
+    }
     return CoverageBaseline(
         minimum_total_percent=minimum_total,
         tracked_prefixes=tracked_prefixes,
         watch_files=watch_files,
         minimum_watch_file_percent=minimum_watch_file,
+        per_file_minimums=per_file_minimums,
     )
 
 

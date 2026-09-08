@@ -56,6 +56,22 @@ def _build_stdout(report: dict[str, Any], *, reports_path: Path) -> list[str]:
                 continue
             lines.append(f"  {path}: {float(percent):.2f}% baseline={float(expected):.2f}% [{status}]")
 
+    per_file_minimums = report.get("per_file_minimums", [])
+    if isinstance(per_file_minimums, list) and per_file_minimums:
+        lines.append("")
+        lines.append("Per-file minimums:")
+        for item in per_file_minimums:
+            path = item.get("path")
+            if not isinstance(path, str):
+                continue
+            percent = item.get("percent")
+            expected = item.get("baseline", 0.0)
+            status = "FAIL" if item.get("status") in {"fail", "missing"} else "OK"
+            if percent is None:
+                lines.append(f"  {path}: not present in coverage payload [{status}]")
+                continue
+            lines.append(f"  {path}: {float(percent):.2f}% baseline={float(expected):.2f}% [{status}]")
+
     lowest = report.get("lowest_covered_files", [])
     if isinstance(lowest, list) and lowest:
         lines.append("")
@@ -170,6 +186,25 @@ def _write_coverage_reports(*, report_dir: Path, report: dict[str, Any]) -> None
             )
         md_lines.append("")
 
+    per_file_minimums = report.get("per_file_minimums", [])
+    if isinstance(per_file_minimums, list) and per_file_minimums:
+        md_lines.extend(
+            [
+                "## Per-file minimums",
+                "",
+                "| File | Coverage | Covered | Statements | Status |",
+                "|---|---:|---:|---:|---|",
+            ]
+        )
+        for item in per_file_minimums:
+            percent = item.get("percent")
+            percent_text = "-" if percent is None else f"{float(percent):.2f}%"
+            md_lines.append(
+                f"| {item.get('path')} | {percent_text} | {item.get('covered_lines', 0)} | "
+                f"{item.get('num_statements', 0)} | {item.get('status')} |"
+            )
+        md_lines.append("")
+
     lowest = report.get("lowest_covered_files", [])
     if isinstance(lowest, list) and lowest:
         md_lines.extend(
@@ -221,10 +256,12 @@ def _write_missing_capture_reports(*, report_dir: Path) -> None:
             "minimum_total_percent": None,
             "delta_total_percent": None,
             "tracked_prefixes": {},
+            "per_file_minimums": {},
             "regressions": [],
         },
         "tracked_prefixes": [],
         "watch_files": [],
+        "per_file_minimums": [],
         "lowest_covered_files": [],
     }
     write_json(report_dir / _SUMMARY_JSON_NAME, payload)

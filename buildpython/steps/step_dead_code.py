@@ -9,7 +9,9 @@ from ..utils.paths import buildlog_dir, repo_root
 from ..utils.subproc import RunResult, python_exe, run
 
 _FINDING_RE = re.compile(r"^(?P<path>.+?):(?P<line>\d+): (?P<message>.+) \((?P<confidence>\d+)% confidence\)$")
-_SCAN_ROOTS = ("keyrgb", "buildpython", "tests")
+# The installed helper is extensionless Python; vulture only sees it when
+# passed as an explicit file argument.
+_SCAN_ROOTS = ("keyrgb", "buildpython", "tests", "system/bin/keyrgb-power-helper")
 _MIN_CONFIDENCE = 80
 _ACTIONABLE_PREFIXES = (
     "unused function",

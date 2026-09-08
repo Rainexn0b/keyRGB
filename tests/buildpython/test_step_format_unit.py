@@ -26,7 +26,9 @@ def test_ruff_format_check_runner_covers_runtime_and_tooling_surfaces(monkeypatc
             "keyrgb",
             "buildpython",
             "scripts/release",
+            "scripts/dependency_audit.py",
             "tests",
+            "system/bin/keyrgb-power-helper",
         ]
     ]
     assert result.exit_code == 0

@@ -21,6 +21,15 @@ That command updates all manual release metadata:
 
 Then add release notes under the new changelog heading.
 
+Then verify the supply-chain audit locally:
+
+```bash
+.venv/bin/python scripts/dependency_audit.py --project-dir .
+```
+
+Exit semantics: 0 clean, 1 findings, 2 tool/advisory/resolution failure. It audits
+runtime requirements declared in pyproject rather than arbitrary ambient packages.
+
 Then run the safe release flow:
 
 ```bash

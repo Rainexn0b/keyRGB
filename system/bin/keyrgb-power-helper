@@ -7,7 +7,6 @@ import re
 import sys
 from pathlib import Path
 
-
 CPUFREQ_ROOT_DEFAULT = Path("/sys/devices/system/cpu/cpufreq")
 LEDS_ROOT_DEFAULT = Path("/sys/class/leds")
 DEFAULT_EXTREME_SAVER_CAP_KHZ = 800_000
@@ -34,7 +33,7 @@ def _leds_root() -> Path:
 def _read_int(path: Path) -> int | None:
     try:
         return int(path.read_text(encoding="utf-8").strip())
-    except Exception:
+    except (OSError, ValueError):
         return None
 
 
@@ -43,6 +42,10 @@ def _write(path: Path, text: str) -> None:
 
 
 _LED_NAME_RE = re.compile(r"^[A-Za-z0-9:_\-\.]+$")
+
+
+def _is_ite8297_channel(name: str) -> bool:
+    return bool(re.match(r"^ite_8297:[123]$", name, re.IGNORECASE))
 
 
 def _validate_led_name(name: str) -> str:
@@ -55,7 +58,7 @@ def _validate_led_name(name: str) -> str:
     # Safety: keep the privileged helper narrowly-scoped.
     # Only allow common keyboard backlight LED nodes.
     n = name.lower()
-    if "kbd_backlight" not in n:
+    if "kbd_backlight" not in n and not _is_ite8297_channel(name):
         raise SystemExit("Refusing non-keyboard LED")
 
     return name
@@ -72,16 +75,16 @@ def _normalize_extreme_cap_khz(value: int) -> int:
 def _led_dir(led_name: str) -> Path:
     root = _leds_root()
     led_name = _validate_led_name(led_name)
-    p = (root / led_name)
+    p = root / led_name
     try:
         # Avoid path traversal via symlinks.
         real = p.resolve(strict=False)
         root_real = root.resolve(strict=False)
-        if not str(real).startswith(str(root_real) + "/") and str(real) != str(root_real):
-            raise SystemExit("Invalid LED path")
-    except Exception:
-        # If resolve fails, still allow existence checks to handle it.
-        pass
+    except OSError as exc:
+        print(f"Invalid LED path for {led_name}: {exc}", file=sys.stderr)
+        raise SystemExit("Invalid LED path")
+    if str(real) != str(root_real) and not str(real).startswith(str(root_real) + "/"):
+        raise SystemExit("Invalid LED path")
     return p
 
 
@@ -130,7 +133,7 @@ def _policy_dirs(root: Path) -> list[Path]:
 def _read_text(path: Path) -> str | None:
     try:
         return path.read_text(encoding="utf-8").strip()
-    except Exception:
+    except (OSError, ValueError):
         return None
 
 
@@ -257,8 +260,8 @@ def apply_mode(mode: str, *, extreme_cap_khz: int = DEFAULT_EXTREME_SAVER_CAP_KH
     if mode != "extreme-saver":
         try:
             _set_boost(True)
-        except Exception:
-            pass
+        except OSError as exc:
+            print(f"Non-fatal boost enable failed: {exc}", file=sys.stderr)
 
     for pol in policies:
         max_path = pol / "scaling_max_freq"
@@ -281,8 +284,8 @@ def apply_mode(mode: str, *, extreme_cap_khz: int = DEFAULT_EXTREME_SAVER_CAP_KH
             if gov.exists() and "powersave" in available_governors:
                 try:
                     _write(gov, "powersave\n")
-                except Exception:
-                    pass
+                except OSError as exc:
+                    print(f"Non-fatal governor write failed for {pol}: {exc}", file=sys.stderr)
 
         else:
             restore_min_khz = int(min_khz) if min_khz else None
@@ -305,14 +308,14 @@ def apply_mode(mode: str, *, extreme_cap_khz: int = DEFAULT_EXTREME_SAVER_CAP_KH
                             governor_value = "schedutil\n"
                     if governor_value is not None:
                         _write(gov, governor_value)
-                except Exception:
-                    pass
+                except OSError as exc:
+                    print(f"Non-fatal governor write failed for {pol}: {exc}", file=sys.stderr)
 
     if mode == "extreme-saver":
         try:
             _set_boost(False)
-        except Exception:
-            pass
+        except OSError as exc:
+            print(f"Non-fatal boost disable failed: {exc}", file=sys.stderr)
 
     # Some drivers expose mode-dependent EPP choices. amd-pstate-epp, for
     # example, can show only "performance" while the governor is performance.
@@ -351,8 +354,11 @@ def main() -> int:
         return 0
 
     if ns.cmd == "led-apply":
-        rgb = tuple(ns.rgb) if ns.rgb is not None else None
-        _led_apply(str(ns.led), brightness=int(ns.brightness), rgb=rgb)  # type: ignore[arg-type]
+        rgb_value: tuple[int, int, int] | None = None
+        if ns.rgb is not None:
+            red, green, blue = int(ns.rgb[0]), int(ns.rgb[1]), int(ns.rgb[2])
+            rgb_value = (red, green, blue)
+        _led_apply(str(ns.led), brightness=int(ns.brightness), rgb=rgb_value)
         return 0
 
     return 2

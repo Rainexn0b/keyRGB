@@ -1,10 +1,25 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
+import importlib.machinery
+import importlib.util
+from pathlib import Path
+from types import ModuleType, SimpleNamespace
 
 import pytest
 
 import keyrgb.core.backends.sysfs.privileged as sysfs_privileged
+from tests._paths import REPO_ROOT
+
+_HELPER_PATH = Path(REPO_ROOT) / "system" / "bin" / "keyrgb-power-helper"
+
+
+def _load_shipped_helper() -> ModuleType:
+    loader = importlib.machinery.SourceFileLoader("keyrgb_power_helper_shipped", str(_HELPER_PATH))
+    spec = importlib.util.spec_from_loader("keyrgb_power_helper_shipped", loader)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_helper_can_apply_led_matches_helper_contract() -> None:
@@ -17,6 +32,46 @@ def test_helper_can_apply_led_matches_helper_contract() -> None:
     assert sysfs_privileged.helper_can_apply_led("ite_8297:4") is False  # only channels 1-3
     assert sysfs_privileged.helper_can_apply_led("rgb:kbd_backlight", color_kind="rgb") is False
     assert sysfs_privileged.helper_can_apply_led("system76::kbd_backlight", color_kind="file") is False
+
+
+def test_caller_and_shipped_helper_agree_on_ite8297_allowlist() -> None:
+    shipped = _load_shipped_helper()
+
+    accepted = [
+        "rgb:kbd_backlight",
+        "ite_8297:1",
+        "ite_8297:2",
+        "ite_8297:3",
+        "ITE_8297:1",
+        "Ite_8297:3",
+    ]
+    for name in accepted:
+        assert sysfs_privileged.helper_can_apply_led(name) is True, name
+        assert shipped._validate_led_name(name) == name.strip(), name
+
+    rejected = [
+        "ite_8297:4",
+        "ite_8297:0",
+        "ite_8297:",
+        "ite_8297:12",
+        "ite_8297:1x",
+        "ite_8298:1",
+        "ite_8297-1",
+        "ite_8297:1.",
+        "../ite_8297:1",
+        "ite_8297:1/../x",
+        "..\\ite_8297:1",
+        "ite_8297:1\\x",
+        "platform::micmute",
+        "input3::capslock",
+        "random-led",
+        "",
+        "   ",
+    ]
+    for name in rejected:
+        assert sysfs_privileged.helper_can_apply_led(name) is False, name
+        with pytest.raises(SystemExit):
+            shipped._validate_led_name(name)
 
 
 def test_helper_supports_led_apply_returns_false_when_helper_missing(

@@ -261,3 +261,25 @@ def test_any_type_hint_scanner_covers_all_src_including_gui_paths(tmp_path) -> N
         ),
     ]
     assert text_scanners._detect_any_type_hints(helper_target, root) == []
+
+
+def test_iter_python_files_includes_installed_helper(tmp_path) -> None:
+    helper = tmp_path / "system" / "bin" / "keyrgb-power-helper"
+    helper.parent.mkdir(parents=True)
+    helper.write_text("VALUE = 1\n", encoding="utf-8")
+
+    paths = [str(path.relative_to(tmp_path)) for path in step_code_hygiene_baseline._iter_python_files(tmp_path)]
+
+    assert "system/bin/keyrgb-power-helper" in paths
+
+
+def test_broad_except_in_installed_helper_is_flagged(tmp_path) -> None:
+    helper = tmp_path / "system" / "bin" / "keyrgb-power-helper"
+    helper.parent.mkdir(parents=True)
+    helper.write_text("try:\n    run()\nexcept Exception:\n    pass\n", encoding="utf-8")
+
+    issues = code_hygiene_detectors._detect_broad_exception_patterns(helper, tmp_path)
+
+    assert [(issue.path, issue.category) for issue in issues] == [
+        ("system/bin/keyrgb-power-helper", "silent_broad_except")
+    ]

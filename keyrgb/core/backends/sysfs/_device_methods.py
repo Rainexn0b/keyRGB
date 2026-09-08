@@ -39,7 +39,17 @@ def set_zone_color_method(self, zone: dict, color, brightness: int):
         for channel_name, value in scaled.items():
             channel_dir = zone["paths"][channel_name]
             max_value = max(1, common._read_int(channel_dir / "max_brightness"))
-            common._write_int(channel_dir / "brightness", max(0, min(max_value, int(value))))
+            target = max(0, min(max_value, int(value)))
+            try:
+                common._write_int(channel_dir / "brightness", target)
+            except OSError:
+                if (
+                    privileged.helper_can_apply_led(channel_dir.name)
+                    and privileged.helper_supports_led_apply()
+                    and privileged.run_led_apply(led=channel_dir.name, brightness=target, rgb=None)
+                ):
+                    continue
+                raise
         self._channel_group_color = (int(r), int(g), int(b))
         self._channel_group_brightness = max(0, min(50, int(brightness)))
         return

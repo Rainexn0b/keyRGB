@@ -9,6 +9,11 @@ from .models import ExceptionTransparencyBaseline
 
 _DEBT_BASELINE_PATH = Path("buildpython/config/debt_baselines.json")
 
+# Installed privileged helper: extensionless Python that rglob("*.py") would
+# otherwise miss. Scanned explicitly so new broad catches there fail
+# Exception Transparency.
+POWER_HELPER_PATH = Path("system/bin/keyrgb-power-helper")
+
 _EXCLUDE_PATTERNS = [
     "vendor/",
     "__pycache__/",
@@ -41,6 +46,9 @@ def iter_python_files(root: Path) -> Iterable[Path]:
             if should_exclude(path, root):
                 continue
             yield path
+    helper = root / POWER_HELPER_PATH
+    if helper.exists():
+        yield helper
 
 
 def load_baseline(root: Path) -> ExceptionTransparencyBaseline:

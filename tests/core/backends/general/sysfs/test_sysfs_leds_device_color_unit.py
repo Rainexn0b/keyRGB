@@ -326,3 +326,74 @@ def test_sysfs_zone_brightness_uses_helper_or_raises_for_primary(
     )
     with pytest.raises(PermissionError):
         dev._set_zone_brightness(primary, 9)
+
+
+def test_sysfs_device_ite8297_channel_fallback_writes_each_channel_via_helper(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    red = _make_led(tmp_path, "ite_8297:1", brightness=0, max_brightness=255)
+    green = _make_led(tmp_path, "ite_8297:2", brightness=0, max_brightness=255)
+    blue = _make_led(tmp_path, "ite_8297:3", brightness=0, max_brightness=255)
+
+    dev = SysfsLedKeyboardDevice(
+        primary_led_dir=red,
+        all_led_dirs=[red, green, blue],
+    )
+
+    def denied(_path, _value):
+        raise OSError("root-only brightness")
+
+    monkeypatch.setattr(
+        "keyrgb.core.backends.sysfs._device_methods.common._write_int",
+        denied,
+    )
+    monkeypatch.setattr(
+        "keyrgb.core.backends.sysfs._device_methods.privileged.helper_supports_led_apply",
+        lambda: True,
+    )
+    helper_calls: list[tuple[str, int, tuple[int, int, int] | None]] = []
+    monkeypatch.setattr(
+        "keyrgb.core.backends.sysfs._device_methods.privileged.run_led_apply",
+        lambda *, led, brightness, rgb: helper_calls.append((led, brightness, rgb)) or True,
+    )
+
+    dev.set_color((100, 50, 25), brightness=25)
+
+    # Only per-channel brightness writes, one per channel, no RGB payload.
+    assert helper_calls == [
+        ("ite_8297:1", 50, None),
+        ("ite_8297:2", 25, None),
+        ("ite_8297:3", 12, None),
+    ]
+    # Direct files untouched while the helper path was used.
+    assert (red / "brightness").read_text(encoding="utf-8").strip() == "0"
+    assert (green / "brightness").read_text(encoding="utf-8").strip() == "0"
+    assert (blue / "brightness").read_text(encoding="utf-8").strip() == "0"
+
+
+def test_sysfs_device_ite8297_channel_fallback_raises_without_helper(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    red = _make_led(tmp_path, "ite_8297:1", brightness=0, max_brightness=255)
+    green = _make_led(tmp_path, "ite_8297:2", brightness=0, max_brightness=255)
+    blue = _make_led(tmp_path, "ite_8297:3", brightness=0, max_brightness=255)
+
+    dev = SysfsLedKeyboardDevice(
+        primary_led_dir=red,
+        all_led_dirs=[red, green, blue],
+    )
+
+    def denied(_path, _value):
+        raise OSError("root-only brightness")
+
+    monkeypatch.setattr(
+        "keyrgb.core.backends.sysfs._device_methods.common._write_int",
+        denied,
+    )
+    monkeypatch.setattr(
+        "keyrgb.core.backends.sysfs._device_methods.privileged.helper_supports_led_apply",
+        lambda: False,
+    )
+
+    with pytest.raises(OSError, match="root-only brightness"):
+        dev.set_color((100, 50, 25), brightness=25)

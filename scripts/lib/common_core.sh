@@ -52,6 +52,13 @@ OS_RELEASE_ID=""
 OS_RELEASE_ID_LIKE=""
 OS_RELEASE_PRETTY_NAME=""
 
+# Internal seam for the os-release source path. Production always reads
+# /etc/os-release; tests override this function to point at a fixture.
+# No public environment variable selects the path.
+_keyrgb_os_release_path() {
+  printf '%s' "/etc/os-release"
+}
+
 _unquote_os_release_value() {
   local value="${1:-}"
   value="${value#\"}"
@@ -66,7 +73,10 @@ load_os_release() {
 
   OS_RELEASE_LOADED=1
 
-  if ! [ -r /etc/os-release ]; then
+  local os_release_path=""
+  os_release_path="$(_keyrgb_os_release_path)"
+
+  if ! [ -r "$os_release_path" ]; then
     return 0
   fi
 
@@ -85,7 +95,7 @@ load_os_release() {
       ID_LIKE) OS_RELEASE_ID_LIKE="${value,,}" ;;
       PRETTY_NAME) OS_RELEASE_PRETTY_NAME="$value" ;;
     esac
-  done </etc/os-release
+  done <"$os_release_path"
 }
 
 os_pretty_name() {
@@ -463,63 +473,179 @@ download_url_quiet() {
   _download_url_impl "$1" "$2" "quiet"
 }
 
-# verify_downloaded_sha256: verify a downloaded file against a .sha256 sidecar URL.
-# Usage: verify_downloaded_sha256 <file_path> <sha256_url>
-# - Exits non-zero and removes the file on hash mismatch.
-# - By default, missing sidecars are non-fatal so older releases still install.
-# - Set KEYRGB_REQUIRE_CHECKSUM=1 (or true/yes/on) to fail closed when sha256sum
-#   is missing, the sidecar cannot be downloaded, or the sidecar is empty.
-verify_downloaded_sha256() {
-  local file_path="$1" sha256_url="$2"
-  local require_checksum=0
-  case "${KEYRGB_REQUIRE_CHECKSUM:-}" in
-    1|true|TRUE|yes|YES|y|Y|on|ON) require_checksum=1 ;;
+# _keyrgb_release_tag_is_historical: true only for well-formed stable release
+# tags that predate published SHA-256 sidecars (before v0.23.4).
+# - Accepts exactly <major>.<minor>.<patch> with an optional leading 'v',
+#   using canonical numeric components (0 or non-zero without leading zeros).
+# - Anything else (empty, 'main', mutable branch names, non-semver refs,
+#   leading-zero components, or prerelease suffixes such as '-rc1') is NOT
+#   historical and stays strict.
+# - Comparison is string-based (length then lexicographic) so absurdly large
+#   numeric components cannot overflow into a historical classification.
+_keyrgb_release_tag_is_historical() {
+  local tag="${1:-}"
+  local ver="$tag"
+  case "$ver" in
+    v*) ver="${ver#v}" ;;
   esac
 
+  local major="" minor="" patch=""
+  local semver_re='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+  if [[ "$ver" =~ $semver_re ]]; then
+    major="${BASH_REMATCH[1]}"
+    minor="${BASH_REMATCH[2]}"
+    patch="${BASH_REMATCH[3]}"
+  else
+    return 1
+  fi
+
+  [ "$major" = "0" ] || return 1
+  case "$minor" in
+    [0-9]) return 0 ;;
+    1[0-9]|2[0-2]) return 0 ;;
+    23) : ;;
+    *) return 1 ;;
+  esac
+  # Only minor "23" reaches here.
+  case "$patch" in
+    [0-3]) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# verify_downloaded_sha256: verify a downloaded file against a .sha256 sidecar URL.
+# Usage: verify_downloaded_sha256 <file_path> <sha256_url> [release_tag]
+# - Default is strict (fail closed): current releases (v0.23.4 and later),
+#   empty/unknown/non-semver tags, and mutable refs such as 'main' fail
+#   closed when 'sha256sum' is missing, the sidecar cannot be downloaded, or
+#   the sidecar is empty or malformed. Hash mismatches always fail closed.
+# - Historical compatibility is limited to well-formed stable tags before
+#   v0.23.4 (the first release that published sidecars): for those tags only,
+#   a missing sidecar or missing 'sha256sum' warns and continues. A present
+#   but empty/malformed sidecar, a hash-tool failure, or a hash mismatch
+#   still fails closed for historical tags.
+# - Set KEYRGB_REQUIRE_CHECKSUM=1 (or true/yes/on) to force strict
+#   verification even for historical tags. A false/unset value never weakens
+#   strict verification of current or unknown tags.
+# - Every rejection removes the downloaded file; temporary sidecars are
+#   always cleaned up.
+verify_downloaded_sha256() {
+  local file_path="$1" sha256_url="$2" release_tag="${3:-}"
+  local base_name=""
+  base_name="$(basename "$file_path")"
+  local display_tag="${release_tag:-unknown}"
+
+  local require_checksum=0
+  if is_truthy "${KEYRGB_REQUIRE_CHECKSUM:-}"; then
+    require_checksum=1
+  fi
+
+  local strict=1
+  if [ "$require_checksum" -eq 0 ] && _keyrgb_release_tag_is_historical "$release_tag"; then
+    strict=0
+  fi
+
+  local env_note=""
+  if [ "$require_checksum" -eq 1 ]; then
+    env_note=" (KEYRGB_REQUIRE_CHECKSUM=1)"
+  fi
+
   if ! have_cmd sha256sum; then
-    if [ "$require_checksum" -eq 1 ]; then
+    if [ "$strict" -eq 1 ]; then
       rm -f "$file_path" 2>/dev/null || true
-      die "sha256sum not found; cannot verify integrity of $(basename "$file_path") (KEYRGB_REQUIRE_CHECKSUM=1)."
+      die "Integrity verification failed for $base_name (release '$display_tag'): sha256sum not found; cannot verify SHA-256 integrity. Removed $base_name.$env_note"
     fi
-    log_warn "sha256sum not found; skipping integrity check of $(basename "$file_path")."
+    log_warn "Historical release '$release_tag' predates checksum sidecars (historical compatibility): sha256sum not found; skipping integrity verification of $base_name."
+    log_warn "Set KEYRGB_REQUIRE_CHECKSUM=1 to require strict checksum verification for historical releases."
     return 0
   fi
 
-  local sha256_tmp
-  sha256_tmp="$(mktemp)"
+  local sha256_tmp=""
+  if ! sha256_tmp="$(mktemp)"; then
+    rm -f "$file_path" 2>/dev/null || true
+    die "Integrity verification failed for $base_name (release '$display_tag'): could not create a temporary file to verify SHA-256 integrity. Removed $base_name."
+  fi
 
   if ! download_url_quiet "$sha256_url" "$sha256_tmp" 2>/dev/null; then
     rm -f "$sha256_tmp" 2>/dev/null || true
-    if [ "$require_checksum" -eq 1 ]; then
+    if [ "$strict" -eq 1 ]; then
       rm -f "$file_path" 2>/dev/null || true
-      die "No SHA-256 sidecar found at: $sha256_url (KEYRGB_REQUIRE_CHECKSUM=1). Removed $(basename "$file_path")."
+      die "Integrity verification failed for $base_name (release '$display_tag'): no SHA-256 sidecar found at: $sha256_url. Removed $base_name. Current releases must publish a .sha256 sidecar.$env_note"
     fi
-    log_warn "No SHA-256 sidecar found at: $sha256_url"
-    log_warn "Integrity of $(basename "$file_path") could not be verified. Ensure the release publishes a .sha256 file."
+    log_warn "Historical release '$release_tag' predates checksum sidecars (historical compatibility): no SHA-256 sidecar found at: $sha256_url; skipping integrity verification of $base_name."
+    log_warn "Set KEYRGB_REQUIRE_CHECKSUM=1 to require strict checksum verification for historical releases."
     return 0
   fi
 
-  local expected_hash
-  expected_hash="$(awk 'NR==1{print $1}' "$sha256_tmp")"
+  # Parse the sidecar with shell builtins only, so a failing parser utility
+  # can never leave the payload behind: anything other than exactly one
+  # nonempty entry falls through to the fail-closed path below, which
+  # always removes the payload.
+  local nonempty_count=0
+  local entry=""
+  local line=""
+  if ! while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%$'\r'}"
+    case "$line" in
+      *[^[:space:]]*)
+        nonempty_count=$((nonempty_count + 1))
+        entry="$line"
+        ;;
+    esac
+  done <"$sha256_tmp"; then
+    rm -f "$sha256_tmp" 2>/dev/null || true
+    rm -f "$file_path" 2>/dev/null || true
+    die "Integrity verification failed for $base_name (release '$display_tag'): checksum sidecar could not be read (expected exactly one SHA-256 entry: a 64-character hex digest, optionally followed by standard sha256sum separator and filename). Removed $base_name."
+  fi
+
+  local expected_hash=""
+  if [ "$nonempty_count" -eq 1 ]; then
+    local digest_only_re='^[[:space:]]*([0-9A-Fa-f]{64})[[:space:]]*$'
+    local sha256sum_line_re='^[[:space:]]*([0-9A-Fa-f]{64}) ([ *])[^[:space:]].*'
+    if [[ "$entry" =~ $digest_only_re ]]; then
+      expected_hash="${BASH_REMATCH[1]}"
+    elif [[ "$entry" =~ $sha256sum_line_re ]]; then
+      expected_hash="${BASH_REMATCH[1]}"
+    fi
+  fi
   rm -f "$sha256_tmp" 2>/dev/null || true
 
   if [ -z "$expected_hash" ]; then
-    if [ "$require_checksum" -eq 1 ]; then
-      rm -f "$file_path" 2>/dev/null || true
-      die "Checksum sidecar was empty or unreadable for $(basename "$file_path") (KEYRGB_REQUIRE_CHECKSUM=1)."
+    rm -f "$file_path" 2>/dev/null || true
+    if [ "$strict" -eq 0 ]; then
+      die "Integrity verification failed for $base_name (release '$display_tag'): checksum sidecar is empty or malformed (expected exactly one SHA-256 entry: a 64-character hex digest, optionally followed by standard sha256sum separator and filename). Removed $base_name. Historical compatibility covers only missing sidecars, never malformed ones."
     fi
-    log_warn "Checksum sidecar was empty or unreadable; skipping integrity check of $(basename "$file_path")."
-    return 0
+    die "Integrity verification failed for $base_name (release '$display_tag'): checksum sidecar is empty or malformed (expected exactly one SHA-256 entry: a 64-character hex digest, optionally followed by standard sha256sum separator and filename). Removed $base_name.$env_note"
+  fi
+  expected_hash="${expected_hash,,}"
+
+  local actual_output=""
+  if ! actual_output="$(sha256sum "$file_path" 2>/dev/null)"; then
+    rm -f "$file_path" 2>/dev/null || true
+    die "Integrity verification failed for $base_name (release '$display_tag'): could not compute SHA-256 integrity (sha256sum failed). Removed $base_name."
   fi
 
-  local actual_hash
-  actual_hash="$(sha256sum "$file_path" | awk '{print $1}')"
+  # sha256sum must print exactly one line; extra output lines are malformed.
+  if [ "$actual_output" != "${actual_output%%$'\n'*}" ]; then
+    rm -f "$file_path" 2>/dev/null || true
+    die "Integrity verification failed for $base_name (release '$display_tag'): could not compute SHA-256 integrity (sha256sum returned malformed output). Removed $base_name."
+  fi
+
+  local actual_hash=""
+  local actual_sha256sum_re='^([0-9A-Fa-f]{64}) ([ *])[^[:space:]].*$'
+  if [[ "$actual_output" =~ $actual_sha256sum_re ]]; then
+    actual_hash="${BASH_REMATCH[1]}"
+  else
+    rm -f "$file_path" 2>/dev/null || true
+    die "Integrity verification failed for $base_name (release '$display_tag'): could not compute SHA-256 integrity (sha256sum returned malformed output). Removed $base_name."
+  fi
+  actual_hash="${actual_hash,,}"
 
   if [ "$actual_hash" = "$expected_hash" ]; then
     log_ok "Integrity verified (SHA-256 match: ${actual_hash:0:16}…)"
   else
     rm -f "$file_path" 2>/dev/null || true
-    die "SHA-256 mismatch for $(basename "$file_path").
+    die "Integrity verification failed for $base_name (release '$display_tag'): SHA-256 mismatch.
   Expected: $expected_hash
   Got:      $actual_hash
   The downloaded file has been removed. Aborting for safety."

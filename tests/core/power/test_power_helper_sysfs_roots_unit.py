@@ -67,3 +67,39 @@ def test_power_helper_surfaces_nonfatal_epp_write_failure(
 
     assert helper._write_mode_epp_preferences("performance", policies=[policy]) is False
     assert "Non-fatal EPP write failed" in capsys.readouterr().err
+
+
+def _make_helper_led(root: Path, name: str, *, brightness: int, max_brightness: int) -> Path:
+    led_dir = root / name
+    led_dir.mkdir(parents=True, exist_ok=True)
+    (led_dir / "brightness").write_text(f"{brightness}\n", encoding="utf-8")
+    (led_dir / "max_brightness").write_text(f"{max_brightness}\n", encoding="utf-8")
+    return led_dir
+
+
+def test_power_helper_ite8297_channel_write_stays_within_injected_root(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    helper = _load_helper()
+    monkeypatch.setattr(helper.os, "geteuid", lambda: 1000)
+    leds = tmp_path / "leds"
+    for channel in ("ite_8297:1", "ite_8297:2", "ite_8297:3"):
+        _make_helper_led(leds, channel, brightness=0, max_brightness=255)
+    monkeypatch.setenv("KEYRGB_LEDS_ROOT", str(leds))
+
+    helper._led_apply("ite_8297:2", brightness=80, rgb=None)
+
+    assert (leds / "ite_8297:2" / "brightness").read_text(encoding="utf-8").strip() == "80"
+    assert (leds / "ite_8297:1" / "brightness").read_text(encoding="utf-8").strip() == "0"
+    assert (leds / "ite_8297:3" / "brightness").read_text(encoding="utf-8").strip() == "0"
+
+    # Same clamping as direct sysfs writes.
+    helper._led_apply("ite_8297:1", brightness=999, rgb=None)
+    assert (leds / "ite_8297:1" / "brightness").read_text(encoding="utf-8").strip() == "255"
+    assert (leds / "ite_8297:2" / "brightness").read_text(encoding="utf-8").strip() == "80"
+
+    with pytest.raises(SystemExit):
+        helper._led_apply("ite_8297:4", brightness=10, rgb=None)
+    with pytest.raises(SystemExit):
+        helper._led_apply("../ite_8297:1", brightness=10, rgb=None)

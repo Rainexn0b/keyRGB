@@ -26,7 +26,7 @@ Also note your distro, kernel, desktop session, and whether other RGB tools or v
 
 Requirements:
 
-- Python 3.10+
+- Python 3.10+ (CI tests 3.10–3.14; quality gate runs on 3.12, mypy floor stays at 3.10)
 - A Linux desktop session if you need to exercise the tray or Tk windows
 
 Quick setup:
@@ -138,6 +138,15 @@ Full test suite:
 ```bash
 .venv/bin/python -m pytest -q -o addopts=
 ```
+
+Dependency audit (supply-chain):
+
+```bash
+.venv/bin/python scripts/dependency_audit.py --project-dir .
+```
+
+Exit semantics: 0 clean, 1 findings, 2 tool/advisory/resolution failure. It audits
+runtime requirements declared in pyproject rather than arbitrary ambient packages.
 
 Hardware tests are opt-in only:
 

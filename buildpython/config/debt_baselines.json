@@ -38,6 +38,9 @@
       "keyrgb/gui/": 90.0
     },
     "minimum_watch_file_percent": 75.0,
+    "per_file_minimums": {
+      "system/bin/keyrgb-power-helper": 60.0
+    },
     "watch_files": [
       "keyrgb/core/backends/sysfs/device.py",
       "keyrgb/core/backends/asusctl/backend.py",

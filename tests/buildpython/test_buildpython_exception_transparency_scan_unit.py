@@ -282,3 +282,28 @@ def test_exception_transparency_reports_include_annotation_inventory(tmp_path) -
     }
     assert "## Runtime-Boundary Annotation Inventory" in report_md
     assert "| keyrgb/tray | 2 |" in report_md
+
+
+def test_iter_python_files_includes_installed_helper(tmp_path) -> None:
+    from buildpython.steps.exception_transparency import baseline as transparency_baseline
+
+    helper = tmp_path / "system" / "bin" / "keyrgb-power-helper"
+    helper.parent.mkdir(parents=True)
+    helper.write_text("VALUE = 1\n", encoding="utf-8")
+
+    paths = [str(path.relative_to(tmp_path)) for path in transparency_baseline.iter_python_files(tmp_path)]
+
+    assert "system/bin/keyrgb-power-helper" in paths
+
+
+def test_broad_except_in_installed_helper_is_collected(tmp_path) -> None:
+    helper = tmp_path / "system" / "bin" / "keyrgb-power-helper"
+    helper.parent.mkdir(parents=True)
+    helper.write_text("try:\n    run()\nexcept Exception:\n    pass\n", encoding="utf-8")
+
+    findings = collect_findings(tmp_path)
+
+    assert [(finding.path, finding.category) for finding in findings] == [
+        ("system/bin/keyrgb-power-helper", "broad_except_total"),
+        ("system/bin/keyrgb-power-helper", "broad_except_unlogged"),
+    ]

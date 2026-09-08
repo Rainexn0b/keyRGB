@@ -19,6 +19,11 @@ EXCLUDE_PATTERNS = [
 _DEBT_BASELINE_PATH = Path("buildpython/config/debt_baselines.json")
 _BASELINE_LOAD_ERRORS = (OSError, json.JSONDecodeError)
 
+# Installed privileged helper: extensionless Python that rglob("*.py") would
+# otherwise miss. Scanned explicitly so new broad-exception debt there fails
+# Code Hygiene.
+POWER_HELPER_PATH = Path("system/bin/keyrgb-power-helper")
+
 
 def _should_exclude(path: Path, root: Path) -> bool:
     rel = str(path.relative_to(root))
@@ -33,6 +38,9 @@ def _iter_python_files(root: Path) -> Iterable[Path]:
             if _should_exclude(path, root):
                 continue
             yield path
+    helper = root / POWER_HELPER_PATH
+    if helper.exists():
+        yield helper
 
 
 def _load_hygiene_baseline(root: Path) -> HygieneBaseline:

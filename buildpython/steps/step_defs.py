@@ -6,6 +6,11 @@ from ..core.model import Step
 from ..utils.paths import buildlog_dir, repo_root
 from ..utils.subproc import python_exe, run
 
+# Installed privileged helper: extensionless Python that must stay covered by
+# every file-based quality gate. Kept as an explicit literal (not derived) so
+# drift is greppable and unit tests can assert exact gate membership.
+POWER_HELPER_PATH = "system/bin/keyrgb-power-helper"
+
 
 def _log(name: str) -> Path:
     return buildlog_dir() / name
@@ -15,8 +20,17 @@ def steps() -> list[Step]:
     root = repo_root()
 
     def compileall_runner():
-        return run(
+        compile_result = run(
             [python_exe(), "-m", "compileall", "-q", "keyrgb"],
+            cwd=str(root),
+            env_overrides={"KEYRGB_HW_TESTS": "0"},
+        )
+        if compile_result.exit_code != 0:
+            return compile_result
+        # compileall silently skips extensionless files, so byte-compile the
+        # installed helper explicitly; syntax errors here must fail Compile.
+        return run(
+            [python_exe(), "-m", "py_compile", POWER_HELPER_PATH],
             cwd=str(root),
             env_overrides={"KEYRGB_HW_TESTS": "0"},
         )
@@ -34,7 +48,9 @@ def steps() -> list[Step]:
                 "keyrgb",
                 "buildpython",
                 "scripts/release",
+                "scripts/dependency_audit.py",
                 "tests",
+                POWER_HELPER_PATH,
             ],
             cwd=str(root),
             env_overrides={"KEYRGB_HW_TESTS": "0"},
@@ -147,7 +163,7 @@ def steps() -> list[Step]:
         Step(
             number=13,
             name="Type Check",
-            description="Type-check core, tray, GUI, buildpython, release scripts, and buildpython tests",
+            description="Type-check core, tray, GUI, buildpython, release/audit scripts, and buildpython tests",
             log_file=_log("step-13-type-check.log"),
             runner=mypy_runner,
         ),

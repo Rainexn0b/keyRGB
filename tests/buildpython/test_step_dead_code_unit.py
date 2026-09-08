@@ -89,3 +89,23 @@ def test_dead_code_runner_fails_on_unused_runtime_functions(monkeypatch, tmp_pat
     assert result.exit_code == 1
     assert "Actionable findings: 1" in result.stdout
     assert "legacy_helper" in result.stdout
+
+
+def test_dead_code_runner_scans_installed_helper_explicitly(monkeypatch, tmp_path) -> None:
+    seen_args: list[list[str]] = []
+
+    monkeypatch.setattr(step_dead_code, "repo_root", lambda: tmp_path)
+    monkeypatch.setattr(step_dead_code, "buildlog_dir", lambda: tmp_path / "buildlog" / "keyrgb")
+
+    def fake_run(args, **_kwargs):
+        seen_args.append(args)
+        return RunResult(command_str="vulture", stdout="", stderr="", exit_code=0)
+
+    monkeypatch.setattr(step_dead_code, "run", fake_run)
+
+    result = step_dead_code.dead_code_runner()
+
+    assert result.exit_code == 0
+    assert seen_args and "system/bin/keyrgb-power-helper" in seen_args[0]
+    payload = json.loads((tmp_path / "buildlog" / "keyrgb" / "dead-code-vulture.json").read_text(encoding="utf-8"))
+    assert "system/bin/keyrgb-power-helper" in payload["scan_roots"]

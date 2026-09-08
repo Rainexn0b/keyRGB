@@ -13,6 +13,13 @@ _CI_DOC = _REPO_ROOT / "docs" / "1-buildpython" / "03-CI.md"
 _CONTRIBUTING = _REPO_ROOT / "CONTRIBUTING.md"
 _CI_WORKFLOW = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
 _RELEASE_WORKFLOW = _REPO_ROOT / ".github" / "workflows" / "release.yml"
+_PYPROJECT = _REPO_ROOT / "pyproject.toml"
+
+# Declared/tested runtime support: runtime matrix and classifiers grow
+# together, while the type-check floor stays pinned.
+_TESTED_PYTHON_VERSIONS = ("3.10", "3.11", "3.12", "3.13", "3.14")
+_QUALITY_GATE_PYTHON = "3.12"
+_MYPY_FLOOR_PYTHON = "3.10"
 
 
 def test_build_steps_doc_lists_every_registered_step() -> None:
@@ -61,3 +68,29 @@ def test_contributing_doc_points_at_existing_backend_guides() -> None:
     assert (_REPO_ROOT / "docs" / "B-backend-guides").is_dir()
     assert (_REPO_ROOT / "docs" / "2-usage" / "validation.md").is_file()
     assert (_REPO_ROOT / "docs" / "3-contributing" / "01-build_runner.md").is_file()
+
+
+def test_ci_runtime_matrix_covers_tested_python_versions() -> None:
+    ci_workflow = _CI_WORKFLOW.read_text(encoding="utf-8")
+
+    for version in _TESTED_PYTHON_VERSIONS:
+        assert f'"{version}"' in ci_workflow, f"CI runtime matrix is missing Python {version}"
+    assert f'python-version: "{_QUALITY_GATE_PYTHON}"' in ci_workflow, "quality gate must stay on Python 3.12"
+
+
+def test_project_classifiers_track_tested_python_versions() -> None:
+    text = _PYPROJECT.read_text(encoding="utf-8")
+
+    for version in _TESTED_PYTHON_VERSIONS:
+        assert f"Programming Language :: Python :: {version}" in text, f"project classifier is missing Python {version}"
+    assert 'requires-python = ">=3.10"' in text, "minimum supported Python must stay at 3.10"
+    assert f'python_version = "{_MYPY_FLOOR_PYTHON}"' in text, "mypy language floor must stay at 3.10"
+
+
+def test_ci_doc_states_tested_matrix_and_mypy_floor() -> None:
+    text = _CI_DOC.read_text(encoding="utf-8")
+
+    for version in _TESTED_PYTHON_VERSIONS:
+        assert version in text, f"CI doc is missing tested Python {version}"
+    assert "Quality Gate" in text and _QUALITY_GATE_PYTHON in text
+    assert "3.10" in text and "mypy" in text, "CI doc must state the 3.10 mypy floor"

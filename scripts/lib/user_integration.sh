@@ -353,8 +353,10 @@ appimage_install() {
   fi
 
   log_info "Downloading AppImage (this may take a while): $url"
-  download_url_progress "$url" "$dst_path"
-  verify_downloaded_sha256 "$dst_path" "${url}.sha256"
+  if ! download_url_progress "$url" "$dst_path"; then
+    die "Failed to download AppImage from: $url"
+  fi
+  verify_downloaded_sha256 "$dst_path" "${url}.sha256" "$resolved_tag"
   chmod +x "$dst_path"
   log_ok "Installed AppImage: $dst_path"
 

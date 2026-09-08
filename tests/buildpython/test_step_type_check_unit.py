@@ -28,7 +28,9 @@ def test_mypy_runner_checks_runtime_and_gui(monkeypatch) -> None:
             "keyrgb/gui",
             "buildpython",
             "scripts/release",
+            "scripts/dependency_audit.py",
             "tests/buildpython",
+            "system/bin/keyrgb-power-helper",
         ]
     ]
     assert result.exit_code == 0
