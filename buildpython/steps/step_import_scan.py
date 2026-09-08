@@ -70,15 +70,8 @@ def _iter_py_files() -> list[Path]:
 
 
 def _parse_imports(path: Path) -> set[str]:
-    try:
-        text = path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return set()
-
-    try:
-        tree = ast.parse(text, filename=str(path))
-    except SyntaxError:
-        return set()
+    text = path.read_text(encoding="utf-8")
+    tree = ast.parse(text, filename=str(path))
 
     imports: set[str] = set()
 
@@ -105,8 +98,15 @@ def import_scan_runner() -> RunResult:
     stdlib = _stdlib_modules()
 
     all_imports: set[str] = set()
-    for p in _iter_py_files():
-        all_imports.update(_parse_imports(p))
+    files = _iter_py_files()
+    scan_errors: list[str] = []
+    if not files:
+        scan_errors.append("No source files found to scan")
+    for p in files:
+        try:
+            all_imports.update(_parse_imports(p))
+        except (OSError, UnicodeError, SyntaxError) as exc:
+            scan_errors.append(f"Cannot scan {p}: {exc}")
 
     # Filter out obvious project-internal top-levels
     ignore = {"keyrgb", "buildpython"}
@@ -115,7 +115,7 @@ def import_scan_runner() -> RunResult:
     missing: list[str] = []
     optional_missing: list[str] = []
     ok: list[str] = []
-    probe_diagnostics: list[str] = []
+    probe_diagnostics: list[str] = list(scan_errors)
 
     for name in candidates:
         probe = probe_module_import(name, cwd=root)
@@ -135,6 +135,8 @@ def import_scan_runner() -> RunResult:
     stdout_lines.append("Import scan")
     stdout_lines.append("")
     stdout_lines.append(f"Modules seen: {len(candidates)}")
+    stdout_lines.append(f"Source files discovered: {len(files)} | Scan errors: {len(scan_errors)}")
+    stdout_lines.append("Scope: external top-level imports; excludes stdlib and project-internal imports.")
 
     if missing:
         stdout_lines.append("")
@@ -150,7 +152,7 @@ def import_scan_runner() -> RunResult:
     stdout_lines.append("OK:")
     stdout_lines.extend(f"  - {m}" for m in ok)
 
-    exit_code = 1 if missing else 0
+    exit_code = 1 if missing or scan_errors else 0
 
     return RunResult(
         command_str="(internal) import scan",

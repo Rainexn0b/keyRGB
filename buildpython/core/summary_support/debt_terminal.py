@@ -55,7 +55,7 @@ def build_terminal_hygiene_highlight(buildlog_dir: Path) -> list[str]:
         if not isinstance(current, int):
             continue
         s = suppressed.get(key, 0)
-        parts.append(f"{label} {current} ({s})" if isinstance(s, int) and s else f"{label} {current}")
+        parts.append(f"{label} {current} (suppressed {s})" if isinstance(s, int) and s else f"{label} {current}")
 
     if not parts:
         return []
@@ -93,7 +93,7 @@ def build_terminal_transparency_highlight(buildlog_dir: Path) -> list[str]:
         if not isinstance(current, int):
             continue
         if key == "broad_except_total" and isinstance(waived_total, int) and waived_total:
-            parts.append(f"{label} {current} ({waived_total})")
+            parts.append(f"{label} {current} (waived {waived_total})")
         else:
             parts.append(f"{label} {current}")
 

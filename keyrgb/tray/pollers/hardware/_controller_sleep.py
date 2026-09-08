@@ -7,7 +7,8 @@ from collections.abc import Callable
 from typing import Any, cast
 
 from keyrgb.core.backends.policies.sleep_state import is_controller_sleep_state
-from keyrgb.tray.idle_power_state import set_idle_power_state_field
+from keyrgb.core.backends.policies.wake_settle import controller_wake_settle_s
+from keyrgb.tray.idle_power_state import ensure_tray_idle_power_state, set_idle_power_state_field
 from keyrgb.tray.protocols import IdlePowerTrayProtocol, LightingTrayProtocol
 
 from . import _recovery
@@ -27,6 +28,87 @@ def _callback_accepts_controller_handoff(callback: object) -> bool:
         parameter.name == "controller_brightness_handoff" or parameter.kind is inspect.Parameter.VAR_KEYWORD
         for parameter in parameters
     )
+
+
+def controller_wake_settle_delay_s(tray: IdlePowerTrayProtocol) -> float:
+    """Backend-declared wake-settle delay in seconds (0.0 when none)."""
+
+    keyboard = getattr(getattr(tray, "engine", None), "kb", None)
+    try:
+        return float(controller_wake_settle_s(keyboard))
+    except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
+        return 0.0
+
+
+def controller_wake_settle_until(tray: IdlePowerTrayProtocol) -> float:
+    """Armed settle deadline as a monotonic timestamp (0.0 when none)."""
+
+    try:
+        until = float(ensure_tray_idle_power_state(tray).controller_wake_settle_until)
+    except (AttributeError, TypeError, ValueError):
+        return 0.0
+    return max(0.0, until)
+
+
+def controller_wake_settle_pending(tray: IdlePowerTrayProtocol) -> bool:
+    """Whether a wake-settle deadline is armed (due or not)."""
+
+    return controller_wake_settle_until(tray) > 0.0
+
+
+def controller_wake_settle_remaining_s(tray: IdlePowerTrayProtocol, *, now: float) -> float:
+    """Seconds until the armed deadline (0.0 when none pending or due)."""
+
+    until = controller_wake_settle_until(tray)
+    if until <= 0.0:
+        return 0.0
+    try:
+        return max(0.0, until - float(now))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def controller_wake_settle_due(tray: IdlePowerTrayProtocol, *, now: float) -> bool:
+    """Whether an armed settle deadline has been reached."""
+
+    until = controller_wake_settle_until(tray)
+    if until <= 0.0:
+        return False
+    try:
+        return float(now) >= until
+    except (TypeError, ValueError):
+        return False
+
+
+def arm_controller_wake_settle(tray: IdlePowerTrayProtocol, *, now: float) -> bool:
+    """Arm the wake-settle deadline once. Returns True when newly armed.
+
+    Duplicate firmware/evdev evidence never extends the deadline, and a zero
+    backend delay preserves the current immediate behavior (no arm).
+    """
+
+    if controller_wake_settle_delay_s(tray) <= 0.0:
+        return False
+    if controller_wake_settle_pending(tray):
+        return False
+    try:
+        deadline = float(now) + controller_wake_settle_delay_s(tray)
+    except (TypeError, ValueError):
+        return False
+    try:
+        ensure_tray_idle_power_state(tray).controller_wake_settle_until = float(deadline)
+    except (AttributeError, TypeError, ValueError):
+        return False
+    return True
+
+
+def clear_controller_wake_settle(tray: IdlePowerTrayProtocol) -> None:
+    """Drop any armed wake-settle deadline."""
+
+    try:
+        ensure_tray_idle_power_state(tray).controller_wake_settle_until = 0.0
+    except (AttributeError, TypeError, ValueError):
+        pass
 
 
 def classify_polled_state(

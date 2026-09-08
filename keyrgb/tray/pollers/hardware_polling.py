@@ -140,26 +140,54 @@ def start_hardware_polling(tray: IdlePowerTrayProtocol) -> threading.Thread:
                 last_error_at = outcome.value
 
         while not polling_lifecycle.shutdown_requested(tray):
-            # While reactive pulses are mid-flight, synchronous USB reads would
-            # stall the render thread. Defer on a short retry cadence, except
-            # after input clears controller-sleep ownership and the resulting
-            # wake still needs its first accepted hardware verification.
-            current_controller_sleep_off = _controller_sleep_off_active(tray)
-            if _should_defer_poll_for_reactive_pulses(
-                reactive_pulse_mix=_reactive_pulse_mix_or_zero(tray),
-                now=time.monotonic(),
-                last_real_poll_at=last_real_poll_at,
-                controller_wake_verification_pending=(
-                    last_real_controller_sleep_off and not current_controller_sleep_off
-                ),
-            ):
-                if polling_lifecycle.wait_for_shutdown(
+            # Backend-declared wake settle: never perform USB reads while the
+            # controller is still settling. Chunk the exact remaining deadline
+            # at the existing fast state-check cadence so a manual/power
+            # cancellation of the deadline (or shutdown) is noticed within
+            # 0.25 s; a decrementing local budget totals the deadline without
+            # relying on wall-clock progress. Then fall through to poll once.
+            if _controller_sleep.controller_wake_settle_pending(tray):
+                settle_remaining = _controller_sleep.controller_wake_settle_remaining_s(
                     tray,
-                    _REACTIVE_PULSE_POLL_DEFER_RETRY_S,
-                    sleep_fn=time.sleep,
+                    now=time.monotonic(),
+                )
+                if settle_remaining > 0:
+                    settle_budget = float(settle_remaining)
+                    while settle_budget > 0:
+                        if not _controller_sleep.controller_wake_settle_pending(tray):
+                            break
+                        settle_step = min(float(_decisions.FAST_HARDWARE_POLL_INTERVAL_S), settle_budget)
+                        if polling_lifecycle.wait_for_shutdown(
+                            tray,
+                            settle_step,
+                            sleep_fn=time.sleep,
+                        ):
+                            return
+                        settle_budget -= settle_step
+                    continue
+                # Due: fall through to the verification poll below, bypassing
+                # the reactive-pulse deferral so the wake completes on time.
+            else:
+                # While reactive pulses are mid-flight, synchronous USB reads would
+                # stall the render thread. Defer on a short retry cadence, except
+                # after input clears controller-sleep ownership and the resulting
+                # wake still needs its first accepted hardware verification.
+                current_controller_sleep_off = _controller_sleep_off_active(tray)
+                if _should_defer_poll_for_reactive_pulses(
+                    reactive_pulse_mix=_reactive_pulse_mix_or_zero(tray),
+                    now=time.monotonic(),
+                    last_real_poll_at=last_real_poll_at,
+                    controller_wake_verification_pending=(
+                        last_real_controller_sleep_off and not current_controller_sleep_off
+                    ),
                 ):
-                    return
-                continue
+                    if polling_lifecycle.wait_for_shutdown(
+                        tray,
+                        _REACTIVE_PULSE_POLL_DEFER_RETRY_S,
+                        sleep_fn=time.sleep,
+                    ):
+                        return
+                    continue
 
             poll_revision = capture_transition_revision(tray)
 
@@ -191,9 +219,37 @@ def start_hardware_polling(tray: IdlePowerTrayProtocol) -> threading.Thread:
                 last_brightness, last_off_state = polled_state
                 last_real_controller_sleep_off = _controller_sleep_off_active(tray)
 
-            if polling_lifecycle.wait_for_shutdown(
+            ordinary_interval = _hardware_poll_interval_s(tray, now=time.monotonic())
+            if last_real_controller_sleep_off and _controller_sleep.controller_wake_settle_delay_s(tray) > 0:
+                # An evdev wake from another thread can arm a settle deadline
+                # shorter than the ordinary interval. Chunk only the wait at
+                # the existing fast cadence and break early when a settle
+                # appears — without performing fast-cadence USB reads. The
+                # decrementing local budget bounds iterations even when a
+                # monkeypatched test clock never advances.
+                ordinary_budget = float(ordinary_interval)
+                while ordinary_budget > 0:
+                    if polling_lifecycle.shutdown_requested(tray):
+                        return
+                    ordinary_step = min(float(_decisions.FAST_HARDWARE_POLL_INTERVAL_S), ordinary_budget)
+                    if polling_lifecycle.wait_for_shutdown(
+                        tray,
+                        ordinary_step,
+                        sleep_fn=time.sleep,
+                    ):
+                        return
+                    ordinary_budget -= ordinary_step
+                    if (
+                        _controller_sleep.controller_wake_settle_remaining_s(
+                            tray,
+                            now=time.monotonic(),
+                        )
+                        > 0
+                    ):
+                        break
+            elif polling_lifecycle.wait_for_shutdown(
                 tray,
-                _hardware_poll_interval_s(tray, now=time.monotonic()),
+                ordinary_interval,
                 sleep_fn=time.sleep,
             ):
                 return

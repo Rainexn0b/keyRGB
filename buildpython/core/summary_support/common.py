@@ -12,12 +12,14 @@ _LOC_BUCKET_KEYS = (
 )
 
 
-def read_json_if_exists(path: Path) -> dict[str, Any] | None:
+def read_json_if_exists(path: Path, *, report_names: tuple[str, ...] | None = None) -> dict[str, Any] | None:
+    if report_names is not None and path.name not in report_names:
+        return None
     if not path.exists():
         return None
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, ValueError):
         return None
     return payload if isinstance(payload, dict) else None
 

@@ -129,6 +129,12 @@ class Ite8291r3KeyboardDevice:
     # backends/policies/sleep_state.py.
     keyrgb_sleep_state_policy = "zero_brightness_without_off"
 
+    # Controller wake-settle window (diagnostics evidence): an early accepted
+    # nonzero brightness at +0.146s was overwritten with zero at +2.013s, so
+    # wake transitions need a ~2.5s settle before the settled value is trusted.
+    # See backends/policies/wake_settle.py.
+    keyrgb_controller_wake_settle_s = 2.5
+
     def __init__(
         self,
         send_control_report: ControlWriter,

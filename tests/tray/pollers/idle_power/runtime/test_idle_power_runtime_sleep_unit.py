@@ -36,7 +36,10 @@ def _make_controller_sleep_tray(*, sleep_at: float = 100.0):
 
     tray = make_owner_backed_simple_tray(
         config=SimpleNamespace(brightness=25),
-        engine=SimpleNamespace(turn_off=lambda: None),
+        engine=SimpleNamespace(
+            turn_off=lambda: None,
+            kb=SimpleNamespace(keyrgb_controller_wake_settle_s=0.0),
+        ),
         _start_current_effect=lambda **_kwargs: True,
         _refresh_ui=lambda **_kwargs: None,
         is_off=True,
@@ -232,6 +235,50 @@ def test_screen_idle_off_ignores_wayland_resume_until_keyboard_activity() -> Non
     )
 
     assert actions == [None]
+
+
+def test_controller_sleep_restore_event_waits_for_actual_relight(caplog) -> None:
+    """With a backend wake-settle delay, the first evdev arm must not journal
+    a restore: the deck is still dark, the arm event is authoritative, and a
+    duplicate stays quiet. Delay-zero backends still log the immediate restore.
+    """
+
+    import logging
+
+    with caplog.at_level(logging.INFO, logger="keyrgb.tray.pollers.idle_power._runtime"):
+        tray = _make_controller_sleep_tray(sleep_at=100.0)
+        tray.engine.kb = SimpleNamespace(keyrgb_controller_wake_settle_s=2.0)
+        tray._start_current_effect = lambda **_kwargs: (_ for _ in ()).throw(
+            AssertionError("settle arm must not restart the effect")
+        )
+        loop_state = _runtime.IdlePollLoopState()
+        loop_state.input_idle_tracker = SimpleNamespace(last_keyboard_activity_at=105.0)
+
+        _runtime._maybe_restore_from_controller_sleep(tray, loop_state=loop_state, session_idle=None)
+
+        assert tray._controller_sleep_off is True
+        assert tray.tray_idle_power_state.controller_wake_settle_until > 0
+        assert [record for record in caplog.records if "controller_sleep_restore" in record.getMessage()] == []
+
+        caplog.clear()
+        loop_state.input_idle_tracker = SimpleNamespace(last_keyboard_activity_at=106.0)
+        _runtime._maybe_restore_from_controller_sleep(tray, loop_state=loop_state, session_idle=None)
+
+        assert tray.tray_idle_power_state.controller_wake_settle_until > 0
+        assert [record for record in caplog.records if "controller_sleep_restore" in record.getMessage()] == []
+
+    with caplog.at_level(logging.INFO, logger="keyrgb.tray.pollers.idle_power._runtime"):
+        immediate = _make_controller_sleep_tray(sleep_at=100.0)
+        immediate.engine.turn_off = lambda: (_ for _ in ()).throw(AssertionError("must not force off native wake"))
+        start_calls: list[object] = []
+        immediate._start_current_effect = lambda **kwargs: start_calls.append(kwargs) or True
+        immediate_loop_state = _runtime.IdlePollLoopState()
+        immediate_loop_state.input_idle_tracker = SimpleNamespace(last_keyboard_activity_at=105.0)
+
+        _runtime._maybe_restore_from_controller_sleep(immediate, loop_state=immediate_loop_state, session_idle=None)
+
+        assert start_calls == [{"controller_brightness_handoff": 50}]
+        assert [record for record in caplog.records if "controller_sleep_restore" in record.getMessage()]
 
 
 def test_controller_sleep_restore_noop_without_flag(monkeypatch) -> None:

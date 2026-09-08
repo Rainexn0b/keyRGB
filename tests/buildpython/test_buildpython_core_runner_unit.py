@@ -49,7 +49,7 @@ def _capture_runner_summaries(monkeypatch, tmp_path: Path) -> list[object]:
     monkeypatch.setattr(runner, "buildlog_dir", lambda: tmp_path)
     monkeypatch.setattr(runner.summary_module, "write_summary", lambda _path, summary: summaries.append(summary))
     monkeypatch.setattr(runner.summary_module, "build_terminal_build_overview", lambda _path, _summary: [])
-    monkeypatch.setattr(runner, "write_debt_index", lambda _path: None)
+    monkeypatch.setattr(runner, "write_debt_index", lambda _path, **_kwargs: None)
     return summaries
 
 
@@ -85,7 +85,7 @@ def test_run_stops_at_first_failure_and_returns_its_exit_code_without_continue(m
     assert exit_code == 7
     assert calls == ["one"]
     assert summaries[-1].passed is False  # type: ignore[attr-defined]
-    assert [step.name for step in summaries[-1].steps] == ["one"]  # type: ignore[attr-defined]
+    assert [step.status for step in summaries[-1].steps] == ["failure", "not_run"]  # type: ignore[attr-defined]
 
 
 def test_continue_on_error_runs_later_steps_and_writes_failed_summary(monkeypatch, tmp_path: Path) -> None:
@@ -108,7 +108,7 @@ def test_continue_on_error_runs_later_steps_and_writes_failed_summary(monkeypatc
     assert exit_code == 3
     assert calls == ["one", "two"]
     assert summaries[-1].passed is False  # type: ignore[attr-defined]
-    assert summaries[-1].health_score == 49  # type: ignore[attr-defined]
+    assert summaries[-1].status == "failed"  # type: ignore[attr-defined]
     assert [step.status for step in summaries[-1].steps] == ["failure", "success"]  # type: ignore[attr-defined]
 
 
@@ -151,7 +151,7 @@ def test_continue_on_error_normalizes_invalid_zero_failure_code(monkeypatch, tmp
     assert exit_code == 1
 
 
-def test_default_output_uses_metric_healthbar_and_keeps_failure_details_in_step_log(
+def test_default_output_reports_test_counts_and_keeps_failure_details_in_step_log(
     monkeypatch, tmp_path: Path, capsys
 ) -> None:
     _capture_runner_summaries(monkeypatch, tmp_path)
@@ -168,8 +168,8 @@ def test_default_output_uses_metric_healthbar_and_keeps_failure_details_in_step_
 
     output = capsys.readouterr().out
     assert exit_code == 7
-    assert "Test Health:" in output
-    assert "49%" in output
+    assert "Tests: 8 passed, 2 failed" in output
+    assert "Health" not in output
     assert raw_failure.strip() not in output
     assert f"→ See {step.log_file}" in output
     assert "first diagnostic" in step.log_file.read_text(encoding="utf-8")

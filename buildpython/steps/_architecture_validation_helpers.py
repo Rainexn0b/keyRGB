@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 from dataclasses import dataclass
+from fnmatch import fnmatchcase
 from pathlib import Path, PurePosixPath
 from typing import Protocol
 
@@ -55,10 +56,23 @@ def _iter_rule_files(*, root: Path, rule: _ArchitectureRuleCorpus) -> list[Path]
             if not path.is_file():
                 continue
             rel = _rel_path(root, path)
-            if any(PurePosixPath(rel).match(exclude) for exclude in rule.exclude_globs):
+            if any(_path_matches_glob(rel, exclude) for exclude in rule.exclude_globs):
                 continue
             matched[rel] = path
     return [matched[key] for key in sorted(matched)]
+
+
+def _path_matches_glob(path: str, pattern: str) -> bool:
+    """Match a repo-relative glob; ** covers zero or more whole directories."""
+
+    def match(parts: tuple[str, ...], glob: tuple[str, ...]) -> bool:
+        if not glob:
+            return not parts
+        if glob[0] == "**":
+            return match(parts, glob[1:]) or bool(parts and match(parts[1:], glob))
+        return bool(parts and fnmatchcase(parts[0], glob[0]) and match(parts[1:], glob[1:]))
+
+    return match(PurePosixPath(path).parts, PurePosixPath(pattern).parts)
 
 
 def _rel_path(root: Path, path: Path) -> str:
@@ -79,7 +93,21 @@ def _module_matches_import_rule(imported_module: str, forbidden_module: str) -> 
     return imported_module == forbidden_module or imported_module.startswith(f"{forbidden_module}.")
 
 
-def _scan_python_signals(text: str) -> tuple[tuple[_ScannedImport, ...], tuple[_ScannedAttribute, ...]]:
+def _import_from_module(node: ast.ImportFrom, relative_path: str) -> str:
+    """Resolve relative imports from the scanned file, without importing code."""
+
+    if not node.level:
+        return node.module or ""
+    package = Path(relative_path).parent.parts
+    if not relative_path or node.level > len(package):
+        raise ValueError(f"Cannot resolve relative import in {relative_path!r}:{node.lineno}")
+    prefix = package[: len(package) - node.level + 1]
+    return ".".join((*prefix, *((node.module,) if node.module else ())))
+
+
+def _scan_python_signals(
+    text: str, *, relative_path: str = ""
+) -> tuple[tuple[_ScannedImport, ...], tuple[_ScannedAttribute, ...]]:
     try:
         tree = ast.parse(text)
     except SyntaxError:
@@ -117,9 +145,7 @@ def _scan_python_signals(text: str) -> tuple[tuple[_ScannedImport, ...], tuple[_
             continue
 
         if isinstance(node, ast.ImportFrom):
-            if int(getattr(node, "level", 0)) != 0:
-                continue
-            module = str(getattr(node, "module", "") or "").strip()
+            module = _import_from_module(node, relative_path)
             if not module:
                 continue
             line = int(getattr(node, "lineno", 0))

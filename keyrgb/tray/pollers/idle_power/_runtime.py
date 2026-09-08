@@ -169,7 +169,16 @@ def _maybe_restore_from_controller_sleep(
             now=time.monotonic(),
             guards=SleepWakeGuards(keyboard_activity=True),
         )
-        if restored:
+        # Journal a restore only once the deck actually relit. A
+        # backend-declared wake settle defers the restart to a later
+        # firmware-wake poll, so the first evdev arm (restored=True, flags
+        # still set) must stay quiet; the arm event is authoritative there.
+        if restored and not read_idle_power_state_bool_field(
+            tray,
+            attr_name="_controller_sleep_off",
+            state_name="controller_sleep_off",
+            default=False,
+        ):
             logger.info("EVENT idle_power:controller_sleep_restore trigger=keyboard_evdev")
 
     run_tray_observation_if_current(tray, observation_revision, restore_transition)

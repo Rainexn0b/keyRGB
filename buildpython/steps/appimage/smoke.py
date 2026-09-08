@@ -37,7 +37,7 @@ def appimage_smoke_runner() -> RunResult:
     docker = shutil.which("docker")
     on_ci = _is_truthy(os.environ.get("CI")) or _is_truthy(os.environ.get("GITHUB_ACTIONS"))
     if docker is None:
-        msg = "Docker not found; skipping AppImage smoke test."
+        msg = "Docker not found; AppImage smoke test was not executed."
         if on_ci and not _is_truthy(os.environ.get("KEYRGB_ALLOW_NO_DOCKER")):
             return RunResult(
                 command_str="appimage-smoke",
@@ -45,7 +45,7 @@ def appimage_smoke_runner() -> RunResult:
                 stderr=msg + "\n",
                 exit_code=2,
             )
-        return RunResult(command_str="appimage-smoke", stdout=msg + "\n", stderr="", exit_code=0)
+        return RunResult(command_str="appimage-smoke", stdout=msg + "\n", stderr="", exit_code=0, skip_reason=msg)
 
     if _is_truthy(os.environ.get("KEYRGB_SKIP_APPIMAGE_SMOKE")):
         return RunResult(
@@ -53,6 +53,7 @@ def appimage_smoke_runner() -> RunResult:
             stdout="Skipping AppImage smoke test (KEYRGB_SKIP_APPIMAGE_SMOKE).\n",
             stderr="",
             exit_code=0,
+            skip_reason="KEYRGB_SKIP_APPIMAGE_SMOKE is enabled",
         )
 
     image = os.environ.get("KEYRGB_APPIMAGE_SMOKE_IMAGE", "ubuntu:24.04")

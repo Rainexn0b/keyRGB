@@ -2,14 +2,25 @@ from __future__ import annotations
 
 from typing import SupportsIndex, SupportsInt, cast
 
+from keyrgb.core.backends.policies.per_key_mode import per_key_mode_requires_frame_reassert
 from keyrgb.core.effects.device import Color, PerKeyColorMap
 from keyrgb.core.effects.software_targets import (
     SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE,
     normalize_software_effect_target,
 )
 from keyrgb.core.utils.safe_attrs import safe_int_attr
+from keyrgb.tray.protocols import ConfigPollingTrayProtocol
 
+_PERKEY_POLICY_READ_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _INT_COERCION_EXCEPTIONS = (TypeError, ValueError, OverflowError)
+
+
+def backend_requires_perkey_reassert(tray: ConfigPollingTrayProtocol) -> bool:
+    try:
+        kb = getattr(getattr(tray, "engine", None), "kb", None)
+        return bool(per_key_mode_requires_frame_reassert(kb))
+    except _PERKEY_POLICY_READ_EXCEPTIONS:
+        return False
 
 
 def _coerce_int(value: object, *, default: int) -> int:

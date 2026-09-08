@@ -86,7 +86,7 @@ def test_init_builds_controls_and_slider_binding(monkeypatch) -> None:
     # other (uniform) columns.
     assert checks[1].kwargs["text"] == "Let the controller's own sleep timeout turn the keyboard off"
     assert "wraplength" not in checks[1].kwargs
-    assert labels[3].kwargs["text"].startswith("The controller sleeps after ~10 min")
+    assert labels[3].kwargs["text"].startswith("Recommended for supported ITE controllers")
     assert labels[3].kwargs["wraplength"] == 400
     # Delays are shown in seconds (0.5s steps), not internal poll counts.
     assert labels[5].kwargs["text"] == "Delay before reacting to screen idle/blanking, in seconds."

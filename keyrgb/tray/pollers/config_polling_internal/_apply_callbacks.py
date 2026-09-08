@@ -6,7 +6,6 @@ They rely on helpers.py scaffold for "how to apply safely" infrastructure.
 
 from __future__ import annotations
 
-from keyrgb.core.backends.policies.per_key_mode import per_key_mode_requires_frame_reassert
 from keyrgb.core.effects.perkey_animation import restore_hidden_per_key_rows_once
 from keyrgb.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
 from keyrgb.tray.idle_power_state import any_forced_off, read_forced_off_flags
@@ -14,6 +13,7 @@ from keyrgb.tray.protocols import ConfigPollingTrayProtocol
 
 from . import helpers as _helpers
 from ._apply_support import (
+    backend_requires_perkey_reassert,
     build_perkey_color_map,
     current_software_effect_target,
     has_all_uniform_capable_target,
@@ -21,15 +21,33 @@ from ._apply_support import (
     reactive_visual_mode_value,
 )
 
-_PERKEY_POLICY_READ_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 
+def _enable_user_mode_best_effort(tray: ConfigPollingTrayProtocol, *, brightness: int) -> None:
+    enable_user_mode = getattr(getattr(tray.engine, "kb", None), "enable_user_mode", None)
+    if not callable(enable_user_mode):
+        return
 
-def _backend_requires_perkey_reassert(tray: ConfigPollingTrayProtocol) -> bool:
+    def apply(*, save: bool) -> None:
+        # The engine uses an RLock: safe both alone and inside a full frame commit.
+        with tray.engine.kb_lock:
+            if save:
+                enable_user_mode(brightness=brightness, save=True)
+            else:
+                enable_user_mode(brightness=brightness)
+
     try:
-        kb = getattr(getattr(tray, "engine", None), "kb", None)
-        return bool(per_key_mode_requires_frame_reassert(kb))
-    except _PERKEY_POLICY_READ_EXCEPTIONS:
-        return False
+        _helpers._run_diagnostic_boundary(
+            tray,
+            lambda: apply(save=True),
+            error_msg="Failed to enable per-key user mode: %s",
+            runtime_exceptions=_helpers._ENABLE_USER_MODE_SAVE_EXCEPTIONS,
+        )
+    except TypeError:
+        _helpers._run_diagnostic_boundary(
+            tray,
+            lambda: apply(save=False),
+            error_msg="Failed to enable per-key user mode fallback: %s",
+        )
 
 
 def _handle_controller_sleep_off(
@@ -236,7 +254,7 @@ def _apply_perkey(
     cause: str,
     reassert_user_mode: bool = True,
 ) -> None:
-    should_reassert_user_mode = bool(reassert_user_mode) or _backend_requires_perkey_reassert(tray)
+    should_reassert_user_mode = bool(reassert_user_mode) or backend_requires_perkey_reassert(tray)
     should_pre_enable_user_mode = bool(reassert_user_mode)
     perkey_keys = 0 if current.perkey_sig is None else len(current.perkey_sig)
     _helpers._try_log_event(
@@ -280,7 +298,7 @@ def _apply_perkey(
 
     with tray.engine.kb_lock, optional_output_transaction(tray.engine.kb):
         if should_pre_enable_user_mode:
-            _helpers._enable_user_mode_best_effort(tray, brightness=int(current.brightness))
+            _enable_user_mode_best_effort(tray, brightness=int(current.brightness))
         tray.engine.kb.set_key_colors(
             color_map,
             brightness=current.brightness,

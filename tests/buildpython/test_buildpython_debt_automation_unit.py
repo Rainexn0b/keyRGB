@@ -203,7 +203,7 @@ def test_terminal_debt_snapshot_includes_exception_transparency(tmp_path) -> Non
 
     lines = build_terminal_transparency_highlight(buildlog_dir)
 
-    assert any("total 6 (205)" in line for line in lines)
+    assert any("total 6 (waived 205)" in line for line in lines)
     assert any("unlogged 4" in line for line in lines)
     assert any("annotated 102" in line for line in lines)
     assert any("Top unlogged" in line and "keyrgb/core/config/config.py" in line for line in lines)
@@ -242,10 +242,9 @@ def test_write_summary_includes_exception_transparency_annotation_inventory(tmp_
     write_summary(
         buildlog_dir,
         BuildSummary(
-            passed=True,
-            health_score=100,
             total_duration_s=0.1,
             steps=[],
+            report_names=tuple(p.name for p in buildlog_dir.glob("*.json")),
         ),
     )
 
@@ -285,7 +284,7 @@ def test_terminal_debt_snapshot_marks_missing_coverage_capture(tmp_path) -> None
     coverage_line = build_terminal_coverage_highlight(buildlog_dir)
     lines = [coverage_line] if coverage_line is not None else []
 
-    assert any("waiting for pytest coverage capture" in line for line in lines)
+    assert any("no successful pytest capture in this run" in line for line in lines)
     assert not any("Coverage: total=0.00%" in line for line in lines)
 
 
@@ -319,10 +318,9 @@ def test_write_summary_and_debt_index_render_missing_capture_state(tmp_path) -> 
     write_summary(
         buildlog_dir,
         BuildSummary(
-            passed=False,
-            health_score=0,
             total_duration_s=0.1,
             steps=[],
+            report_names=tuple(p.name for p in buildlog_dir.glob("*.json")),
         ),
     )
     write_debt_index(buildlog_dir)
@@ -357,10 +355,9 @@ def test_write_summary_and_debt_index_include_loc_check_snapshot(tmp_path) -> No
     write_summary(
         buildlog_dir,
         BuildSummary(
-            passed=True,
-            health_score=100,
             total_duration_s=0.1,
             steps=[],
+            report_names=tuple(p.name for p in buildlog_dir.glob("*.json")),
         ),
     )
     write_debt_index(buildlog_dir)
@@ -428,14 +425,13 @@ def test_terminal_build_overview_includes_status_health_and_coverage(tmp_path) -
     lines = build_terminal_build_overview(
         buildlog_dir,
         BuildSummary(
-            passed=True,
-            health_score=100,
             total_duration_s=3.4,
             steps=[],
+            report_names=tuple(p.name for p in buildlog_dir.glob("*.json")),
         ),
     )
 
     assert any("Build Results" in line for line in lines)
-    assert any("PASS" in line for line in lines)
-    assert any("100/100" in line for line in lines)
+    assert any("NOT RUN" in line for line in lines)
+    assert not any("100/100" in line for line in lines)
     assert any("59.49%" in line and "73.28%" in line for line in lines)

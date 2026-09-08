@@ -6,8 +6,21 @@ from buildpython.steps import step_import_scan
 from buildpython.utils.import_probe import ImportProbeResult
 
 
-def test_parse_imports_skips_unreadable_files(tmp_path) -> None:
-    assert step_import_scan._parse_imports(tmp_path / "missing.py") == set()
+def test_parse_imports_reports_unreadable_files(tmp_path) -> None:
+    with pytest.raises(OSError):
+        step_import_scan._parse_imports(tmp_path / "missing.py")
+
+
+@pytest.mark.parametrize("source", [b"def broken(:", b"\xff", None])
+def test_import_scan_fails_instead_of_silently_ignoring_unscannable_source(tmp_path, monkeypatch, source) -> None:
+    path = tmp_path / "broken.py"
+    if source is not None:
+        path.write_bytes(source)
+    monkeypatch.setattr(step_import_scan, "_iter_py_files", lambda: [path])
+    result = step_import_scan.import_scan_runner()
+    assert result.exit_code == 1
+    assert "Scan errors: 1" in result.stdout
+    assert str(path) in result.stderr
 
 
 def test_import_scan_runner_captures_import_failures_and_continues(monkeypatch, tmp_path, capsys) -> None:

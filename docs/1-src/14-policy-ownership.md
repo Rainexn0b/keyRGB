@@ -11,13 +11,23 @@ and tray-runtime decisions and make dependency direction less clear.
 | Backend selection, stability, and experimental evidence | `keyrgb/core/backends/policies/backend_selection.py` |
 | Backend per-key mode initialization | `keyrgb/core/backends/policies/per_key_mode.py` |
 | Backend controller-sleep signatures | `keyrgb/core/backends/policies/sleep_state.py` |
+| Backend controller wake-settle windows | `keyrgb/core/backends/policies/wake_settle.py` |
 | Power events, power-source changes, and battery saver | `keyrgb/core/power/policies/` |
 | Tray idle/blanking actions | `keyrgb/tray/pollers/idle_power/policy.py` |
 
 Backend devices declare hardware-specific attributes such as
-`keyrgb_per_key_mode_policy` and `keyrgb_sleep_state_policy`. The backend policy
+`keyrgb_per_key_mode_policy`, `keyrgb_sleep_state_policy`, and
+`keyrgb_controller_wake_settle_s`. The backend policy
 modules own policy names, normalization, and classification; consumers should
 not duplicate backend signatures or firmware assumptions.
+
+Controller wake-settle defaults conservative: a missing
+`keyrgb_controller_wake_settle_s` attribute, or an invalid value (bool,
+unsupported type/string, negative, NaN/Inf), resolves to
+`DEFAULT_CONTROLLER_WAKE_SETTLE_S = 2.5`. An explicit numeric `0`/`0.0`
+disables settling and preserves immediate wake behavior, but only for a
+backend proven safe without a settle window. Positive finite values are
+preserved exactly.
 
 ## Import rule
 

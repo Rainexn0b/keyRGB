@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from threading import RLock
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from keyrgb.tray.pollers.config_polling_internal import helpers
+from keyrgb.tray.pollers.config_polling_internal import _apply_callbacks, helpers
 
 
 def _mk_tray() -> SimpleNamespace:
@@ -154,7 +155,7 @@ def test_set_engine_attr_best_effort_propagates_unexpected_setter_failures() -> 
 
 def test_enable_user_mode_best_effort_logs_runtime_fallback_failures() -> None:
     tray = _mk_tray()
-    tray.engine = SimpleNamespace(kb=SimpleNamespace())
+    tray.engine = SimpleNamespace(kb=SimpleNamespace(), kb_lock=RLock())
 
     def enable_user_mode(*, brightness: int, save: bool = False):
         if save:
@@ -164,7 +165,7 @@ def test_enable_user_mode_best_effort_logs_runtime_fallback_failures() -> None:
     tray.engine.kb.enable_user_mode = enable_user_mode
 
     with patch.object(helpers, "_log_tray_exception") as log_tray_exception:
-        helpers._enable_user_mode_best_effort(tray, brightness=10)
+        _apply_callbacks._enable_user_mode_best_effort(tray, brightness=10)
 
     log_tray_exception.assert_called_once()
     assert log_tray_exception.call_args.args[0] is tray
@@ -174,7 +175,7 @@ def test_enable_user_mode_best_effort_logs_runtime_fallback_failures() -> None:
 
 def test_enable_user_mode_best_effort_propagates_unexpected_fallback_failures() -> None:
     tray = _mk_tray()
-    tray.engine = SimpleNamespace(kb=SimpleNamespace())
+    tray.engine = SimpleNamespace(kb=SimpleNamespace(), kb_lock=RLock())
 
     def enable_user_mode(*, brightness: int, save: bool = False):
         if save:
@@ -184,4 +185,4 @@ def test_enable_user_mode_best_effort_propagates_unexpected_fallback_failures() 
     tray.engine.kb.enable_user_mode = enable_user_mode
 
     with pytest.raises(AssertionError, match="unexpected fallback bug"):
-        helpers._enable_user_mode_best_effort(tray, brightness=10)
+        _apply_callbacks._enable_user_mode_best_effort(tray, brightness=10)

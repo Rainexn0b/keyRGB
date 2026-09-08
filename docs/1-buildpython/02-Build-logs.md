@@ -16,16 +16,16 @@ Every selected step writes a standard step log such as:
 - `step-18-coverage.log`
 - `step-19-exception-transparency.log`
 
-At the end of a run, and also on stop-on-first-failure, the runner refreshes:
+The runner initializes incomplete summaries before executing steps, checkpoints progress, and finalizes the following on completion or stop-on-first-failure:
 
 - `build-summary.json`
 - `build-summary.md`
 - `debt-index.json`
 - `debt-index.md`
 
-`build-summary.*` describes build status, health score, duration, step outcomes, and a debt snapshot assembled from any structured reports that are available.
+`build-summary.*` describes status, duration, all selected step outcomes, skip reasons, run ID, UTC start time, and current report names. JSON schema version 2 removes the aggregate `health_score`; per-step `health` is either null or an object with `label` and `score` (a finding penalty score, independent of pass/fail). Markdown includes the same scores; consumers should read `status`, `counts`, `exit_code`, and `passed` (true only for a complete pass). An incomplete checkpoint has `completed: false` and no final exit code.
 
-`debt-index.*` is the combined index for debt-oriented reports that were produced in that run.
+`debt-index.*` combines only reports produced in that run (`scope: current_run`). Standalone inventory calls can explicitly list the latest files on disk (`scope: latest_available`); that scope does not imply a single build. Canonical artifacts from older runs remain on disk; use `report_names` and each step's log path in the current build summary to identify current evidence. A lock prevents concurrent writers to this directory.
 
 ## Structured report outputs
 
@@ -47,7 +47,7 @@ aliases. The secondary-device rule checks its configured primary receiver
 spellings (including `tray.engine` and `self.tray.engine`); generic
 `engine` and secondary-target receivers remain outside that rule.
 
-Coverage also maintains internal capture and export artifacts used by the coverage summary step.
+Coverage also maintains internal capture and export artifacts. A new build invalidates the previous capture marker; Step 18 requires successful pytest coverage capture in the same invocation. Run `--run-steps=2,18` when selecting coverage explicitly.
 
 ## Step log format
 
@@ -70,7 +70,7 @@ Exit Code: N
 
 ## Summary and debt snapshot behavior
 
-- `build-summary.md` includes a debt snapshot section when structured debt reports exist.
+- `build-summary.md` includes a debt snapshot section for reports generated in the current run.
 - `debt-index.md` aggregates available sections such as coverage, exception transparency, code hygiene, code markers, LOC, file size, and architecture validation.
 - Coverage can report `waiting for pytest coverage capture` if Step `18` runs without fresh coverage data from Step `2`.
 

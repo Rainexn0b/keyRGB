@@ -2,7 +2,7 @@
   "rules": [
     {
       "id": "secondary-device-no-primary-keyboard-mutations",
-      "description": "Secondary and auxiliary tray modules must not mutate the primary keyboard through the configured tray-engine receiver spellings. Generic engine and secondary-target receivers remain allowed; dynamic object aliases are not inferred.",
+      "description": "Secondary and auxiliary tray modules must not mutate the primary keyboard through configured tray-engine receivers or simple local aliases. Generic engine and secondary-target receivers remain allowed.",
       "severity": "error",
       "corpus": {
         "include": [
@@ -89,10 +89,13 @@
           "keyrgb/core/**/*.py"
         ]
       },
-      "patterns": [
+      "imports": [
         {
-          "regex": "^\\s*(?:from|import)\\s+keyrgb\\.(?:tray|gui)\\b",
-          "flags": "m",
+          "module": "keyrgb.tray",
+          "message": "Core modules must not import tray or gui modules."
+        },
+        {
+          "module": "keyrgb.gui",
           "message": "Core modules must not import tray or gui modules."
         }
       ]
@@ -158,10 +161,9 @@
           "keyrgb/gui/**/*.py"
         ]
       },
-      "patterns": [
+      "imports": [
         {
-          "regex": "^\\s*(?:from|import)\\s+keyrgb\\.tray\\b",
-          "flags": "m",
+          "module": "keyrgb.tray",
           "message": "GUI modules must not import tray runtime modules."
         }
       ]
@@ -178,10 +180,17 @@
           "keyrgb/gui/utils/tk_async.py"
         ]
       },
-      "patterns": [
+      "calls": [
         {
-          "regex": "Thread\\s*\\(\\s*target\\s*=",
-          "message": "GUI modules must not start Thread(target=...) directly; use TkAsyncCoordinator, submit_gui_work, or run_in_thread."
+          "receivers": [
+            "threading"
+          ],
+          "methods": [
+            "Thread",
+            "Timer"
+          ],
+          "forbid_all": true,
+          "message": "GUI modules must not create worker threads directly; use TkAsyncCoordinator, submit_gui_work, or run_in_thread."
         }
       ]
     },
@@ -194,10 +203,9 @@
           "keyrgb/tray/ui/**/*.py"
         ]
       },
-      "patterns": [
+      "imports": [
         {
-          "regex": "^\\s*(?:from|import)\\s+keyrgb\\.core\\.backends\\.registry\\b",
-          "flags": "m",
+          "module": "keyrgb.core.backends.registry",
           "message": "Tray UI should not import backend selection directly."
         }
       ]
@@ -390,10 +398,9 @@
           "buildpython/**/*.py"
         ]
       },
-      "patterns": [
+      "imports": [
         {
-          "regex": "^\\s*(?:from|import)\\s+keyrgb\\.core\\.effects\\.ite_backend\\b",
-          "flags": "m",
+          "module": "keyrgb.core.effects.ite_backend",
           "message": "Legacy keyrgb.core.effects.ite_backend imports are forbidden."
         }
       ]
@@ -698,13 +705,14 @@
       },
       "patterns": [
         {
-          "regex": "^\\s*(?:from|import)\\s+keyrgb\\.tray\\b",
-          "flags": "m",
-          "message": "Core profile modules must not import tray; callers inject runtime hooks."
-        },
-        {
           "regex": "getattr\\([^,]+,\\s*['\\\"]_",
           "message": "Core profile code must not look up private attributes by name; pass explicit hooks."
+        }
+      ],
+      "imports": [
+        {
+          "module": "keyrgb.tray",
+          "message": "Core profile modules must not import tray; callers inject runtime hooks."
         }
       ]
     },

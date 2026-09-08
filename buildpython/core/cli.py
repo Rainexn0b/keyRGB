@@ -17,6 +17,8 @@ def _parse_csv(raw: str | None) -> list[str] | None:
         return []
     if "," in raw:
         return [p.strip() for p in raw.split(",") if p.strip()]
+    if raw.lower() in {step.name.lower() for step in all_steps()}:
+        return [raw]
     return [p for p in raw.split() if p]
 
 
@@ -66,6 +68,9 @@ def _select_steps(run_steps: list[str] | None, skip_steps: list[str] | None, pro
 
     if skip_steps:
         skip = {t.lower() for t in skip_steps}
+        unknown = skip - set(by_number) - set(by_name)
+        if unknown:
+            raise SystemExit(f"Unknown step selector: {min(unknown)!r}")
         selected = [s for s in selected if str(s.number) not in skip and s.name.lower() not in skip]
 
     # Deduplicate
@@ -117,12 +122,14 @@ def _maybe_add_black(selected: list, *, enabled: bool):
 
 
 def main(argv: Iterable[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(add_help=True)
+    parser = argparse.ArgumentParser(
+        add_help=True, description="Run KeyRGB validation. Default: full profile; Black and AppImage are opt-in."
+    )
     parser.add_argument("--profile", choices=sorted(PROFILES.keys()), help="Run a predefined profile")
     parser.add_argument("--list-profiles", action="store_true", help="List profiles and exit")
     parser.add_argument("--list-steps", action="store_true", help="List steps and exit")
-    parser.add_argument("--run-steps", help="Comma/space-separated list of step numbers or names")
-    parser.add_argument("--skip-steps", help="Comma/space-separated list of step numbers or names")
+    parser.add_argument("--run-steps", help="Comma-separated step names, or comma/space-separated step numbers")
+    parser.add_argument("--skip-steps", help="Comma-separated step names, or comma/space-separated step numbers")
     parser.add_argument("--verbose", action="store_true", help="Print stdout/stderr for steps")
     parser.add_argument(
         "--continue-on-error",
@@ -132,7 +139,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     parser.add_argument(
         "--with-appimage",
         action="store_true",
-        help="Also build the AppImage after the selected steps",
+        help="Also build and smoke-test the AppImage after the selected steps",
     )
     parser.add_argument(
         "--with-black",

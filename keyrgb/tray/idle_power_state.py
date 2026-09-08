@@ -61,6 +61,12 @@ class TrayIdlePowerState:
     # new input, a power restore, or a manual turn-on arrives.
     controller_sleep_off: bool = False
     controller_sleep_off_at: float = 0.0
+    # Backend-declared delayed controller wake (stage 1): after firmware or
+    # evdev wake evidence, some controllers need a settle interval before a
+    # restart write is safe. While armed, ``controller_sleep_off``/``is_off``
+    # stay set and the effect stays stopped; duplicate evidence never extends
+    # the deadline. ``0.0`` means no settle is pending (backend delay is zero).
+    controller_wake_settle_until: float = 0.0
     # Event-driven guard that prevents a freshly-armed relight intent (manual
     # turn-on or a successful power restore) from being undone by a native
     # controller-sleep zero read. After suspend/resume (or a manual turn-on)

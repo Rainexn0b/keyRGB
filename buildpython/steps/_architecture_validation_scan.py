@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -24,15 +25,21 @@ def scan_architecture(root: Path, rules: Iterable[ArchitectureRule]) -> Architec
     scanned_python_calls: dict[str, tuple[_helpers._ScannedCall, ...]] = {}
     scanned_python_lock_acquisitions: dict[str, tuple[_helpers._ScannedLockAcquisition, ...]] = {}
     rules_list = list(rules)
+    source_cache: dict[str, str] = {}
 
     for rule in rules_list:
         for path in _helpers._iter_rule_files(root=root, rule=rule):
             rel = _helpers._rel_path(root, path)
             scanned_files.add(rel)
-            try:
-                text = path.read_text(encoding="utf-8", errors="replace")
-            except OSError:
-                continue
+            text = source_cache.get(rel)
+            if text is None:
+                try:
+                    text = path.read_text(encoding="utf-8")
+                    if path.suffix == ".py":
+                        ast.parse(text, filename=rel)
+                except (OSError, UnicodeError, SyntaxError) as exc:
+                    raise ValueError(f"Architecture scan cannot read or parse {rel}: {exc}") from exc
+                source_cache[rel] = text
 
             lines = text.splitlines()
             for pattern in rule.patterns:
@@ -58,7 +65,7 @@ def scan_architecture(root: Path, rules: Iterable[ArchitectureRule]) -> Architec
             if rule.imports or rule.attributes:
                 signals = scanned_python_signals.get(rel)
                 if signals is None:
-                    signals = _helpers._scan_python_signals(text)
+                    signals = _helpers._scan_python_signals(text, relative_path=rel)
                     scanned_python_signals[rel] = signals
                 imports, attributes = signals
 
@@ -74,7 +81,7 @@ def scan_architecture(root: Path, rules: Iterable[ArchitectureRule]) -> Architec
             if rule.calls or rule.forbidden_under_locks:
                 cached_calls = scanned_python_calls.get(rel)
                 if cached_calls is None:
-                    cached_calls = _scan_python_calls(text)
+                    cached_calls = _scan_python_calls(text, relative_path=rel)
                     scanned_python_calls[rel] = cached_calls
                 calls = cached_calls
 
@@ -284,7 +291,7 @@ def scan_architecture(root: Path, rules: Iterable[ArchitectureRule]) -> Architec
 
 def _path_matches_any(path: str, patterns: tuple[str, ...]) -> bool:
     posix_path = Path(path).as_posix()
-    return any(posix_path == pattern or Path(posix_path).match(pattern) for pattern in patterns)
+    return any(_helpers._path_matches_glob(posix_path, pattern) for pattern in patterns)
 
 
 def _literal_keyword_matches(*, actual: object, expected: object) -> bool:

@@ -6,8 +6,10 @@ import sys
 from ...utils.log_format import StepLogRecord, format_standard_log
 from ...utils.paths import buildlog_dir
 from .. import summary as summary_module
-from ..model import Step, StepHealth, StepOutcome
+from ..model import Step, StepOutcome
 from ..summary_support import debt_terminal
+from ..summary_support.common import read_json_if_exists
+from .reports import STEP_REPORTS
 
 _USE_COLOR = sys.stdout.isatty()
 _RESET = "\033[0m" if _USE_COLOR else ""
@@ -73,33 +75,18 @@ def _print_step_footer(outcome: StepOutcome, highlights: list[str]) -> None:
         text = f"{icon}Failed ({outcome.duration_s:.1f}s)"
     print(_color(text, _status_color(outcome.status)))
 
+    if outcome.health is not None:
+        health = outcome.health
+        filled = int(health.score / 5)
+        bar = "█" * filled + "░" * (20 - filled)
+        print(f"    {health.label}: [{bar}] {health.score:g}% (penalty score)")
+
     for line in highlights:
         print(_color(f"    {line}", _DIM))
 
 
-def _health_bar(score: int, *, width: int = 25) -> str:
-    normalized = max(0, min(100, int(score)))
-    filled = max(0, min(width, round(normalized / 100 * width)))
-    bar_color = _GREEN if normalized >= 90 else _YELLOW if normalized >= 70 else _RED
-    return f"{_color('█' * filled, bar_color)}{_color('░' * (width - filled), _DIM)}"
-
-
-def _health_status(health: StepHealth) -> tuple[str, str]:
-    if health.score >= 90:
-        return "✅", _GREEN
-    if health.score >= 70:
-        return "⚠️", _YELLOW
-    return "❌", _RED
-
-
 def _print_compact_step_footer(outcome: StepOutcome) -> None:
-    _print_step_footer(outcome, [])
-    if outcome.health is not None:
-        icon, color = _health_status(outcome.health)
-        line = f"{icon} {outcome.health.label}: [{_health_bar(outcome.health.score)}] {outcome.health.score}%"
-        print(_color(line, color))
-    for line in outcome.highlights[:2]:
-        print(_color(f"    {line}", _DIM))
+    _print_step_footer(outcome, list(outcome.highlights))
 
 
 def _print_failure_guidance(step: Step, *, index: int, total_steps: int) -> None:
@@ -109,15 +96,14 @@ def _print_failure_guidance(step: Step, *, index: int, total_steps: int) -> None
 
 
 def _extract_pytest_highlight(stdout: str, stderr: str) -> str | None:
-    text = f"{stdout}\n{stderr}"
-    patterns = [
-        r"(\d+ passed(?:, \d+ skipped)?(?:, \d+ deselected)?(?:, \d+ xfailed)?(?:, \d+ xpassed)?(?:, \d+ warnings?)?) in [^\n]+",
-        r"(\d+ failed(?:, \d+ passed)?(?:, \d+ skipped)?(?:, \d+ errors?)?) in [^\n]+",
-    ]
-    for pattern in patterns:
-        matches = re.findall(pattern, text)
-        if matches:
-            return f"Tests: {matches[-1]}"
+    for line in reversed(f"{stdout}\n{stderr}".splitlines()):
+        if not re.search(r"\bin \d+(?:\.\d+)?s\b", line):
+            continue
+        counts = re.findall(
+            r"\b\d+ (?:passed|failed|skipped|deselected|xfailed|xpassed|errors?|warnings?|rerun)\b", line
+        )
+        if counts:
+            return "Tests: " + ", ".join(counts)
     return None
 
 
@@ -147,12 +133,46 @@ def _extract_import_scan_highlight(stdout: str) -> str | None:
     return None
 
 
-def _step_highlights(step: Step, *, stdout: str, stderr: str) -> list[str]:
+def _step_highlights(step: Step, *, stdout: str, stderr: str, report_names: tuple[str, ...] = ()) -> list[str]:
     highlights: list[str] = []
+    report_name = STEP_REPORTS.get(step.name)
+    if report_name is not None and report_name not in report_names:
+        return ["No report produced by this invocation; see the step log."]
+    if step.name in {"Architecture Validation", "Dead Code"}:
+        report = read_json_if_exists(buildlog_dir() / str(report_name))
+        if report is None:
+            return ["Report unreadable; see the step log."]
+        if step.name == "Architecture Validation":
+            counts = report.get("summary", {})
+            return [
+                (
+                    f"Rules checked: {counts.get('rules_checked', 'unknown')} | "
+                    f"Files scanned: {counts.get('scanned_files', 'unknown')} | "
+                    f"Errors: {counts.get('errors', 'unknown')} | Warnings: {counts.get('warnings', 'unknown')}"
+                )
+            ]
+        return [
+            f"Unused-code candidates: {report.get('count', 'unknown')} | Actionable: {report.get('actionable_count', 'unknown')}"
+        ]
     if step.name == "Pytest":
         pytest_line = _extract_pytest_highlight(stdout, stderr)
         if pytest_line is not None:
             highlights.append(pytest_line)
+    elif step.name == "Import Validation":
+        highlights.extend(
+            line.strip()
+            for line in stdout.splitlines()
+            if line.startswith(("Checked imports:", "Skipped GUI imports:"))
+        )
+    elif step.name == "AppImage":
+        highlights.extend(
+            line
+            for line in stdout.splitlines()
+            if line.startswith(("Built AppImage:", "Runtime dependency installation skipped"))
+        )
+    elif step.name == "Repo Validation":
+        if "Warnings:" in stdout:
+            highlights.append("Repository warnings reported; see the step log.")
     elif step.name == "Import Scan":
         import_line = _extract_import_scan_highlight(stdout)
         if import_line is not None:
@@ -179,8 +199,10 @@ def _write_log(
     command: str,
     stdout: str,
     stderr: str,
-    exit_code: int,
+    exit_code: int | None,
     duration_s: float,
+    *,
+    status: str = "",
 ) -> None:
     buildlog_dir().mkdir(parents=True, exist_ok=True)
     step.log_file.parent.mkdir(parents=True, exist_ok=True)
@@ -192,5 +214,6 @@ def _write_log(
         exit_code=exit_code,
         stdout=stdout,
         stderr=stderr,
+        status=status,
     )
     step.log_file.write_text(format_standard_log(record), encoding="utf-8")

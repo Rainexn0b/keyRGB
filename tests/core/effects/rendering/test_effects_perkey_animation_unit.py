@@ -72,21 +72,27 @@ def test_enable_user_mode_once_propagates_unexpected_errors() -> None:
 
 def test_enable_user_mode_once_passes_save_flag() -> None:
     seen: list[tuple[int, bool]] = []
+    held = False
 
     class _Kb:
         def enable_user_mode(self, *, brightness: int, save: bool = False):
+            assert held
             seen.append((int(brightness), bool(save)))
 
     class _Lock:
         def __enter__(self):
-            return None
+            nonlocal held
+            held = True
 
         def __exit__(self, exc_type, exc, tb):
+            nonlocal held
+            held = False
             return False
 
     enable_user_mode_once(kb=_Kb(), kb_lock=_Lock(), brightness=25, save=True)
 
     assert seen == [(25, True)]
+    assert not held
 
 
 def test_restore_hidden_per_key_rows_once_rewrites_rows_before_brightness_raise() -> None:

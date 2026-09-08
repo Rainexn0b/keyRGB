@@ -8,15 +8,13 @@ from typing import Any, Protocol
 from ..model import StepHealth
 from ..summary_support.common import read_json_if_exists
 
-_PYTEST_RESULT_PATTERN = re.compile(r"(\d+)\s+(passed|failed|errors?)\b")
-
 
 class _HealthScorer(Protocol):
-    def __call__(self, payload: Mapping[str, Any], *, failed: bool) -> StepHealth | None: ...
+    def __call__(self, payload: Mapping[str, Any]) -> StepHealth | None: ...
 
 
-def _clamp_score(value: float) -> int:
-    return max(0, min(100, round(value)))
+def _clamp_score(value: float) -> float:
+    return max(0, min(100, value))
 
 
 def _mapping(value: object) -> Mapping[str, Any]:
@@ -28,34 +26,21 @@ def _count(mapping: Mapping[str, Any], key: str) -> int:
     return int(value) if isinstance(value, int | float) else 0
 
 
-def _failed_cap(score: int, *, failed: bool) -> int:
-    return min(score, 49) if failed else score
+def _valid_counts(value: object) -> bool:
+    if isinstance(value, dict):
+        return bool(value) and all(_valid_counts(count) for count in value.values())
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
 
 
-def _pytest_health(stdout: str, stderr: str, *, failed: bool) -> StepHealth | None:
-    result_lines = [line for line in f"{stdout}\n{stderr}".splitlines() if " in " in line]
-    if not result_lines:
-        return None
-    counts: dict[str, int] = {}
-    for count, category in _PYTEST_RESULT_PATTERN.findall(result_lines[-1]):
-        normalized = "error" if category.startswith("error") else category
-        counts[normalized] = counts.get(normalized, 0) + int(count)
-    total = counts.get("passed", 0) + counts.get("failed", 0) + counts.get("error", 0)
-    if total <= 0:
-        return None
-    score = _clamp_score(100 * counts.get("passed", 0) / total)
-    return StepHealth("Test Health", _failed_cap(score, failed=failed))
-
-
-def _marker_health(payload: Mapping[str, Any], *, failed: bool) -> StepHealth:
+def _marker_health(payload: Mapping[str, Any]) -> StepHealth:
     counts = _mapping(payload.get("marker_counts"))
     gated = _mapping(payload.get("baseline")).get("gated_markers", [])
     gated_markers = gated if isinstance(gated, list) else []
     debt = sum(_count(counts, str(marker)) for marker in gated_markers)
-    return StepHealth("Marker Health", _failed_cap(_clamp_score(100 - debt * 20), failed=failed))
+    return StepHealth("Marker Health", _clamp_score(100 - debt * 20))
 
 
-def _file_size_health(payload: Mapping[str, Any], *, failed: bool) -> StepHealth:
+def _file_size_health(payload: Mapping[str, Any]) -> StepHealth:
     counts = _mapping(payload.get("counts"))
     files = _mapping(counts.get("file_lines"))
     imports = _mapping(counts.get("import_block_lines"))
@@ -72,22 +57,22 @@ def _file_size_health(payload: Mapping[str, Any], *, failed: bool) -> StepHealth
         + _count(counts, "middleman_modules") * 2
         + _count(counts, "unreferenced_files") * 8
     )
-    return StepHealth("File Size Health", _failed_cap(_clamp_score(100 - penalty), failed=failed))
+    return StepHealth("File Size Health", _clamp_score(100 - penalty))
 
 
-def _loc_health(payload: Mapping[str, Any], *, failed: bool) -> StepHealth:
+def _loc_health(payload: Mapping[str, Any]) -> StepHealth:
     counts = _mapping(payload.get("counts"))
-    monitor_penalty = min(10.0, _count(counts, "monitor") * 0.25)
+    monitor_penalty = _count(counts, "monitor") * 0.25
     penalty = (
         monitor_penalty
         + _count(counts, "refactor") * 5
         + _count(counts, "critical") * 12
         + _count(counts, "severe") * 25
     )
-    return StepHealth("LOC Health", _failed_cap(_clamp_score(100 - penalty), failed=failed))
+    return StepHealth("LOC Health", _clamp_score(100 - penalty))
 
 
-def _hygiene_health(payload: Mapping[str, Any], *, failed: bool) -> StepHealth:
+def _hygiene_health(payload: Mapping[str, Any]) -> StepHealth:
     active = _mapping(payload.get("active_counts"))
     high_weight = {"forbidden_api", "resource_leak", "silent_broad_except", "any_type_hint"}
     medium_weight = {"forbidden_getattr", "hasattr_coupling", "runtime_copy_hotspot", "test_naming"}
@@ -97,24 +82,16 @@ def _hygiene_health(payload: Mapping[str, Any], *, failed: bool) -> StepHealth:
             continue
         weight = 20 if category in high_weight else 8 if category in medium_weight else 4
         penalty += int(value) * weight
-    return StepHealth("Hygiene Health", _failed_cap(_clamp_score(100 - penalty), failed=failed))
+    return StepHealth("Hygiene Health", _clamp_score(100 - penalty))
 
 
-def _architecture_health(payload: Mapping[str, Any], *, failed: bool) -> StepHealth:
+def _architecture_health(payload: Mapping[str, Any]) -> StepHealth:
     summary = _mapping(payload.get("summary"))
     penalty = _count(summary, "errors") * 25 + _count(summary, "warnings") * 5
-    return StepHealth("Architecture Health", _failed_cap(_clamp_score(100 - penalty), failed=failed))
+    return StepHealth("Architecture Health", _clamp_score(100 - penalty))
 
 
-def _coverage_health(payload: Mapping[str, Any], *, failed: bool) -> StepHealth | None:
-    summary = _mapping(payload.get("summary"))
-    total = summary.get("total_percent")
-    if not isinstance(total, int | float):
-        return None
-    return StepHealth("Coverage", _failed_cap(_clamp_score(float(total)), failed=failed))
-
-
-def _transparency_health(payload: Mapping[str, Any], *, failed: bool) -> StepHealth:
+def _transparency_health(payload: Mapping[str, Any]) -> StepHealth:
     counts = _mapping(payload.get("counts"))
     penalty = (
         _count(counts, "naked_except") * 30
@@ -123,12 +100,29 @@ def _transparency_health(payload: Mapping[str, Any], *, failed: bool) -> StepHea
         + _count(counts, "broad_except_logged_no_traceback") * 8
         + _count(counts, "broad_except_traceback_logged") * 5
     )
-    return StepHealth("Exception Health", _failed_cap(_clamp_score(100 - penalty), failed=failed))
+    return StepHealth("Exception Health", _clamp_score(100 - penalty))
 
 
-def _dead_code_health(payload: Mapping[str, Any], *, failed: bool) -> StepHealth:
+def _dead_code_health(payload: Mapping[str, Any]) -> StepHealth:
     penalty = _count(payload, "actionable_count") * 20
-    return StepHealth("Dead Code Health", _failed_cap(_clamp_score(100 - penalty), failed=failed))
+    return StepHealth("Dead Code Health", _clamp_score(100 - penalty))
+
+
+# The summaries count diagnostics once; parsing individual source excerpts can double count them.
+def _diagnostic_health(step_name: str, output: str, *, failed: bool) -> StepHealth | None:
+    if step_name == "Ruff":
+        match = re.search(r"^Found (\d+) errors?\.$", output, re.MULTILINE)
+        if match:
+            return StepHealth("Ruff Health", _clamp_score(100 - int(match[1]) * 5))
+        if not failed and "All checks passed!" in output:
+            return StepHealth("Ruff Health", 100)
+    elif step_name == "Type Check":
+        match = re.search(r"^Found (\d+) errors? in ", output, re.MULTILINE)
+        if match:
+            return StepHealth("Type Check Health", _clamp_score(100 - int(match[1]) * 10))
+        if not failed and re.search(r"^Success: no issues found in \d+ source files?", output, re.MULTILINE):
+            return StepHealth("Type Check Health", 100)
+    return None
 
 
 def build_step_health(
@@ -138,33 +132,35 @@ def build_step_health(
     stderr: str,
     report_dir: Path,
     failed: bool,
-    started_at: float | None = None,
+    report_names: tuple[str, ...] = (),
 ) -> StepHealth | None:
-    if step_name == "Pytest":
-        return _pytest_health(stdout, stderr, failed=failed)
+    """Penalty scores for current findings, independent of gate status and coverage."""
+    if step_name in {"Ruff", "Type Check"}:
+        return _diagnostic_health(step_name, f"{stdout}\n{stderr}", failed=failed)
 
-    report_specs: dict[str, tuple[str, _HealthScorer]] = {
-        "Code Markers": ("code-markers.json", _marker_health),
-        "File Size": ("file-size-analysis.json", _file_size_health),
-        "LOC Check": ("loc-check.json", _loc_health),
-        "Code Hygiene": ("code-hygiene.json", _hygiene_health),
-        "Architecture Validation": ("architecture-validation.json", _architecture_health),
-        "Coverage": ("coverage-summary.json", _coverage_health),
-        "Exception Transparency": ("exception-transparency.json", _transparency_health),
-        "Dead Code": ("dead-code-vulture.json", _dead_code_health),
+    report_specs: dict[str, tuple[str, str, _HealthScorer]] = {
+        "Code Markers": ("code-markers.json", "marker_counts", _marker_health),
+        "File Size": ("file-size-analysis.json", "counts", _file_size_health),
+        "LOC Check": ("loc-check.json", "counts", _loc_health),
+        "Code Hygiene": ("code-hygiene.json", "active_counts", _hygiene_health),
+        "Architecture Validation": ("architecture-validation.json", "summary", _architecture_health),
+        "Exception Transparency": ("exception-transparency.json", "counts", _transparency_health),
+        "Dead Code": ("dead-code-vulture.json", "actionable_count", _dead_code_health),
     }
     spec = report_specs.get(step_name)
     if spec is None:
         return None
-    report_name, scorer = spec
-    report_path = report_dir / report_name
-    if started_at is not None:
-        try:
-            if report_path.stat().st_mtime < started_at:
-                return None
-        except OSError:
-            return None
-    payload = read_json_if_exists(report_path)
-    if payload is None:
+    report_name, count_key, scorer = spec
+    payload = read_json_if_exists(report_dir / report_name, report_names=report_names)
+    if payload is None or count_key not in payload:
         return None
-    return scorer(payload, failed=failed)
+    counts = payload[count_key]
+    if not _valid_counts(counts):
+        return None
+    if count_key != "actionable_count" and not isinstance(counts, dict):
+        return None
+    if step_name == "Architecture Validation" and not {"errors", "warnings"} <= _mapping(counts).keys():
+        return None
+    if step_name == "Code Markers" and not isinstance(_mapping(payload.get("baseline")).get("gated_markers"), list):
+        return None
+    return scorer(payload)

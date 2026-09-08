@@ -33,13 +33,15 @@ def _annotation_inventory_summary(exception_transparency: dict[str, object]) -> 
     return total if isinstance(total, int) else None, subtree_bits
 
 
-def append_debt_snapshot(lines: list[str], buildlog_dir: Path) -> None:
-    hygiene = read_json_if_exists(buildlog_dir / "code-hygiene.json")
-    exception_transparency = read_json_if_exists(buildlog_dir / "exception-transparency.json")
-    markers = read_json_if_exists(buildlog_dir / "code-markers.json")
-    coverage = read_json_if_exists(buildlog_dir / "coverage-summary.json")
-    file_size = read_json_if_exists(buildlog_dir / "file-size-analysis.json")
-    loc_check = read_json_if_exists(buildlog_dir / "loc-check.json")
+def append_debt_snapshot(lines: list[str], buildlog_dir: Path, *, report_names: tuple[str, ...] = ()) -> None:
+    hygiene = read_json_if_exists(buildlog_dir / "code-hygiene.json", report_names=report_names)
+    exception_transparency = read_json_if_exists(
+        buildlog_dir / "exception-transparency.json", report_names=report_names
+    )
+    markers = read_json_if_exists(buildlog_dir / "code-markers.json", report_names=report_names)
+    coverage = read_json_if_exists(buildlog_dir / "coverage-summary.json", report_names=report_names)
+    file_size = read_json_if_exists(buildlog_dir / "file-size-analysis.json", report_names=report_names)
+    loc_check = read_json_if_exists(buildlog_dir / "loc-check.json", report_names=report_names)
 
     if (
         hygiene is None
@@ -51,7 +53,7 @@ def append_debt_snapshot(lines: list[str], buildlog_dir: Path) -> None:
     ):
         return
 
-    lines.extend(["", "## Debt Snapshot", ""])
+    lines.extend(["", "## Debt snapshot from this run", ""])
 
     if hygiene is not None:
         active = hygiene.get("active_counts", {})

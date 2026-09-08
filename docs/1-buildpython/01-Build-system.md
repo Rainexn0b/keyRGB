@@ -31,7 +31,7 @@ python -m buildpython --continue-on-error
 python -m buildpython --verbose
 ```
 
-Bare `python -m buildpython` is not a named profile. It selects the live step registry except `Black`, so it can include packaging steps such as `AppImage` and `AppImage Smoke`. For reproducible automation, use a profile.
+Bare `python -m buildpython` selects the `full` profile. Black and packaging remain opt-in through `--with-black`, `--with-appimage`, explicit step selectors, or the release profile.
 
 ## Current profiles
 
@@ -86,7 +86,7 @@ The step slug scopes the waiver to one checker. A tag for `exception-transparenc
 
 ## Logs and structured reports
 
-All selected steps write logs under `buildlog/keyrgb/`. The runner also refreshes:
+All executed or skipped steps write logs under `buildlog/keyrgb/`. The runner also refreshes:
 
 - `build-summary.json`
 - `build-summary.md`
@@ -104,25 +104,32 @@ Debt-focused steps write structured reports under the same directory when they r
 - `exception-transparency.{json,csv,md}`
 - `dead-code-vulture.{json,md,txt}`
 
-`build-summary.md` includes the overall build state plus a debt snapshot of available structured reports. `debt-index.md` is the combined report index for debt-oriented outputs. When present, both surfaces summarize file-size and LOC hotspots so debt-oriented size issues are visible without opening each standalone report.
+`build-summary.md` includes the overall build state plus a debt snapshot of structured reports produced in that run. `debt-index.md` is the combined report index for debt-oriented outputs. When present, both surfaces summarize file-size and LOC hotspots so debt-oriented size issues are visible without opening each standalone report.
 
-By default, buildpython replaces raw command dumps with concise structured
-highlights in local terminals and CI. Ordinary binary checks print only their
-completion state. Metric-bearing steps print scored health bars:
+By default, buildpython prints the step outcome and factual counts: tests by
+outcome, architecture rules/files/findings, and scanner findings with explicit
+suppressed or waived counts. Coverage retains its measured percentage even when
+its baseline gate fails. Relevant scanners also show health bars: 100 minus
+weighted deductions for each finding, floored at zero. These penalty scores are
+independent of gate status. See [health scoring](06-Health-scoring.md) for weights.
+Passing a configured check does not measure architectural completeness.
 
-- Pytest uses the pass rate.
-- Code Markers scores only gated marker debt.
-- File Size and LOC use weighted severity and structural penalties.
-- Code Hygiene and Exception Transparency weight unsafe categories more heavily.
-- Architecture weights errors above warnings.
-- Coverage shows the measured total percentage.
-- Dead Code scores actionable findings only.
+The build result counts every selected step as passed, failed, skipped, or not
+run. `PASS` requires all selected steps to succeed. `PARTIAL` means some passed
+and others were skipped; `NOT RUN` means no check succeeded and none failed.
+Optional skips retain exit code 0 for compatibility, but are not called a full
+pass. A failure stops execution unless `--continue-on-error` is set; remaining
+selected steps are recorded as not run. Unselected checks are outside the run.
 
-Any failed scored gate is capped at 49 so a red build cannot retain a green
-health bar. Advisory data such as `NOTE`, waived exceptions, and non-actionable
-vulture findings does not receive a false penalty. Canonical per-step logs retain
-complete stdout and stderr; CI workflows upload them on failure. Passing
-`--verbose` explicitly restores raw terminal output.
+Canonical step logs retain complete returned stdout/stderr and explicit status.
+Use `--verbose` to print raw output. Summaries include a run ID, UTC start time,
+selected steps, and names of fresh structured reports. Prior standalone artifacts
+remain on disk but do not contribute to this run's summaries. Interrupted runs
+leave an incomplete checkpoint instead of an old PASS. Concurrent builds using
+the same log directory are rejected before overwriting its contents.
+
+See the [CLI output audit](05-CLI-output-audit-2026-09-08.md) for evidence,
+report schema changes, and limitations.
 
 ## Related docs
 

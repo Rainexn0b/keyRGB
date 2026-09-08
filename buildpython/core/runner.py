@@ -1,19 +1,42 @@
 from __future__ import annotations
 
+import fcntl
 import importlib.util
 import shutil
 import time
+import traceback
+from dataclasses import replace
+from uuid import uuid4
 
+from ..steps.coverage_step.constants import _CAPTURE_MARKER_NAME
+from ..utils.log_format import iso_now
 from ..utils.paths import buildlog_dir
 from . import summary as summary_module
 from .debt_index import write_debt_index
 from .model import Step, StepOutcome
-from .runner_support import display as _ui
-from .runner_support.health import build_step_health
+from .runner_support import display as _ui, health, reports
+from .summary_support.common import read_json_if_exists
+
+_OPTIONAL_MODULES = {
+    "Ruff": ("ruff",),
+    "Ruff Format": ("ruff",),
+    "Black": ("black",),
+    "Type Check": ("mypy",),
+    "Coverage": ("coverage", "pytest"),
+    "Dead Code": ("vulture",),
+}
 
 
 def _is_module_available(module: str) -> bool:
     return importlib.util.find_spec(module) is not None
+
+
+def _abort_exit_code(exc: BaseException) -> int:
+    if isinstance(exc, KeyboardInterrupt):
+        return 130
+    if isinstance(exc, SystemExit):
+        return exc.code if isinstance(exc.code, int) else 0 if exc.code is None else 1
+    return 1
 
 
 def run_step(
@@ -25,210 +48,164 @@ def run_step(
     label_width: int,
     verbose: bool,
     compact_output: bool,
+    skip_reason: str = "",
 ) -> StepOutcome:
-    start = time.time()
+    start = time.monotonic()
     _ui._print_step_header(step, index=index, total_steps=total_steps, name_width=name_width, label_width=label_width)
-
-    # Optional step gating
-    if step.name in {"Ruff", "Ruff Format"} and not _is_module_available("ruff"):
-        duration = time.time() - start
-        _ui._write_log(
-            step,
-            "python -m ruff ...",
-            "(skipped: ruff not installed)\n",
-            "",
-            0,
-            duration,
-        )
-        outcome = StepOutcome(
-            status="skipped",
-            exit_code=0,
-            duration_s=duration,
-            message="ruff not installed",
-            highlights=("ruff not installed",),
-        )
-        if not compact_output:
-            _ui._print_step_footer(outcome, ["ruff not installed"])
-        return outcome
-
-    if step.name == "Black" and not _is_module_available("black"):
-        duration = time.time() - start
-        _ui._write_log(
-            step,
-            "python -m black ...",
-            "(skipped: black not installed)\n",
-            "",
-            0,
-            duration,
-        )
-        outcome = StepOutcome(
-            status="skipped",
-            exit_code=0,
-            duration_s=duration,
-            message="black not installed",
-            highlights=("black not installed",),
-        )
-        if not compact_output:
-            _ui._print_step_footer(outcome, ["black not installed"])
-        return outcome
-
-    if step.name == "Type Check" and not _is_module_available("mypy"):
-        duration = time.time() - start
-        _ui._write_log(
-            step,
-            "python -m mypy ...",
-            "(skipped: mypy not installed)\n",
-            "",
-            0,
-            duration,
-        )
-        outcome = StepOutcome(
-            status="skipped",
-            exit_code=0,
-            duration_s=duration,
-            message="mypy not installed",
-            highlights=("mypy not installed",),
-        )
-        if not compact_output:
-            _ui._print_step_footer(outcome, ["mypy not installed"])
-        return outcome
-
-    if step.name == "Coverage" and (not _is_module_available("coverage") or not _is_module_available("pytest")):
-        duration = time.time() - start
-        _ui._write_log(
-            step,
-            "python -m coverage ...",
-            "(skipped: coverage or pytest not installed)\n",
-            "",
-            0,
-            duration,
-        )
-        outcome = StepOutcome(
-            status="skipped",
-            exit_code=0,
-            duration_s=duration,
-            message="coverage or pytest not installed",
-            highlights=("coverage or pytest not installed",),
-        )
-        if not compact_output:
-            _ui._print_step_footer(outcome, ["coverage or pytest not installed"])
-        return outcome
-
-    if step.name == "Dead Code" and not _is_module_available("vulture"):
-        duration = time.time() - start
-        _ui._write_log(
-            step,
-            "python -m vulture ...",
-            "(skipped: vulture not installed)\n",
-            "",
-            0,
-            duration,
-        )
-        outcome = StepOutcome(
-            status="skipped",
-            exit_code=0,
-            duration_s=duration,
-            message="vulture not installed",
-            highlights=("vulture not installed",),
-        )
-        if not compact_output:
-            _ui._print_step_footer(outcome, ["vulture not installed"])
-        return outcome
-
+    missing = [module for module in _OPTIONAL_MODULES.get(step.name, ()) if not _is_module_available(module)]
     if step.name == "ShellCheck" and shutil.which("shellcheck") is None:
-        duration = time.time() - start
-        _ui._write_log(
-            step,
-            "shellcheck ...",
-            "(skipped: shellcheck not installed)\n",
-            "",
-            0,
-            duration,
-        )
-        outcome = StepOutcome(
-            status="skipped",
-            exit_code=0,
-            duration_s=duration,
-            message="shellcheck not installed",
-            highlights=("shellcheck not installed",),
-        )
+        missing.append("shellcheck")
+    if missing or skip_reason:
+        reason = skip_reason or f"{', '.join(missing)} not installed"
+        duration = time.monotonic() - start
+        _ui._write_log(step, "(not executed)", reason + "\n", "", 0, duration, status="skipped")
+        outcome = StepOutcome(status="skipped", exit_code=0, duration_s=duration, message=reason, highlights=(reason,))
         if not compact_output:
-            _ui._print_step_footer(outcome, ["shellcheck not installed"])
+            _ui._print_step_footer(outcome, list(outcome.highlights))
         return outcome
 
-    result = step.runner()
-    duration = time.time() - start
-
-    _ui._write_log(
-        step,
-        result.command_str,
-        result.stdout,
-        result.stderr,
-        result.exit_code,
-        duration,
+    report_name = reports.STEP_REPORTS.get(step.name)
+    before = reports.report_stamp(buildlog_dir() / report_name) if report_name else None
+    # Replace an old successful log before invoking a runner that may abort.
+    _ui._write_log(step, "(runner starting)", "", "", None, 0, status="running")
+    try:
+        result = step.runner()
+    # @quality-exception exception-transparency: CLI boundary records the full traceback in the step log and re-raises
+    except (Exception, KeyboardInterrupt, SystemExit) as exc:
+        _ui._write_log(
+            step,
+            "(runner aborted)",
+            "",
+            traceback.format_exc(),
+            _abort_exit_code(exc),
+            time.monotonic() - start,
+            status="aborted",
+        )
+        raise
+    duration = time.monotonic() - start
+    status = "failure" if result.exit_code else "skipped" if result.skip_reason else "success"
+    report_names = () if status == "skipped" else reports.refreshed_reports(buildlog_dir(), step.name, before)
+    if (
+        status == "success"
+        and report_name
+        and (not report_names or read_json_if_exists(buildlog_dir() / report_name) is None)
+    ):
+        result = replace(
+            result,
+            exit_code=1,
+            stderr=result.stderr + f"\nExpected fresh JSON report was not produced: {report_name}\n",
+        )
+        status = "failure"
+        report_names = ()
+    _ui._write_log(step, result.command_str, result.stdout, result.stderr, result.exit_code, duration, status=status)
+    highlights = (
+        [result.skip_reason]
+        if status == "skipped"
+        else _ui._step_highlights(step, stdout=result.stdout, stderr=result.stderr, report_names=report_names)
     )
-
-    highlights = _ui._step_highlights(step, stdout=result.stdout, stderr=result.stderr)
-    health = build_step_health(
-        step.name,
-        stdout=result.stdout,
-        stderr=result.stderr,
-        report_dir=buildlog_dir(),
-        failed=result.exit_code != 0,
-        started_at=start,
-    )
+    if result.stderr.strip() and not highlights:
+        highlights.append(f"Diagnostics on stderr; see {step.log_file}")
     outcome = StepOutcome(
-        status="success" if result.exit_code == 0 else "failure",
+        status=status,
         exit_code=result.exit_code,
         duration_s=duration,
+        message=result.skip_reason,
         highlights=tuple(highlights),
-        health=health,
+        report_names=report_names,
+        health=None
+        if status == "skipped"
+        else health.build_step_health(
+            step.name,
+            stdout=result.stdout,
+            stderr=result.stderr,
+            report_dir=buildlog_dir(),
+            report_names=report_names,
+            failed=status == "failure",
+        ),
     )
     if not compact_output:
         _ui._print_step_footer(outcome, highlights)
-
     if verbose:
         if result.stdout.strip():
             print(result.stdout.rstrip())
         if result.stderr.strip():
             print(result.stderr.rstrip())
-
     return outcome
 
 
 def _completed_run_exit_code(summaries: list[summary_module.StepSummary]) -> int:
-    """Return the first failed step's code after every selected step ran."""
-
     for step in summaries:
         if step.status == "failure":
-            # A failure status should always carry a nonzero subprocess code,
-            # but retain a safe shell failure if a custom step violates that
-            # invariant.
-            return step.exit_code if step.exit_code != 0 else 1
+            return step.exit_code or 1
     return 0
 
 
 def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
+    report_dir = buildlog_dir()
+    report_dir.mkdir(parents=True, exist_ok=True)
+    with (report_dir / ".buildpython.lock").open("a", encoding="utf-8") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            print(f"Build not started: another buildpython run owns {report_dir}.")
+            return 2
+        return _run_locked(steps, verbose=verbose, continue_on_error=continue_on_error)
+
+
+def _run_locked(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
     total_steps = len(steps)
     name_width = max((len(step.name) for step in steps), default=7)
     label_width = len(f"[{total_steps}/{total_steps}]")
-    build_label = f"\u00b7  {total_steps} steps  \u00b7  Logs in {buildlog_dir()}"
-
-    print(f"\U0001f527  {_ui._color('KeyRGB Build', _ui._BOLD + _ui._CYAN)}  {_ui._color(build_label, _ui._DIM)}")
-
-    started = time.time()
+    report_dir = buildlog_dir()
+    report_dir.mkdir(parents=True, exist_ok=True)
+    # Coverage must come from a successful pytest invocation in this build.
+    (report_dir / _CAPTURE_MARKER_NAME).unlink(missing_ok=True)
+    print(f"🔧  KeyRGB Build · {total_steps} selected steps · Logs in {report_dir}")
+    started = time.monotonic()
+    run_id = str(uuid4())
+    started_at = iso_now()
     summaries: list[summary_module.StepSummary] = []
-    compact_output = not verbose
+    report_names: list[str] = []
 
-    def _health_score() -> int:
-        considered = [s for s in summaries if s.status != "skipped"]
-        if not considered:
-            return 100
-        successes = sum(1 for s in considered if s.status == "success")
-        score = round(100 * successes / len(considered))
-        return min(score, 49) if any(s.status == "failure" for s in considered) else score
+    def snapshot(*, completed: bool, running_step: Step | None = None) -> summary_module.BuildSummary:
+        pending = [
+            summary_module.StepSummary(
+                number=step.number,
+                name=step.name,
+                status="not_run",
+                exit_code=None,
+                duration_s=0,
+                message="Not executed in this run",
+            )
+            for step in steps[len(summaries) :]
+        ]
+        if running_step is not None:
+            pending[0] = summary_module.StepSummary(
+                number=running_step.number,
+                name=running_step.name,
+                status="running",
+                exit_code=None,
+                duration_s=0,
+                message="Started; no final outcome recorded",
+                log_file=str(running_step.log_file),
+            )
+        return summary_module.BuildSummary(
+            total_duration_s=time.monotonic() - started,
+            steps=[*summaries, *pending],
+            completed=completed,
+            run_id=run_id,
+            started_at=started_at,
+            report_names=tuple(report_names),
+        )
 
+    # An interrupted run must never leave the previous build's PASS summary current.
+    write_debt_index(report_dir, report_names=())
+    summary_module.write_summary(report_dir, snapshot(completed=False))
     for index, step in enumerate(steps, start=1):
+        summary_module.write_summary(report_dir, snapshot(completed=False, running_step=step))
+        skip_reason = ""
+        if step.name == "AppImage Smoke" and any(s.name == "AppImage" and s.status != "success" for s in summaries):
+            skip_reason = "AppImage build did not complete in this run; refusing to smoke-test an older artifact"
         outcome = run_step(
             step,
             index=index,
@@ -236,9 +213,9 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
             name_width=name_width,
             label_width=label_width,
             verbose=verbose,
-            compact_output=compact_output,
+            compact_output=not verbose,
+            skip_reason=skip_reason,
         )
-
         summaries.append(
             summary_module.StepSummary(
                 number=step.number,
@@ -246,61 +223,24 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
                 status=outcome.status,
                 exit_code=outcome.exit_code,
                 duration_s=outcome.duration_s,
+                message=outcome.message,
+                log_file=str(step.log_file),
+                health=outcome.health,
             )
         )
-
-        if compact_output:
+        report_names.extend(outcome.report_names)
+        if not verbose:
             _ui._print_compact_step_footer(outcome)
+        summary_module.write_summary(report_dir, snapshot(completed=False))
+        if outcome.status == "failure":
+            if not continue_on_error:
+                _ui._print_failure_guidance(step, index=index, total_steps=total_steps)
+                break
+            print(f"→ Failure details: {step.log_file}; continuing with remaining selected steps")
 
-        if outcome.status == "failure" and not continue_on_error:
-            _ui._print_failure_guidance(step, index=index, total_steps=total_steps)
-
-            score = _health_score()
-
-            summary_module.write_summary(
-                buildlog_dir(),
-                summary_module.BuildSummary(
-                    passed=False,
-                    health_score=score,
-                    total_duration_s=time.time() - started,
-                    steps=summaries,
-                ),
-            )
-            write_debt_index(buildlog_dir())
-
-            final_summary = summary_module.BuildSummary(
-                passed=False,
-                health_score=score,
-                total_duration_s=time.time() - started,
-                steps=summaries,
-            )
-            for line in summary_module.build_terminal_build_overview(buildlog_dir(), final_summary):
-                print(line)
-
-            return outcome.exit_code
-
-    final_exit_code = _completed_run_exit_code(summaries)
-    passed = final_exit_code == 0
-    score = _health_score()
-
-    summary_module.write_summary(
-        buildlog_dir(),
-        summary_module.BuildSummary(
-            passed=passed,
-            health_score=score,
-            total_duration_s=time.time() - started,
-            steps=summaries,
-        ),
-    )
-    write_debt_index(buildlog_dir())
-
-    final_summary = summary_module.BuildSummary(
-        passed=passed,
-        health_score=score,
-        total_duration_s=time.time() - started,
-        steps=summaries,
-    )
-    for line in summary_module.build_terminal_build_overview(buildlog_dir(), final_summary):
+    final_summary = snapshot(completed=True)
+    write_debt_index(report_dir, report_names=final_summary.report_names)
+    summary_module.write_summary(report_dir, final_summary)
+    for line in summary_module.build_terminal_build_overview(report_dir, final_summary):
         print(line)
-
-    return final_exit_code
+    return _completed_run_exit_code(summaries)

@@ -63,14 +63,14 @@ def steps() -> list[Step]:
         Step(
             number=1,
             name="Compile",
-            description="Compile all Python sources (syntax check)",
+            description="Compile keyrgb application sources (syntax check)",
             log_file=_log("step-01-compile.log"),
             runner=compileall_runner,
         ),
         Step(
             number=2,
             name="Pytest",
-            description="Run tests (hardware tests opt-in)",
+            description="Run tests with hardware tests disabled (KEYRGB_HW_TESTS=0)",
             log_file=_log("step-02-pytest.log"),
             runner=pytest_runner,
         ),
@@ -119,7 +119,7 @@ def steps() -> list[Step]:
         Step(
             number=9,
             name="Import Scan",
-            description="Parse imports and verify required modules import",
+            description="Parse sources and probe external top-level imports",
             log_file=_log("step-09-import-scan.log"),
             runner=import_scan_runner,
         ),
@@ -147,7 +147,7 @@ def steps() -> list[Step]:
         Step(
             number=13,
             name="Type Check",
-            description="Run mypy type checking on runtime and narrow GUI baseline",
+            description="Type-check core, tray, GUI, buildpython, release scripts, and buildpython tests",
             log_file=_log("step-13-type-check.log"),
             runner=mypy_runner,
         ),
@@ -175,7 +175,7 @@ def steps() -> list[Step]:
         Step(
             number=17,
             name="Architecture Validation",
-            description="Validate configured corpus-pattern architecture boundaries",
+            description="Validate architecture boundaries, write ownership, and lexical locks",
             log_file=_log("step-17-architecture.log"),
             runner=architecture_validation_runner,
         ),

@@ -5,6 +5,7 @@ from collections import Counter
 
 from ..utils.paths import buildlog_dir, repo_root
 from ..utils.subproc import RunResult
+from ._architecture_validation_integrity import validate_rule_corpora
 from .architecture_validation import load_architecture_rules, scan_architecture
 from .reports import write_csv, write_json, write_md
 
@@ -22,6 +23,7 @@ def architecture_validation_runner() -> RunResult:
 
     try:
         rules = load_architecture_rules(config_path)
+        validate_rule_corpora(root, rules)
         result = scan_architecture(root, rules)
     except _ARCHITECTURE_VALIDATION_RUNTIME_ERRORS as exc:
         return RunResult(

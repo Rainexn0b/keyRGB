@@ -4,6 +4,7 @@ import json
 import re
 from pathlib import Path
 
+from ._architecture_validation_integrity import validate_rule_payload
 from ._architecture_validation_models import (
     _FLAG_MAP,
     ArchitectureAssignmentRule,
@@ -21,6 +22,7 @@ from ._architecture_validation_models import (
 
 def load_architecture_rules(config_path: Path) -> list[ArchitectureRule]:
     payload = json.loads(config_path.read_text(encoding="utf-8"))
+    validate_rule_payload(payload)
     raw_rules = payload.get("rules", [])
 
     rules: list[ArchitectureRule] = []

@@ -4,17 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .summary_support.common import loc_bucket_parts, loc_check_counts, loc_severe_scope_part
-
-
-def _read_json_if_exists(path: Path) -> dict[str, Any] | None:
-    if not path.exists():
-        return None
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    return payload if isinstance(payload, dict) else None
+from .summary_support.common import loc_bucket_parts, loc_check_counts, loc_severe_scope_part, read_json_if_exists
 
 
 def _coverage_status(coverage: dict[str, Any]) -> str | None:
@@ -45,17 +35,24 @@ def _annotation_inventory_summary(payload: dict[str, Any]) -> tuple[int | None, 
     return total if isinstance(total, int) else None, subtree_bits
 
 
-def build_debt_index(buildlog_dir: Path) -> dict[str, Any]:
-    hygiene = _read_json_if_exists(buildlog_dir / "code-hygiene.json")
-    exception_transparency = _read_json_if_exists(buildlog_dir / "exception-transparency.json")
-    markers = _read_json_if_exists(buildlog_dir / "code-markers.json")
-    file_size = _read_json_if_exists(buildlog_dir / "file-size-analysis.json")
-    loc_check = _read_json_if_exists(buildlog_dir / "loc-check.json")
-    architecture = _read_json_if_exists(buildlog_dir / "architecture-validation.json")
-    coverage = _read_json_if_exists(buildlog_dir / "coverage-summary.json")
+def build_debt_index(buildlog_dir: Path, *, report_names: tuple[str, ...] | None = None) -> dict[str, Any]:
+    hygiene = read_json_if_exists(buildlog_dir / "code-hygiene.json", report_names=report_names)
+    exception_transparency = read_json_if_exists(
+        buildlog_dir / "exception-transparency.json", report_names=report_names
+    )
+    markers = read_json_if_exists(buildlog_dir / "code-markers.json", report_names=report_names)
+    file_size = read_json_if_exists(buildlog_dir / "file-size-analysis.json", report_names=report_names)
+    loc_check = read_json_if_exists(buildlog_dir / "loc-check.json", report_names=report_names)
+    architecture = read_json_if_exists(buildlog_dir / "architecture-validation.json", report_names=report_names)
+    coverage = read_json_if_exists(buildlog_dir / "coverage-summary.json", report_names=report_names)
+    dead_code = read_json_if_exists(buildlog_dir / "dead-code-vulture.json", report_names=report_names)
 
     sections: dict[str, Any] = {}
     report_paths: dict[str, str] = {}
+
+    if dead_code is not None:
+        sections["dead_code"] = {"candidates": dead_code.get("count"), "actionable": dead_code.get("actionable_count")}
+        report_paths["dead_code"] = str(buildlog_dir / "dead-code-vulture.md")
 
     if hygiene is not None:
         sections["code_hygiene"] = {
@@ -120,6 +117,7 @@ def build_debt_index(buildlog_dir: Path) -> dict[str, Any]:
 
     return {
         "summary": {
+            "scope": "current_run" if report_names is not None else "latest_available",
             "available_sections": sorted(sections.keys()),
             "report_count": len(report_paths),
         },
@@ -128,9 +126,9 @@ def build_debt_index(buildlog_dir: Path) -> dict[str, Any]:
     }
 
 
-def write_debt_index(buildlog_dir: Path) -> None:
+def write_debt_index(buildlog_dir: Path, *, report_names: tuple[str, ...] | None = None) -> None:
     buildlog_dir.mkdir(parents=True, exist_ok=True)
-    payload = build_debt_index(buildlog_dir)
+    payload = build_debt_index(buildlog_dir, report_names=report_names)
 
     json_path = buildlog_dir / "debt-index.json"
     md_path = buildlog_dir / "debt-index.md"
@@ -139,6 +137,7 @@ def write_debt_index(buildlog_dir: Path) -> None:
     lines: list[str] = [
         "# Debt index",
         "",
+        f"- Scope: {payload['summary']['scope']}",
         f"- Reports: {payload.get('summary', {}).get('report_count', 0)}",
         f"- Sections: {', '.join(payload.get('summary', {}).get('available_sections', [])) or 'none'}",
         "",
@@ -153,6 +152,17 @@ def write_debt_index(buildlog_dir: Path) -> None:
 
     sections = payload.get("sections", {})
     if isinstance(sections, dict):
+        dead_code = sections.get("dead_code")
+        if isinstance(dead_code, dict):
+            lines.extend(
+                [
+                    "## Dead code",
+                    "",
+                    f"- Candidates: {dead_code.get('candidates')}",
+                    f"- Actionable findings: {dead_code.get('actionable')}",
+                    "",
+                ]
+            )
         hygiene = sections.get("code_hygiene")
         if isinstance(hygiene, dict):
             active = hygiene.get("active_counts", {})

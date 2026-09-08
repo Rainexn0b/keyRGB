@@ -3,37 +3,12 @@ from __future__ import annotations
 from keyrgb.core.power.policies.power_source_loop_policy import (
     ActivatePerkeyProfile,
     ActivatePowerMode,
-    ApplyBrightness,
-    PowerSourceLoopInputs,
     PowerSourceLoopPolicy,
     RestoreKeyboard,
     TurnOffKeyboard,
 )
 from keyrgb.core.power.system import PowerMode
-
-
-def _inputs(**overrides) -> PowerSourceLoopInputs:
-    values = {
-        "on_ac": True,
-        "now": 0.0,
-        "power_management_enabled": True,
-        "current_brightness": 50,
-        "is_off": False,
-        "active_power_mode": None,
-        "active_perkey_profile_name": None,
-        "ac_enabled": True,
-        "battery_enabled": True,
-        "ac_brightness_override": None,
-        "battery_brightness_override": None,
-        "ac_power_mode": None,
-        "battery_power_mode": None,
-        "ac_perkey_profile_name": None,
-        "battery_perkey_profile_name": None,
-        "battery_saver_enabled": False,
-        "battery_saver_brightness": 25,
-    }
-    values.update(overrides)
-    return PowerSourceLoopInputs(**values)
+from tests.core.power.policy._power_source_loop_support import make_inputs as _inputs
 
 
 def test_power_source_loop_policy_debounces_power_flapping() -> None:
@@ -91,80 +66,6 @@ def test_power_source_loop_policy_restores_on_first_tick_when_currently_off() ->
     res = policy.update(_inputs(current_brightness=0, is_off=True))
 
     assert any(isinstance(a, RestoreKeyboard) for a in res.actions)
-
-
-def test_power_source_loop_policy_applies_override_brightness_only_on_change() -> None:
-    policy = PowerSourceLoopPolicy(debounce_seconds=0.0)
-
-    res = policy.update(
-        _inputs(
-            ac_brightness_override=20,
-        )
-    )
-    assert any(isinstance(a, ApplyBrightness) and a.brightness == 20 for a in res.actions)
-
-    # Same override again -> should not re-emit ApplyBrightness.
-    res2 = policy.update(
-        _inputs(
-            now=1.0,
-            ac_brightness_override=20,
-        )
-    )
-    assert not any(isinstance(a, ApplyBrightness) for a in res2.actions)
-
-
-def test_power_source_loop_policy_skips_noop_initial_override_apply() -> None:
-    policy = PowerSourceLoopPolicy(debounce_seconds=0.0)
-
-    res = policy.update(_inputs(current_brightness=20, ac_brightness_override=20))
-
-    assert not any(isinstance(a, ApplyBrightness) for a in res.actions)
-
-
-def test_power_source_loop_policy_reapplies_same_override_after_no_override_state() -> None:
-    policy = PowerSourceLoopPolicy(debounce_seconds=0.0)
-
-    first = policy.update(_inputs(ac_brightness_override=20, current_brightness=50))
-    no_override = policy.update(_inputs(now=1.0, ac_brightness_override=None, current_brightness=35))
-    reapplied = policy.update(_inputs(now=2.0, ac_brightness_override=20, current_brightness=35))
-
-    assert ApplyBrightness(20) in first.actions
-    assert not any(isinstance(a, ApplyBrightness) for a in no_override.actions)
-    assert ApplyBrightness(20) in reapplied.actions
-
-
-def test_power_source_loop_policy_reapplies_same_override_after_disabled_state() -> None:
-    policy = PowerSourceLoopPolicy(debounce_seconds=0.0)
-
-    first = policy.update(_inputs(ac_brightness_override=20, current_brightness=50))
-    disabled = policy.update(_inputs(now=1.0, ac_enabled=False, ac_brightness_override=20, current_brightness=20))
-    restored = policy.update(_inputs(now=2.0, ac_brightness_override=20, current_brightness=35))
-
-    assert ApplyBrightness(20) in first.actions
-    assert any(isinstance(a, TurnOffKeyboard) for a in disabled.actions)
-    assert ApplyBrightness(20) in restored.actions
-
-
-def test_power_source_loop_policy_legacy_battery_saver_dim_action() -> None:
-    policy = PowerSourceLoopPolicy(debounce_seconds=0.0)
-
-    # Prime state.
-    _ = policy.update(
-        _inputs(
-            battery_saver_enabled=True,
-        )
-    )
-
-    # Transition to battery after enough time: expect dim to 25.
-    res = policy.update(
-        _inputs(
-            on_ac=False,
-            now=10.0,
-            battery_saver_enabled=True,
-        )
-    )
-
-    assert any(isinstance(a, ApplyBrightness) and a.brightness == 25 for a in res.actions)
 
 
 def test_power_source_loop_policy_activates_selected_power_mode_on_first_tick_when_needed() -> None:

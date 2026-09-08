@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 from keyrgb.tray._deck_state_store import _completed_lit_state, _store_deck_state
 from keyrgb.tray.deck_state import DeckState, SleepWakeGuards, SleepWakeIntent, SleepWakeIntentKind, next_state
 from keyrgb.tray.idle_power_state import is_dim_temp_active
+from keyrgb.tray.pollers.hardware._controller_sleep import clear_controller_wake_settle
 
 if TYPE_CHECKING:
     from keyrgb.tray.protocols import IdlePowerTrayProtocol
@@ -50,6 +51,18 @@ def commit_lighting_power_intent(
         derive_deck_state,
         respect_enabled,
     )
+
+    if intent_kind in (
+        SleepWakeIntentKind.MANUAL_ON,
+        SleepWakeIntentKind.MANUAL_OFF,
+        SleepWakeIntentKind.POWER_OFF,
+        SleepWakeIntentKind.POWER_RESUME,
+    ):
+        # An explicit lighting-power intent supersedes any pending controller
+        # wake settle: the user/power action owns the deck now. Cancel before
+        # the decision so no stale deadline survives even a no-op or a
+        # blocked restore.
+        clear_controller_wake_settle(tray)
 
     origin = derive_deck_state(tray)
     now_val = float(now if now is not None else time.monotonic())

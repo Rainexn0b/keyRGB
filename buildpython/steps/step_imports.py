@@ -49,9 +49,9 @@ def import_validation_runner() -> RunResult:
     return RunResult(
         command_str="(internal) import validation",
         stdout=(
-            "All imports OK:\n"
+            f"Checked imports: {sum(has_tk or not m.startswith('keyrgb.gui.') for m in DEFAULT_IMPORTS)}/{len(DEFAULT_IMPORTS)} OK\n"
             + "\n".join(f"  - {m}" for m in DEFAULT_IMPORTS if has_tk or not m.startswith("keyrgb.gui."))
-            + ("\n\n(Note: Tkinter not available; skipped Tk GUI imports.)\n" if not has_tk else "\n")
+            + ("\n\nSkipped GUI imports: Tkinter not available.\n" if not has_tk else "\n")
         ),
         stderr="",
         exit_code=0,

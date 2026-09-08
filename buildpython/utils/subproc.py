@@ -14,6 +14,7 @@ class RunResult:
     stdout: str
     stderr: str
     exit_code: int
+    skip_reason: str = ""
 
 
 def run(

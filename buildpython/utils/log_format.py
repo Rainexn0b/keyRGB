@@ -13,9 +13,10 @@ class StepLogRecord:
     step_name: str
     command: str
     duration_s: float
-    exit_code: int
+    exit_code: int | None
     stdout: str
     stderr: str
+    status: str = ""
 
 
 def format_standard_log(record: StepLogRecord) -> str:
@@ -27,7 +28,8 @@ def format_standard_log(record: StepLogRecord) -> str:
         f"=== {record.step_name} - {iso_now()} ===\n"
         f"Command: {record.command}\n"
         f"Duration: {duration_text}\n"
-        f"Exit Code: {record.exit_code}\n\n"
+        f"Status: {record.status or ('success' if record.exit_code == 0 else 'failure')}\n"
+        f"Exit Code: {record.exit_code if record.exit_code is not None else 'not available'}\n\n"
         f"=== STDOUT ===\n{stdout}\n\n"
         f"=== STDERR ===\n{stderr}\n\n"
         f"=== END ===\n"

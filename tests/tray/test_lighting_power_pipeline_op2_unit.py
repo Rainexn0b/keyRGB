@@ -346,6 +346,7 @@ class TestExtractedPipelineCoverage:
         from keyrgb.tray._deck_sleep_wake_commits import _commit_keyboard_wake
 
         tray = make_owner_backed_mock_tray(is_off=True, dim_temp_active=True, dim_temp_target_brightness=8)
+        tray.engine.kb.keyrgb_controller_wake_settle_s = 0.0
         tray.tray_idle_power_state.controller_sleep_resume_guard = True
 
         with (

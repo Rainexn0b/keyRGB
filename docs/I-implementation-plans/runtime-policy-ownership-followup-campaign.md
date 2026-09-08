@@ -1,7 +1,7 @@
 # Runtime Policy Ownership Follow-up Campaign
 
-**Started:** 2026-09-03  
-**Baseline:** `~/.cache/keyrgb/diagnostic-sessions/20260903T092201.323445Z`  
+**Started:** 2026-09-03
+**Baseline:** `~/.cache/keyrgb/diagnostic-sessions/20260903T092201.323445Z`
 **Status:** Software-complete and merged-validated; live retest pending
 
 ## Purpose

@@ -287,10 +287,9 @@ def test_file_size_debt_summaries_include_middleman_and_deadfile_candidates(tmp_
     write_summary(
         buildlog_dir,
         BuildSummary(
-            passed=True,
-            health_score=100,
             total_duration_s=0.1,
             steps=[],
+            report_names=tuple(p.name for p in buildlog_dir.glob("*.json")),
         ),
     )
 

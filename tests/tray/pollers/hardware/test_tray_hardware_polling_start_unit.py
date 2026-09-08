@@ -69,7 +69,11 @@ def test_start_hardware_polling_verifies_controller_wake_before_deferring(
     tray = SimpleNamespace(
         engine=SimpleNamespace(
             kb_lock=_Lock(),
-            kb=SimpleNamespace(get_brightness=lambda: 5, is_off=lambda: False),
+            kb=SimpleNamespace(
+                get_brightness=lambda: 5,
+                is_off=lambda: False,
+                keyrgb_controller_wake_settle_s=0.0,
+            ),
         )
     )
 

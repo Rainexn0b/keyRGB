@@ -31,6 +31,7 @@ def _commit_controller_sleep(
     clear_post_stop: ClearPostStopFn | None,
 ) -> bool:
     _recovery.set_controller_sleep_off(tray, True, now=now)
+    _controller_sleep.clear_controller_wake_settle(tray)
     tray.is_off = True
     stopper = stop_engine or _controller_sleep.stop_engine_for_controller_sleep_best_effort
     clearer = clear_post_stop or _controller_sleep.clear_post_stop_write_best_effort
@@ -51,6 +52,24 @@ def _commit_firmware_wake(
     restart_firmware_wake: RestartWakeFn | None,
 ) -> bool:
     restarter = restart_firmware_wake or _controller_sleep.restart_effect_after_firmware_wake_best_effort
+    settle_delay = _controller_sleep.controller_wake_settle_delay_s(tray)
+    if settle_delay > 0:
+        now_f = float(now)
+        if not _controller_sleep.controller_wake_settle_pending(tray):
+            # First wake evidence only arms the deadline: no flag clears, no
+            # effect start, no hardware writes. The post-delay poll completes
+            # the restart with the then-current brightness as the handoff.
+            if not _controller_sleep.arm_controller_wake_settle(tray, now=now_f):
+                return False
+            _recovery._log_polled_hardware_event(
+                tray,
+                "controller_wake_settle_armed",
+                wake_source="firmware_wake",
+                delay_s=float(settle_delay),
+            )
+            return True
+        if not _controller_sleep.controller_wake_settle_due(tray, now=now_f):
+            return True
     _recovery._seed_reactive_restore_damp_best_effort(tray)
     if _controller_sleep._callback_accepts_controller_handoff(restarter):
         restored = restarter(
@@ -68,6 +87,9 @@ def _commit_firmware_wake(
             effect_restored=False,
         )
         return False
+    # Keep a due deadline armed across a failed restart so a later poll can
+    # retry without another delay; only a successful restart clears it.
+    _controller_sleep.clear_controller_wake_settle(tray)
     _recovery.set_controller_sleep_off(tray, False)
     tray.is_off = False
     if _recovery.controller_sleep_resume_guard_active(tray):
@@ -99,6 +121,24 @@ def _commit_keyboard_wake(
     effective_dim_target = dim_temp_target
     if effective_dim_target is None and is_dim_temp_active(tray):
         effective_dim_target = dim_temp_target_brightness(tray)
+    settle_delay = _controller_sleep.controller_wake_settle_delay_s(tray)
+    if settle_delay > 0:
+        # Delayed wake: arm the settle deadline once and stay dark. The
+        # controller_sleep_off/is_off flags, the stopped effect, and the
+        # hardware are all left untouched; the post-delay firmware-wake poll
+        # performs the single restart. Duplicates return False so idle
+        # iterations stay quiet, and the idle runtime only journals a restore
+        # once the flags actually clear.
+        newly_armed = _controller_sleep.arm_controller_wake_settle(tray, now=float(now))
+        if newly_armed:
+            _recovery._log_polled_hardware_event(
+                tray,
+                "controller_wake_settle_armed",
+                wake_source="keyboard_evdev",
+                delay_s=float(settle_delay),
+            )
+            _recovery._refresh_ui_without_icon_animation(tray)
+        return bool(newly_armed)
     _recovery._seed_reactive_restore_damp_best_effort(tray)
     restored = _controller_sleep.restart_effect_after_firmware_wake_best_effort(
         tray,

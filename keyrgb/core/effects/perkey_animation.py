@@ -87,18 +87,17 @@ def enable_user_mode_once(*, kb, kb_lock, brightness: int, save: bool = False) -
     if not callable(fn):
         return
 
+    def _enable() -> None:
+        with kb_lock:
+            fn(brightness=brightness, save=bool(save))
+
     _run_with_recoverable_logging(
-        fn=lambda: _enable_user_mode_locked(kb_lock=kb_lock, fn=fn, brightness=brightness, save=save),
+        fn=_enable,
         recoverable_errors=_ENABLE_USER_MODE_RUNTIME_ERRORS,
         throttle_key="perkey_animation.enable_user_mode_once",
         msg="Failed to enable per-key user mode",
         fallback=None,
     )
-
-
-def _enable_user_mode_locked(*, kb_lock, fn: Callable[..., object], brightness: int, save: bool) -> None:
-    with kb_lock:
-        fn(brightness=brightness, save=bool(save))
 
 
 def _recovery_user_mode_save_enabled() -> bool:
@@ -109,7 +108,7 @@ def _recovery_user_mode_save_enabled() -> bool:
     return os.environ.get(RECOVERY_USER_MODE_SAVE_ENV) != "0"
 
 
-def _save_restored_user_mode_best_effort(*, kb, brightness: int) -> None:
+def _save_restored_user_mode_best_effort(*, kb, kb_lock, brightness: int) -> None:
     """Save the just-restored scene as the controller's user mode.
 
     Enabled by default; opt out with ``KEYRGB_RECOVERY_USER_MODE_SAVE=0``.
@@ -127,7 +126,8 @@ def _save_restored_user_mode_best_effort(*, kb, brightness: int) -> None:
         return
 
     def _save() -> None:
-        fn(brightness=int(brightness), save=True)
+        with kb_lock:
+            fn(brightness=int(brightness), save=True)
         logger.info("recovery_user_mode_save: brightness=%d", int(brightness))
 
     _run_with_recoverable_logging(
@@ -191,7 +191,7 @@ def restore_hidden_per_key_rows_once(
             # reuse stays flash-free with enable_user_mode=False).
             set_key_colors(color_map, brightness=int(brightness), enable_user_mode=False)
             set_brightness(int(brightness))
-            _save_restored_user_mode_best_effort(kb=kb, brightness=int(brightness))
+            _save_restored_user_mode_best_effort(kb=kb, kb_lock=kb_lock, brightness=int(brightness))
         return True
 
     return _run_with_recoverable_logging(

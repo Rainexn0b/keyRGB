@@ -10,8 +10,45 @@ from buildpython.steps.appimage import (
     build as appimage_build,
     common as appimage_common,
     python_runtime,
+    smoke,
     tkinter_bundle,
 )
+
+
+def test_staging_only_is_not_reported_as_a_completed_appimage_build(monkeypatch) -> None:
+    from buildpython.utils.subproc import RunResult
+
+    monkeypatch.setenv("KEYRGB_APPIMAGE_STAGING_ONLY", "1")
+    monkeypatch.setattr(appimage_build, "run", lambda *_args, **_kwargs: RunResult("fixture", "Prepared AppDir", "", 0))
+    result = appimage_build.appimage_build_runner()
+    assert "no AppImage built" in result.skip_reason
+
+
+@pytest.mark.parametrize("on_ci", [False, True])
+def test_smoke_without_docker_reports_skip_or_required_check_failure(tmp_path, monkeypatch, on_ci) -> None:
+    artifact = tmp_path / "dist/keyrgb-x86_64.AppImage"
+    artifact.parent.mkdir()
+    artifact.touch()
+    monkeypatch.setattr(smoke, "repo_root", lambda: tmp_path)
+    monkeypatch.setattr(smoke.shutil, "which", lambda _name: None)
+    monkeypatch.setenv("CI", "1" if on_ci else "0")
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    monkeypatch.delenv("KEYRGB_ALLOW_NO_DOCKER", raising=False)
+    result = smoke.appimage_smoke_runner()
+    assert result.exit_code == (2 if on_ci else 0)
+    assert bool(result.skip_reason) is (not on_ci)
+
+
+def test_smoke_opt_out_is_structured_skip(tmp_path, monkeypatch) -> None:
+    artifact = tmp_path / "dist/keyrgb-x86_64.AppImage"
+    artifact.parent.mkdir()
+    artifact.touch()
+    monkeypatch.setattr(smoke, "repo_root", lambda: tmp_path)
+    monkeypatch.setattr(smoke.shutil, "which", lambda _name: "/fixture/docker")
+    monkeypatch.setenv("KEYRGB_SKIP_APPIMAGE_SMOKE", "1")
+    result = smoke.appimage_smoke_runner()
+    assert result.exit_code == 0
+    assert result.skip_reason == "KEYRGB_SKIP_APPIMAGE_SMOKE is enabled"
 
 
 def test_pip_install_args_construction(tmp_path: Path) -> None:

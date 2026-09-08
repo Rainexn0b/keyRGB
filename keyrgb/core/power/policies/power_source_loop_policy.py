@@ -213,7 +213,12 @@ class PowerSourceLoopPolicy:
             if should_apply_brightness:
                 if not bool(inputs.is_off):
                     actions.append(ApplyBrightness(int(desired_brightness)))
-                self._last_desired_brightness = int(desired_brightness)
+                    # Record only a brightness action that was actually
+                    # emitted. A controller-sleep/wake-settle window reports
+                    # is_off=True; latching the desired value there would make
+                    # the first awake iteration deduplicate an update that
+                    # never reached the deck.
+                    self._last_desired_brightness = int(desired_brightness)
             elif self._last_desired_brightness is None:
                 self._last_desired_brightness = int(desired_brightness)
             return PowerSourceLoopResult(skip=False, actions=tuple(actions))

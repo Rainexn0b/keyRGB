@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from .common import coerce_float, coverage_status, read_json_if_exists
+from .common import coverage_status, read_json_if_exists
 from .models import BuildSummary
 
 _USE_COLOR = sys.stdout.isatty()
@@ -21,19 +21,21 @@ def _c(text: str, code: str) -> str:
     return f"{code}{text}{_RESET}" if code else text
 
 
-def build_terminal_coverage_highlight(buildlog_dir: Path) -> str | None:
-    coverage = read_json_if_exists(buildlog_dir / "coverage-summary.json")
+def build_terminal_coverage_highlight(buildlog_dir: Path, *, report_names: tuple[str, ...] | None = None) -> str | None:
+    coverage = read_json_if_exists(buildlog_dir / "coverage-summary.json", report_names=report_names)
     if coverage is None:
         return None
 
     if coverage_status(coverage) == "missing_capture":
-        return "Coverage: waiting for pytest coverage capture"
+        return "Coverage: unavailable — no successful pytest capture in this run"
 
     summary = coverage.get("summary", {})
     if not isinstance(summary, dict):
         return None
 
-    total_percent = coerce_float(summary.get("total_percent", 0.0))
+    total_percent = summary.get("total_percent")
+    if not isinstance(total_percent, (int, float)):
+        return "Coverage: unavailable — report has no measured percentage"
     parts = [f"Coverage: {total_percent:.2f}% total"]
 
     tracked_prefixes = coverage.get("tracked_prefixes", [])
@@ -57,37 +59,29 @@ def build_terminal_coverage_highlight(buildlog_dir: Path) -> str | None:
 
 
 def build_terminal_build_overview(buildlog_dir: Path, summary: BuildSummary) -> list[str]:
-    total_steps = len(summary.steps)
-    successful = sum(1 for step in summary.steps if step.status == "success")
-    failed = sum(1 for step in summary.steps if step.status == "failure")
-    skipped = sum(1 for step in summary.steps if step.status == "skipped")
-
-    bar_width = 20
-    filled = max(0, min(bar_width, round(summary.health_score / 100 * bar_width)))
-    bar_color = _GREEN if summary.health_score >= 90 else _YELLOW if summary.health_score >= 70 else _RED
-    filled_bar = _c("\u2588" * filled, bar_color)
-    empty_bar = _c("\u2591" * (bar_width - filled), _DIM)
-    bar = f"{filled_bar}{empty_bar}"
-
-    status_icon = "\u2705  " if summary.passed else "\u274c  "  # ✅ or ❌
-    status_label = _c("PASS", _BOLD + _GREEN) if summary.passed else _c("FAIL", _BOLD + _RED)
-
-    steps_parts = [f"{successful}/{total_steps} steps"]
-    if failed:
-        steps_parts.append(f"{failed} failed")
-    if skipped:
-        steps_parts.append(f"{skipped} skipped")
-    steps_text = "  \u00b7  ".join(steps_parts)
-
+    counts = summary.counts
+    labels = {
+        "passed": "PASS",
+        "failed": "FAIL",
+        "partial": "PARTIAL",
+        "not_run": "NOT RUN",
+        "incomplete": "INCOMPLETE",
+    }
+    color = _GREEN if summary.passed else _RED if summary.status == "failed" else _YELLOW
+    status_label = _c(labels[summary.status], _BOLD + color)
+    steps_text = " · ".join(
+        f"{counts[key]} {label}"
+        for key, label in (("success", "passed"), ("failure", "failed"), ("skipped", "skipped"), ("not_run", "not run"))
+    )
     lines = [
         _c(_SEP, _DIM),
-        "\U0001f4cb  Build Results",
+        "📋  Build Results",
         _c(_SEP, _DIM),
-        f"{status_icon}{status_label}  \u00b7  {summary.total_duration_s:.1f}s  \u00b7  {steps_text}  \u00b7  Health {summary.health_score}/100  [{bar}]",
+        f"{status_label} · {summary.total_duration_s:.1f}s · {len(summary.steps)} selected · {steps_text}",
     ]
-
-    coverage_line = build_terminal_coverage_highlight(buildlog_dir)
+    if summary.status in {"partial", "not_run"}:
+        lines.append("    Skipped checks were not verified; exit code 0 means no executed check failed.")
+    coverage_line = build_terminal_coverage_highlight(buildlog_dir, report_names=summary.report_names)
     if coverage_line is not None:
         lines.append(f"    {coverage_line}")
-
     return lines

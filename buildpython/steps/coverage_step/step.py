@@ -36,6 +36,7 @@ def coverage_runner() -> RunResult:
             stdout="Coverage summary skipped: coverage.py is not installed.\n",
             stderr="",
             exit_code=0,
+            skip_reason="coverage.py is not installed",
         )
 
     if not _has_fresh_pytest_coverage_data():
@@ -74,7 +75,7 @@ def coverage_runner() -> RunResult:
     if json_result.exit_code != 0:
         return RunResult(
             command_str=json_result.command_str,
-            stdout="Coverage summary\n\nFailed to export coverage JSON.\n",
+            stdout="Coverage summary\n\nFailed to export coverage JSON.\n" + json_result.stdout,
             stderr=json_result.stderr,
             exit_code=json_result.exit_code,
         )

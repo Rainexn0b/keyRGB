@@ -1,7 +1,7 @@
 # Sleep/wake brightness pipeline campaign
 
-**Started:** 2026-09-03  
-**Lane:** `P-power-management`  
+**Started:** 2026-09-03
+**Lane:** `P-power-management`
 **Status:** SWP-1..4 cut over — live matrix pending
 **Hardware validation gate:** inherit [KSW-8](keyboard-sleep-wake-hardening-campaign.md)
 plus one-restore-per-wake evidence after the pipeline cutover
@@ -49,7 +49,7 @@ immediate heal plus typing pulses. If lowest is 0, it recreates the dark gap.
 Yes. `controller_sleep_respect` is a first-class pipeline policy input, not a
 side flag sprinkled through pollers.
 
-Config key: `controller_sleep_respect` (`IDLE_DISPLAY`, default `False`).  
+Config key: `controller_sleep_respect` (`IDLE_DISPLAY`, default `False`).
 GUI: Settings → Screen idle/blanking sync → **Let the controller's own sleep
 timeout turn the keyboard off**.
 

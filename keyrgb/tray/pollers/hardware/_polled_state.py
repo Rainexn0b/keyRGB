@@ -90,7 +90,38 @@ def apply_polled_hardware_state(
     # restore, or a manual turn-on clears the flag. A non-zero read means the
     # firmware woke itself; adopt and resume normal handling.
     if hp._controller_sleep_off_active(tray):
-        if current_brightness > 0 and not current_off and not forced_off:
+        settle = hp._controller_sleep
+        if forced_off:
+            # Forced-off policy wins over a stale/non-zero poll sampled during
+            # the fade to off; drop any stale settle so a later wake re-arms.
+            settle.clear_controller_wake_settle(tray)
+            return current_brightness, True
+        if settle.controller_wake_settle_pending(tray):
+            if not settle.controller_wake_settle_due(tray, now=now):
+                # Active settle is observation-only: stay dark, no writes.
+                return current_brightness, True
+            # Due: complete the wake even from an actual zero snapshot so the
+            # reactive renderer fades upward from the true physical baseline.
+            if not current_off:
+                if hp._commit_polled_intent(
+                    tray,
+                    SleepWakeIntent(SleepWakeIntentKind.FIRMWARE_WAKE),
+                    now=now,
+                    current_brightness=current_brightness,
+                    dim_temp_target=wake_dim_target,
+                    recently_restored=recently_restored,
+                    respect=respect,
+                ):
+                    if settle.controller_wake_settle_pending(tray):
+                        return current_brightness, True
+                    return current_brightness, False
+                return current_brightness, True
+            # Due but the snapshot still reports off: the wake evidence went
+            # stale. Drop the deadline and stay dark; a later nonzero wake
+            # arms a fresh full delay.
+            settle.clear_controller_wake_settle(tray)
+            return current_brightness, True
+        if current_brightness > 0 and not current_off:
             if hp._commit_polled_intent(
                 tray,
                 SleepWakeIntent(SleepWakeIntentKind.FIRMWARE_WAKE),
@@ -100,11 +131,15 @@ def apply_polled_hardware_state(
                 recently_restored=recently_restored,
                 respect=respect,
             ):
+                # A delayed backend only armed the settle deadline above; the
+                # deck stays logically off until the post-delay completion.
+                if settle.controller_wake_settle_pending(tray):
+                    return current_brightness, True
                 return current_brightness, False
             return current_brightness, True
         else:
-            # Forced-off policy wins over a stale/non-zero poll sampled during
-            # the fade to off.
+            # The controller is still physically dark; wait for fresh nonzero
+            # wake evidence rather than starting a restore from this snapshot.
             return current_brightness, True
 
     # A non-zero read means the transient-0 window has cleared. Reset the

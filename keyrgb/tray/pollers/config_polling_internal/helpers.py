@@ -139,25 +139,6 @@ def _throttled_log_exception(
     return now
 
 
-def _enable_user_mode_best_effort(tray: ConfigPollingTrayProtocol, *, brightness: int) -> None:
-    enable_user_mode = getattr(getattr(tray.engine, "kb", None), "enable_user_mode", None)
-    if not callable(enable_user_mode):
-        return
-    try:
-        _run_diagnostic_boundary(
-            tray,
-            lambda: enable_user_mode(brightness=brightness, save=True),
-            error_msg="Failed to enable per-key user mode: %s",
-            runtime_exceptions=_ENABLE_USER_MODE_SAVE_EXCEPTIONS,
-        )
-    except TypeError:
-        _run_diagnostic_boundary(
-            tray,
-            lambda: enable_user_mode(brightness=brightness),
-            error_msg="Failed to enable per-key user mode fallback: %s",
-        )
-
-
 def _log_detected_change(tray: ConfigPollingTrayProtocol, last_applied, current, cause: str, state_for_log_fn):
     old_state = _safe_state_for_log(tray, state_for_log_fn, last_applied)
     new_state = _safe_state_for_log(tray, state_for_log_fn, current)

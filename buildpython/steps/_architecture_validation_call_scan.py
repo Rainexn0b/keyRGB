@@ -5,12 +5,13 @@ import ast
 from ._architecture_validation_helpers import (
     _NON_LITERAL,
     _dotted_name,
+    _import_from_module,
     _literal_value,
     _ScannedCall,
 )
 
 
-def _scan_python_calls(text: str) -> tuple[_ScannedCall, ...]:
+def _scan_python_calls(text: str, *, relative_path: str = "") -> tuple[_ScannedCall, ...]:
     try:
         tree = ast.parse(text)
     except SyntaxError:
@@ -51,21 +52,31 @@ def _scan_python_calls(text: str) -> tuple[_ScannedCall, ...]:
             return ".".join((canonical_root, *parts[1:]))
 
         def _canonical_call(self, node: ast.Call) -> tuple[str, str] | None:
-            if isinstance(node.func, ast.Name):
-                canonical = self._lookup_binding(node.func.id)
-                if canonical is None:
-                    return None
-                receiver, separator, method = canonical.rpartition(".")
-                if not separator:
-                    return None
-                return receiver, method
+            canonical = self._canonical_expression(node.func)
+            if canonical is None:
+                return None
+            receiver, separator, method = canonical.rpartition(".")
+            if not separator:
+                return None
+            return receiver, method
 
-            if not isinstance(node.func, ast.Attribute):
-                return None
-            receiver_name = _dotted_name(node.func.value)
-            if receiver_name is None:
-                return None
-            return self._canonical_dotted_name(receiver_name), node.func.attr
+        def _canonical_expression(self, node: ast.AST) -> str | None:
+            dotted = _dotted_name(node)
+            if dotted is not None:
+                return self._canonical_dotted_name(dotted)
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "getattr"
+                and not any("getattr" in scope for scope in self._bindings)
+                and len(node.args) in (2, 3)
+                and isinstance(node.args[1], ast.Constant)
+                and isinstance(node.args[1].value, str)
+            ):
+                receiver = self._canonical_expression(node.args[0])
+                if receiver is not None:
+                    return f"{receiver}.{node.args[1].value}"
+            return None
 
         def visit_Call(self, node: ast.Call) -> None:
             canonical_call = self._canonical_call(node)
@@ -93,9 +104,7 @@ def _scan_python_calls(text: str) -> tuple[_ScannedCall, ...]:
                 self._bind_name(bound_name, canonical)
 
         def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-            if int(getattr(node, "level", 0)) != 0:
-                return
-            module = str(getattr(node, "module", "") or "").strip()
+            module = _import_from_module(node, relative_path)
             if not module:
                 return
             for alias in node.names:
@@ -106,13 +115,16 @@ def _scan_python_calls(text: str) -> tuple[_ScannedCall, ...]:
 
         def visit_Assign(self, node: ast.Assign) -> None:
             self.visit(node.value)
+            canonical = self._canonical_expression(node.value)
             for target in node.targets:
-                self._bind_target(target)
+                self.visit(target)
+                self._bind_target(target, canonical)
 
         def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
             if node.value is not None:
                 self.visit(node.value)
-            self._bind_target(node.target)
+                self._bind_target(node.target, self._canonical_expression(node.value))
+            self.visit(node.target)
 
         def visit_AugAssign(self, node: ast.AugAssign) -> None:
             self.visit(node.value)
@@ -120,7 +132,7 @@ def _scan_python_calls(text: str) -> tuple[_ScannedCall, ...]:
 
         def visit_NamedExpr(self, node: ast.NamedExpr) -> None:
             self.visit(node.value)
-            self._bind_target(node.target)
+            self._bind_target(node.target, self._canonical_expression(node.value))
 
         def visit_For(self, node: ast.For | ast.AsyncFor) -> None:
             self.visit(node.iter)
@@ -176,6 +188,23 @@ def _scan_python_calls(text: str) -> tuple[_ScannedCall, ...]:
             self._bindings.append({})
             self._bind_function_arguments(node.args)
             self.visit(node.body)
+            self._bindings.pop()
+            self._lexical_locks = saved_locks
+
+        def visit_GeneratorExp(self, node: ast.GeneratorExp) -> None:
+            # Only the outer iterable executes at creation. The generator body
+            # may run after the surrounding lock has been released.
+            self.visit(node.generators[0].iter)
+            saved_locks = self._lexical_locks
+            self._lexical_locks = []
+            self._bindings.append({})
+            for index, generator in enumerate(node.generators):
+                if index:
+                    self.visit(generator.iter)
+                self._bind_target(generator.target)
+                for condition in generator.ifs:
+                    self.visit(condition)
+            self.visit(node.elt)
             self._bindings.pop()
             self._lexical_locks = saved_locks
 

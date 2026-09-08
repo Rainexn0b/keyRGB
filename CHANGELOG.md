@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.35.0 (2026-09-08)
+
+Wake/brightness ownership and release-quality hardening. Public entrypoints and
+on-disk config stay compatible; controller-native sleep remains opt-in and is
+now identified in Settings as recommended for supported ITE controllers.
+
 - Effects/Idle: Make the reactive whole-frame wake envelope monotonic and
   independent of first-pulse phase, and consume one pre-start restore seed so
   typing cannot produce a `0.62 → 1.0 → 0.62` scale reversal.
@@ -34,6 +40,38 @@
   architecture keyword exemptions, cover auxiliary tray modules and exact
   tray-engine receivers, and canonicalize ordinary time/subprocess import
   aliases without inferring dynamic object aliases.
+- Core/Backends: Add a backend-declared controller wake-settle policy with a
+  conservative 2.5-second fallback and an explicit numeric-zero opt-out;
+  ITE8291r3 declares the validated 2.5-second window directly.
+- Tray/Sleep-Wake: Keep effects stopped and perform no hardware reads or writes
+  during controller wake settling, then complete one restart from the
+  post-delay hardware state. Duplicate wake evidence cannot extend the
+  deadline, while forced-off, manual, and power intents cancel stale settling.
+- Core/Power: Retry an AC/battery brightness action that was suppressed while
+  controller sleep or wake settling held the deck dark instead of recording the
+  unissued write as complete.
+- Core/Effects: Put per-key user-mode reassert/save operations under `kb_lock`,
+  and move config-poll reassertion into the approved output owner so recovery
+  no longer depends on implicit caller locking.
+- GUI/Settings: Clarify that letting firmware keep the deck asleep is
+  recommended for supported ITE controllers while retaining the existing
+  opt-in default for unvalidated backends.
+- Build/Runner: Scope reports and debt snapshots to the current invocation,
+  checkpoint incomplete runs, reject concurrent build-log writers, refresh
+  step logs before execution, and fail report-producing steps when their
+  expected fresh JSON is missing.
+- Build/CLI: Make the bare command select the documented full profile, validate
+  multiword and skipped step selectors, force hardware tests off in validation,
+  and prevent AppImage smoke from consuming a stale or skipped build.
+- Build/Health: Restore metric-based health penalties independently of pass/fail
+  status, preserve measured coverage on gate failure, report factual counts,
+  and leave skipped or invalid data unscored.
+- Build/Architecture: Resolve relative imports, strengthen AST call, alias,
+  lock, glob, and corpus analysis, and reject malformed, duplicate, empty, or
+  unreadable architecture-rule inputs instead of silently passing them.
+- Build/Packaging: Report staging-only AppImage work and smoke-test opt-outs as
+  structured skips, with refreshed architecture, CLI-output, health-scoring,
+  policy-ownership, and Tk-async documentation.
 
 ## 0.34.0 (2026-08-31)
 

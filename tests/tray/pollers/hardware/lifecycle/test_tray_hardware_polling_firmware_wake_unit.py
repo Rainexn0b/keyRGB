@@ -17,6 +17,9 @@ class _DummyTray:
 
         self.config = _DummyConfig(brightness=brightness)
         self.is_off = is_off
+        # These legacy wake tests exercise the immediate-policy contract;
+        # conservative-default behavior lives in test_controller_wake_settle.
+        self.engine = SimpleNamespace(kb=SimpleNamespace(keyrgb_controller_wake_settle_s=0.0))
         self.refresh_count = 0
         self.last_animate_icon = None
         attach_idle_power_owner(

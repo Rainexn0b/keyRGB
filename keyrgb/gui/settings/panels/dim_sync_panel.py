@@ -77,8 +77,8 @@ class DimSyncPanel:
         controller_sleep_desc = ttk.Label(
             parent,
             text=(
-                "The controller sleeps after ~10 min without typing. When it or screen-idle sync turns the deck "
-                "off, only a non-modifier keypress restores lighting."
+                "Recommended for supported ITE controllers: firmware sleeps after ~10 min without typing. When "
+                "it or screen-idle sync turns the deck off, only a non-modifier keypress restores lighting."
             ),
             font=("Sans", 8),
             justify="left",

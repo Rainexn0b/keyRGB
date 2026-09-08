@@ -7,6 +7,24 @@ import pytest
 from buildpython.core import cli
 
 
+def test_single_multiword_step_name_is_a_valid_selector() -> None:
+    selected = cli._select_steps(cli._parse_csv("Architecture Validation"), None, None)
+    assert [step.number for step in selected] == [17]
+    assert cli._parse_csv("1 17") == ["1", "17"]
+
+
+def test_unknown_skip_selector_is_not_silently_ignored() -> None:
+    with pytest.raises(SystemExit, match="Unknown step selector"):
+        cli._select_steps(None, ["Architecture Validaton"], None)
+
+
+def test_default_selection_matches_full_profile_without_packaging() -> None:
+    default = cli._select_steps(None, None, None)
+    full = cli._select_steps(None, None, "full")
+    assert [step.name for step in default] == [step.name for step in full]
+    assert not {"AppImage", "AppImage Smoke", "Black"}.intersection(step.name for step in default)
+
+
 @pytest.mark.parametrize("mode", ["debug", "brightness", "full"])
 def test_capture_runtime_log_dispatches_selected_mode(monkeypatch, mode: str) -> None:
     calls: list[tuple[str, str]] = []

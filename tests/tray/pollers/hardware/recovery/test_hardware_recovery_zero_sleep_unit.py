@@ -343,7 +343,7 @@ def test_firmware_wake_commit_adapts_legacy_restarter_then_refreshes_lit_state()
     calls: list[tuple[float, int | None]] = []
     refreshed: list[tuple[bool, bool]] = []
     tray = _make_recovery_tray(is_off=True, controller_sleep_off=True)
-    tray.engine = SimpleNamespace()
+    tray.engine = SimpleNamespace(kb=SimpleNamespace(keyrgb_controller_wake_settle_s=0.0))
     tray._log_event = lambda *_a, **_kw: None
     tray._refresh_ui = lambda **_kwargs: refreshed.append(
         (bool(tray.is_off), bool(tray.tray_idle_power_state.controller_sleep_off))

@@ -61,7 +61,7 @@ def test_import_validation_runner_skips_gui_imports_without_tk(monkeypatch, tmp_
         "keyrgb.core.diagnostics",
         "keyrgb.core.diagnostics.diagnostic_session",
     ]
-    assert "Tkinter not available; skipped Tk GUI imports." in result.stdout
+    assert "Skipped GUI imports: Tkinter not available." in result.stdout
 
 
 def test_import_validation_runner_propagates_unexpected_probe_failures(monkeypatch, tmp_path) -> None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+from dataclasses import replace
 from pathlib import Path
 
 from ...utils.paths import repo_root
@@ -136,6 +137,8 @@ def build_appimage() -> Path:
         run_checked(_pip_install_args(specifiers, site_packages), cwd=root)
 
         bundle_pygobject(appdir=appdir, site_packages=site_packages)
+    else:
+        print("Runtime dependency installation skipped (staging-only or KEYRGB_APPIMAGE_SKIP_DEPS).")
 
     icon_src = _first_existing_asset(
         root,
@@ -199,11 +202,14 @@ def main() -> int:
 
 def appimage_build_runner() -> RunResult:
     root = repo_root()
-    return run(
+    result = run(
         [python_exe(), "-m", "buildpython.steps.appimage.build"],
         cwd=str(root),
         env_overrides={"KEYRGB_HW_TESTS": "0"},
     )
+    if result.exit_code == 0 and env_flag("KEYRGB_APPIMAGE_STAGING_ONLY"):
+        return replace(result, skip_reason="Prepared AppDir only; no AppImage built (KEYRGB_APPIMAGE_STAGING_ONLY)")
+    return result
 
 
 if __name__ == "__main__":
