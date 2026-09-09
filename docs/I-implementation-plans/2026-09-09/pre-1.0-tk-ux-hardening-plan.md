@@ -122,9 +122,9 @@ outcome.
 | UX-03 | Simplify the per-key editor's default view | P2 | L | deferred | UX-01, UX-02, UX-05–UX-09, and dedicated UX discussion |
 | UX-04 | Turn keyboard setup and calibration into a guided workflow | P2 | L | deferred | UX-03 direction and dedicated UX discussion |
 | UX-05 | Establish consistent spacing, typography, focus, and disabled contrast | P1 | M | done | UX-07 |
-| UX-06 | Persist and safely restore main-window geometry | P1 | M | active | UX-09 |
+| UX-06 | Persist and safely restore main-window geometry | P1 | M | monitoring | UX-09 |
 | UX-07 | Replace custom dropdowns with standard Tk controls | P1 | M | done | UX-00 |
-| UX-08 | Add accelerators and keyboard-access contracts | P1 | M | accepted | UX-05 and UX-07 |
+| UX-08 | Add accelerators and keyboard-access contracts | P1 | M | active | UX-05 and UX-07 |
 | UX-09 | Prevent duplicate instances of the same GUI | P1 | M | done | UX-00 |
 
 ## UX-00 — Baseline characterization and review matrix
@@ -1112,3 +1112,39 @@ coverage.
   eight cases (including keyboard and logo Uniform identities) emitted the
   duplicate diagnostic and exited 0 before constructing a window.
 - UX-09 is complete. UX-06 geometry persistence is now the only active item.
+
+### 2026-09-09 — UX-06 geometry persistence implemented
+
+- Added the Tk-free `keyrgb/gui/utils/window_state.py` owner for
+  `config_dir()/ui-state.json`, with a distinct `ui-state.lock`, blocking
+  advisory locks, atomic read-modify-write replacement, sibling-state
+  preservation, validated geometry, screen/minimum clamping, and malformed or
+  wholly off-screen fallback.
+- Window coordinates are persisted on coordinate-capable sessions and omitted
+  on Wayland, where size restoration remains the reliable contract. Configure
+  events ignore descendant widgets and debounce writes by 500 ms.
+- Integrated route-scoped Uniform, Reactive Color, Power Mode, Support Tools,
+  Settings, Per-key Editor, and Keymap Calibrator geometry. Existing centered
+  behavior remains the fallback, startup geometry passes run before tracking,
+  and orderly close saves before teardown. Calibrator Escape now shares its
+  orderly close path instead of bypassing hardware restoration.
+- Added focused coverage for locked/atomic persistence, corruption and screen
+  changes, negative Tk coordinates, Wayland size-only state, write debouncing,
+  dynamic Uniform identities, all seven restore/fallback paths, close ordering,
+  and proof that `config.json` digest and mtime remain unchanged.
+- Validation:
+  - focused UX-06 suite: `117 passed`;
+  - `.venv/bin/python -m pytest tests/gui tests/tray/ui/test_gui_launch_unit.py -q -o addopts=`:
+    `1056 passed`;
+  - Ruff and Ruff Format across `keyrgb/gui` and `tests/gui`: passed (`285`
+    files formatted);
+  - `.venv/bin/python -m buildpython --run-steps=1,4,13,16,17,19,20`:
+    `7 passed`; all `8/8` import probes passed, architecture checked `24` rules
+    across `618` files with zero findings, and Dead Code reported zero
+    actionable candidates;
+  - `git diff --check`: passed;
+  - independent final review found no blocker-, high-, or medium-severity issue.
+- UX-06 is `monitoring` pending a Plasma Wayland close/reopen walkthrough that
+  confirms size restoration for all seven windows and records position behavior
+  as best-effort. UX-08 keyboard access is now the only active implementation
+  item.

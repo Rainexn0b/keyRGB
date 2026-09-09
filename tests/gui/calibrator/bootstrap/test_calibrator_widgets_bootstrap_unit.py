@@ -104,6 +104,7 @@ class _App:
         self._reset_keymap_defaults = MagicMock()
         self._save = MagicMock()
         self._save_and_close = MagicMock()
+        self._on_close = MagicMock()
 
     def columnconfigure(self, index: int, weight: int = 0, **kwargs: object) -> None:
         self.column_calls.append((index, weight, kwargs))
@@ -149,7 +150,8 @@ def test_build_widgets_creates_canvas_controls_and_keybindings() -> None:
 
     esc_cb = next(cb for seq, cb, _ in app.bind_calls if seq == "<Escape>")
     esc_cb(object())  # type: ignore[operator]
-    app.destroy.assert_called()
+    app._on_close.assert_called_once()
+    app.destroy.assert_not_called()
 
     # wrap sync after(0)
     assert app.after_calls and app.after_calls[0][0] == 0

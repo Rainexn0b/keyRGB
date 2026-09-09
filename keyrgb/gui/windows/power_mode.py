@@ -14,6 +14,7 @@ from keyrgb.gui.theme import metrics as theme_metrics
 from keyrgb.gui.utils.tk_async import TkAsyncCoordinator, submit_gui_work
 from keyrgb.gui.utils.window_geometry import compute_centered_window_geometry
 from keyrgb.gui.utils.window_icon import apply_keyrgb_window_icon
+from keyrgb.gui.utils.window_state import WindowGeometryTracker
 
 DEFAULT_EXTREME_SAVER_CAP_KHZ = _power_system.DEFAULT_EXTREME_SAVER_CAP_KHZ
 MAX_EXTREME_SAVER_CAP_KHZ = _power_system.MAX_EXTREME_SAVER_CAP_KHZ
@@ -118,6 +119,8 @@ def _format_live_freq_text() -> str:
 
 
 class PowerModeSettingsGUI:
+    _geometry_restored = False
+
     def __init__(self) -> None:
         self.root = tk.Tk()
         self.tk_jobs = TkAsyncCoordinator()
@@ -136,8 +139,19 @@ class PowerModeSettingsGUI:
         self._live_freq_var = tk.StringVar(value=_format_live_freq_text())
 
         self._build_ui()
-        self._apply_geometry()
-        self.root.after(50, self._apply_geometry)
+        # UX-06: restore persisted geometry before the centered fallback
+        # passes. When restoration wins, both centered passes are suppressed;
+        # otherwise the exact previous fallback behavior runs. Tracking starts
+        # just after the last initial programmatic pass.
+        self._geometry_tracker = WindowGeometryTracker(self.root, "power-mode", 700, 460, 0.95)
+        self._geometry_restored = bool(self._geometry_tracker.restore())
+        if not self._geometry_restored:
+            self._apply_geometry()
+            self.root.after(50, self._apply_geometry)
+        self.root.after(60, self._geometry_tracker.start_tracking)
+        protocol = getattr(self.root, "protocol", None)
+        if callable(protocol):
+            protocol("WM_DELETE_WINDOW", self._close)
         self.root.after(_LIVE_PREVIEW_INTERVAL_MS, self._refresh_live_freq_preview)
 
     def _configured_cap_khz(self) -> int:
@@ -152,6 +166,8 @@ class PowerModeSettingsGUI:
         return normalize_extreme_saver_cap_khz(round(float(self._cap_var.get())) * 1000)
 
     def _apply_geometry(self) -> None:
+        if bool(vars(self).get("_geometry_restored", False)):
+            return
         try:
             self.root.update_idletasks()
             geometry = compute_centered_window_geometry(
@@ -228,10 +244,19 @@ class PowerModeSettingsGUI:
 
     def _close(self) -> None:
         try:
-            self.tk_jobs.cancel()
-        except AttributeError:
-            pass
-        self.root.destroy()
+            self._save_geometry_now()
+        finally:
+            try:
+                self.tk_jobs.cancel()
+            except AttributeError:
+                pass
+            self.root.destroy()
+
+    def _save_geometry_now(self) -> None:
+        tracker = vars(self).get("_geometry_tracker")
+        save_now = getattr(tracker, "save_now", None)
+        if callable(save_now):
+            save_now()
 
     def _build_ui(self) -> None:
         self._main_frame = ttk.Frame(self.root, padding=theme_metrics.OUTER_PADDING)

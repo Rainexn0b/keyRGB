@@ -16,19 +16,37 @@ from .tk_async import TkAsyncCoordinator, TkAsyncJob, run_in_thread, submit_gui_
 from .window_centering import center_window_on_screen
 from .window_geometry import compute_centered_window_geometry
 from .window_icon import apply_keyrgb_window_icon, find_keyrgb_logo_path
+from .window_state import (
+    WindowGeometry,
+    WindowGeometryTracker,
+    geometry_string,
+    load_window_geometry,
+    prepare_restored_geometry,
+    save_window_geometry,
+    ui_state_lock_path,
+    ui_state_path,
+)
 
 __all__ = [
     "KeyDrawStyle",
     "TkAsyncCoordinator",
     "TkAsyncJob",
+    "WindowGeometry",
+    "WindowGeometryTracker",
     "apply_keyrgb_window_icon",
     "center_window_on_screen",
     "compute_centered_window_geometry",
     "find_keyrgb_logo_path",
+    "geometry_string",
     "key_draw_style",
     "load_backdrop_image",
+    "load_window_geometry",
+    "prepare_restored_geometry",
     "reset_backdrop_image",
     "run_in_thread",
     "save_backdrop_image",
+    "save_window_geometry",
     "submit_gui_work",
+    "ui_state_lock_path",
+    "ui_state_path",
 ]

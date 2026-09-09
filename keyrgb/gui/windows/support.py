@@ -7,6 +7,8 @@ import webbrowser
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 from typing import TYPE_CHECKING
 
+from keyrgb.gui.utils.window_state import WindowGeometryTracker
+
 from ._support import (
     _support_window_actions as support_actions,
     _support_window_geometry,
@@ -54,6 +56,7 @@ _GEOMETRY_APPLY_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, 
 
 
 class SupportToolsGUI(support_session_bridge.SupportWindowSessionBridgeMixin):
+    _geometry_restored = False
     _main_frame: _WidgetProtocol
     _wrap_targets: list[WrapTarget]
     status_label: _WidgetProtocol
@@ -97,7 +100,20 @@ class SupportToolsGUI(support_session_bridge.SupportWindowSessionBridgeMixin):
             scrolledtext=scrolledtext,
             center_window_on_screen=center_window_on_screen,
         )
-        self.root.after(50, self._apply_geometry)
+        # UX-06: restore persisted geometry at the initial geometry pass. The
+        # helper above always performs its immediate position-only centering;
+        # restore() re-applies the saved size/position over it. When
+        # restoration wins, the delayed centered pass is suppressed; otherwise
+        # the exact previous fallback behavior runs. Tracking starts just
+        # after the last initial programmatic pass. Dialogs are not persisted.
+        self._geometry_tracker = WindowGeometryTracker(self.root, "support", 960, 720, 0.95)
+        self._geometry_restored = bool(self._geometry_tracker.restore())
+        if not self._geometry_restored:
+            self.root.after(50, self._apply_geometry)
+        self.root.after(60, self._geometry_tracker.start_tracking)
+        protocol = getattr(self.root, "protocol", None)
+        if callable(protocol):
+            protocol("WM_DELETE_WINDOW", self._on_close)
 
         self._sync_button_state()
 
@@ -106,6 +122,8 @@ class SupportToolsGUI(support_session_bridge.SupportWindowSessionBridgeMixin):
         return support_window_state.SupportSessionState
 
     def _apply_geometry(self) -> None:
+        if bool(vars(self).get("_geometry_restored", False)):
+            return
         _support_window_geometry.apply_window_geometry(
             root=self.root,
             main_frame=self._main_frame,
@@ -178,6 +196,18 @@ class SupportToolsGUI(support_session_bridge.SupportWindowSessionBridgeMixin):
 
     def _set_status(self, text: str, *, ok: bool = True) -> None:
         set_status(self, text, ok=ok)
+
+    def _on_close(self) -> None:
+        try:
+            self._save_geometry_now()
+        finally:
+            self.root.destroy()
+
+    def _save_geometry_now(self) -> None:
+        tracker = vars(self).get("_geometry_tracker")
+        save_now = getattr(tracker, "save_now", None)
+        if callable(save_now):
+            save_now()
 
     @staticmethod
     def _set_text(widget: object, text: str) -> None:

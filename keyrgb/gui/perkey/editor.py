@@ -29,6 +29,7 @@ from .ui.wheel_apply import _WheelApplyEditorProtocol
 if TYPE_CHECKING:
     from keyrgb.core.backends.base import KeyboardDevice
     from keyrgb.core.config import Config
+    from keyrgb.gui.utils.window_state import WindowGeometryTracker
     from keyrgb.gui.widgets.color_wheel import ColorWheel
 
     from .commit_pipeline import PerKeyCommitPipeline
@@ -86,6 +87,7 @@ class PerKeyEditor:
     selected_slot_id: str | None
     has_lightbar_device: bool
     backdrop_transparency: object
+    _window_geometry_tracker: WindowGeometryTracker | None = None
 
     def __init__(self):
         from keyrgb.core.config import Config
@@ -184,22 +186,35 @@ class PerKeyEditor:
             return
         if not allowed:
             return
-        kb = getattr(self, "kb", None)
-        self.kb = None
-        close = getattr(kb, "close", None)
-        if callable(close):
-            try:
-                close()
-            except _HARDWARE_CLOSE_ERRORS as exc:
-                _log_boundary_exception(
-                    "perkey.editor.hardware_close",
-                    "Failed to close per-key editor hardware",
-                    exc,
-                )
-        hardware.release_hardware_control()
-        destroy = getattr(self.root, "destroy", None)
-        if callable(destroy):
-            destroy()
+        tracker = vars(self).get("_window_geometry_tracker")
+        save_now = getattr(tracker, "save_now", None)
+        try:
+            if callable(save_now):
+                try:
+                    save_now()
+                except _HARDWARE_CLOSE_ERRORS + _TK_CALL_ERRORS as exc:
+                    _log_boundary_exception(
+                        "perkey.editor.geometry_save",
+                        "Failed to save per-key editor window geometry",
+                        exc,
+                    )
+        finally:
+            kb = getattr(self, "kb", None)
+            self.kb = None
+            close = getattr(kb, "close", None)
+            if callable(close):
+                try:
+                    close()
+                except _HARDWARE_CLOSE_ERRORS as exc:
+                    _log_boundary_exception(
+                        "perkey.editor.hardware_close",
+                        "Failed to close per-key editor hardware",
+                        exc,
+                    )
+            hardware.release_hardware_control()
+            destroy = getattr(self.root, "destroy", None)
+            if callable(destroy):
+                destroy()
 
     def _mark_saved_snapshot(self) -> None:
         dirty_state.mark_saved(self)

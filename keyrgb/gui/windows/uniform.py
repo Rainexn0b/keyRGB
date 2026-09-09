@@ -17,6 +17,7 @@ from keyrgb.gui.theme.focus import schedule_initial_focus
 from keyrgb.gui.utils.tk_async import TkAsyncCoordinator, submit_gui_work
 from keyrgb.gui.utils.window_geometry import compute_centered_window_geometry
 from keyrgb.gui.utils.window_icon import apply_keyrgb_window_icon
+from keyrgb.gui.utils.window_state import WindowGeometryTracker
 from keyrgb.gui.widgets.color_wheel import ColorWheel
 from keyrgb.gui.windows import (
     _uniform_color_bootstrap as uniform_color_bootstrap,
@@ -79,6 +80,7 @@ class UniformColorGUI:
     """Simple GUI for selecting a uniform keyboard color."""
 
     _secondary_route: SecondaryDeviceRoute | None = None
+    _geometry_restored = False
     _main_frame: ttk.Frame
     status_label: _UniformStatusLabel
     _apply_button: ttk.Button
@@ -135,8 +137,25 @@ class UniformColorGUI:
         )
         self._schedule_initial_focus()
 
-        self._apply_geometry()
-        self.root.after(50, self._apply_geometry)
+        # UX-06: restore the route-scoped geometry before the centered
+        # fallback passes. When restoration wins, both centered passes are
+        # suppressed; otherwise the exact previous fallback behavior runs.
+        # Tracking starts just after the last initial programmatic pass.
+        self._geometry_tracker = WindowGeometryTracker(
+            self.root,
+            uniform_instance_identity(
+                target_context=self.target_context,
+                requested_backend=self.requested_backend,
+            ),
+            460,
+            520,
+            0.95,
+        )
+        self._geometry_restored = bool(self._geometry_tracker.restore())
+        if not self._geometry_restored:
+            self._apply_geometry()
+            self.root.after(50, self._apply_geometry)
+        self.root.after(60, self._geometry_tracker.start_tracking)
 
         uniform_color_state.initialize_drag_state(self, drag_commit_interval=0.06)
         protocol = getattr(self.root, "protocol", None)
@@ -154,6 +173,8 @@ class UniformColorGUI:
         schedule_initial_focus(self.root, target)
 
     def _apply_geometry(self) -> None:
+        if bool(vars(self).get("_geometry_restored", False)):
+            return
         try:
             self.root.update_idletasks()
             geometry = compute_centered_window_geometry(
@@ -276,27 +297,36 @@ class UniformColorGUI:
         self._commit_color_to_config(r, g, b)
         self._schedule_color_apply(r, g, b, brightness)
 
+    def _save_geometry_now(self) -> None:
+        tracker = vars(self).get("_geometry_tracker")
+        save_now = getattr(tracker, "save_now", None)
+        if callable(save_now):
+            save_now()
+
     def _on_close(self):
         try:
-            self.tk_jobs.cancel()
-        except AttributeError:
-            pass
-        device = getattr(self, "kb", None)
-        self.kb = None
-        close = getattr(device, "close", None)
-        if callable(close):
+            self._save_geometry_now()
+        finally:
             try:
-                close()
-            except _DEVICE_CLOSE_ERRORS:
-                logger.debug("Failed to close uniform color device", exc_info=True)
-        try:
-            owns_hardware_lock = bool(self._owns_hardware_lock)
-        except AttributeError:
-            owns_hardware_lock = False
-        if owns_hardware_lock:
-            release_hardware_control_lock()
-            self._owns_hardware_lock = False
-        self.root.destroy()
+                self.tk_jobs.cancel()
+            except AttributeError:
+                pass
+            device = getattr(self, "kb", None)
+            self.kb = None
+            close = getattr(device, "close", None)
+            if callable(close):
+                try:
+                    close()
+                except _DEVICE_CLOSE_ERRORS:
+                    logger.debug("Failed to close uniform color device", exc_info=True)
+            try:
+                owns_hardware_lock = bool(self._owns_hardware_lock)
+            except AttributeError:
+                owns_hardware_lock = False
+            if owns_hardware_lock:
+                release_hardware_control_lock()
+                self._owns_hardware_lock = False
+            self.root.destroy()
 
     def run(self):
         self.root.mainloop()

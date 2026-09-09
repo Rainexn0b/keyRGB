@@ -1,14 +1,21 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Sequence
 from typing import Protocol, cast
 
 from keyrgb.core.backends.base import KeyboardDevice
 from keyrgb.core.config import Config
+from keyrgb.gui.utils.window_state import WindowGeometryTracker
 
 from ..commit_pipeline import PerKeyCommitPipeline
 from ..profile_management import KeyCells, Keymap, PerKeyColors
 from . import dirty_state
+
+PERKEY_WINDOW_ID = "perkey"
+PERKEY_SCREEN_RATIO_CAP = 0.92
+
+logger = logging.getLogger(__name__)
 
 LayoutTweaks = dict[str, float]
 PerKeyLayoutTweaks = dict[str, dict[str, float]]
@@ -29,9 +36,31 @@ class _TkRootProtocol(Protocol):
 
     def after(self, delay_ms: int, callback: Callable[..., object]) -> object: ...
 
-    def bind(self, sequence: str, func: Callable[..., object]) -> object: ...
+    def after_cancel(self, after_id: object) -> None: ...
+
+    def bind(self, sequence: str, func: Callable[..., object], add: object = ...) -> object: ...
 
     def protocol(self, name: str, func: Callable[..., object]) -> object: ...
+
+    def winfo_screenwidth(self) -> int: ...
+
+    def winfo_screenheight(self) -> int: ...
+
+    def winfo_width(self) -> int: ...
+
+    def winfo_height(self) -> int: ...
+
+    def winfo_x(self) -> int: ...
+
+    def winfo_y(self) -> int: ...
+
+    def winfo_reqwidth(self) -> int: ...
+
+    def winfo_reqheight(self) -> int: ...
+
+    def geometry(self, value: str) -> None: ...
+
+    def minsize(self, width: int, height: int) -> None: ...
 
 
 class _TkModuleProtocol(Protocol):
@@ -175,16 +204,26 @@ def initialize_editor(
         wheel_size=editor._wheel_size,
     )
 
-    apply_perkey_editor_geometry(
+    geometry_tracker = WindowGeometryTracker(
         editor.root,
-        num_rows=num_rows,
-        num_cols=num_cols,
-        key_margin=editor._key_margin,
-        key_size=editor._key_size,
-        key_gap=editor._key_gap,
-        right_panel_width=editor._right_panel_width,
-        wheel_size=editor._wheel_size,
+        PERKEY_WINDOW_ID,
+        min_content_width,
+        min_content_height,
+        screen_ratio_cap=PERKEY_SCREEN_RATIO_CAP,
     )
+    vars(editor)["_window_geometry_tracker"] = geometry_tracker
+    restored_geometry = bool(geometry_tracker.restore())
+    if not restored_geometry:
+        apply_perkey_editor_geometry(
+            editor.root,
+            num_rows=num_rows,
+            num_cols=num_cols,
+            key_margin=editor._key_margin,
+            key_size=editor._key_size,
+            key_gap=editor._key_gap,
+            right_panel_width=editor._right_panel_width,
+            wheel_size=editor._wheel_size,
+        )
 
     # Widget styling (frames, labelframes, radios, entries, comboboxes,
     # checkbuttons, and focus/disabled maps) is owned centrally by
@@ -258,19 +297,37 @@ def initialize_editor(
     if callable(protocol):
         protocol("WM_DELETE_WINDOW", editor._on_close)
     dirty_state.mark_saved(editor)
-    fit_perkey_editor_geometry_to_content(
-        editor.root,
-        min_content_width_px=min_content_width,
-        min_content_height_px=min_content_height,
-    )
-    editor.root.after(
-        50,
-        lambda: fit_perkey_editor_geometry_to_content(
+    if restored_geometry:
+        # Theme/font layout can require more space than the pre-widget grid
+        # estimate. Grow the resize floor after UI construction without
+        # recentering or shrinking the restored window.
+        try:
+            editor.root.update_idletasks()
+            screen_w = int(editor.root.winfo_screenwidth())
+            screen_h = int(editor.root.winfo_screenheight())
+            requested_width = max(int(min_content_width), int(editor.root.winfo_reqwidth()))
+            requested_height = max(int(min_content_height), int(editor.root.winfo_reqheight()))
+            editor.root.minsize(
+                min(requested_width, int(screen_w * PERKEY_SCREEN_RATIO_CAP)),
+                min(requested_height, int(screen_h * PERKEY_SCREEN_RATIO_CAP)),
+            )
+        except Exception as exc:  # noqa: BLE001  # @quality-exception exception-transparency: Tk/WM boundary is duck-typed here so TclError cannot be named; the restored size is kept when the floor cannot be re-asserted
+            logger.debug("Per-key editor keeps restored geometry without a resize floor: %s", exc)
+    else:
+        fit_perkey_editor_geometry_to_content(
             editor.root,
             min_content_width_px=min_content_width,
             min_content_height_px=min_content_height,
-        ),
-    )
+        )
+        editor.root.after(
+            50,
+            lambda: fit_perkey_editor_geometry_to_content(
+                editor.root,
+                min_content_width_px=min_content_width,
+                min_content_height_px=min_content_height,
+            ),
+        )
+    editor.root.after(60, geometry_tracker.start_tracking)
     editor.canvas.redraw()
 
     if not editor.keymap:

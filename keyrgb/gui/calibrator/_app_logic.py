@@ -115,9 +115,22 @@ def restore_original_config(app: _CalibratorAppLike) -> None:
     app.preview.restore()
 
 
+def _save_window_geometry_now(app: _CalibratorAppLike) -> None:
+    """Persist window geometry synchronously before close teardown (best effort)."""
+    tracker = vars(app).get("_window_geometry_tracker")
+    save_now = getattr(tracker, "save_now", None)
+    if callable(save_now):
+        save_now()
+
+
 def on_close(app: _CalibratorAppLike) -> None:
-    app._restore_original_config()
-    app.destroy()
+    try:
+        _save_window_geometry_now(app)
+    finally:
+        try:
+            app._restore_original_config()
+        finally:
+            app.destroy()
 
 
 def apply_current_probe(app: _CalibratorAppLike) -> None:
@@ -232,8 +245,13 @@ def save_current_keymap(
 
 def save_and_close(app: _CalibratorAppLike) -> None:
     app._save()
-    app._restore_original_config()
-    app.destroy()
+    try:
+        _save_window_geometry_now(app)
+    finally:
+        try:
+            app._restore_original_config()
+        finally:
+            app.destroy()
 
 
 def redraw(

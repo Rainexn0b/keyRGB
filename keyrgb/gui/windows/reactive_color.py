@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, cast
 
 from keyrgb.gui.theme import metrics as theme_metrics
 from keyrgb.gui.theme.focus import schedule_initial_focus
+from keyrgb.gui.utils.window_state import WindowGeometryTracker
 from keyrgb.gui.windows import (
     _reactive_color_geometry,
     _reactive_color_init_adapter,
@@ -52,6 +53,7 @@ select_backend = _init_adapter.select_backend
 
 class ReactiveColorGUI:
     _settings_adapter: ReactiveColorSettingsAdapter | None = None
+    _geometry_restored = False
     root: tk.Tk
     config: ConfigType
     _main_frame: ttk.Frame
@@ -121,8 +123,16 @@ class ReactiveColorGUI:
 
         self._schedule_initial_focus()
 
-        self._apply_geometry()
-        self.root.after(50, self._apply_geometry)
+        # UX-06: restore persisted geometry before the centered fallback
+        # passes. When restoration wins, both centered passes are suppressed;
+        # otherwise the exact previous fallback behavior runs. Tracking starts
+        # just after the last initial programmatic pass.
+        self._geometry_tracker = WindowGeometryTracker(self.root, "reactive-color", 520, 720, 0.95)
+        self._geometry_restored = bool(self._geometry_tracker.restore())
+        if not self._geometry_restored:
+            self._apply_geometry()
+            self.root.after(50, self._apply_geometry)
+        self.root.after(60, self._geometry_tracker.start_tracking)
 
         reactive_color_bootstrap.install_lifecycle_bindings(
             self,
@@ -162,6 +172,8 @@ class ReactiveColorGUI:
         schedule_initial_focus(self.root, target)
 
     def _apply_geometry(self) -> None:
+        if bool(vars(self).get("_geometry_restored", False)):
+            return
         _geometry.apply_centered_geometry(
             self.root,
             self._main_frame,
@@ -270,7 +282,16 @@ class ReactiveColorGUI:
         )
 
     def _on_close(self):
-        self.root.destroy()
+        try:
+            self._save_geometry_now()
+        finally:
+            self.root.destroy()
+
+    def _save_geometry_now(self) -> None:
+        tracker = vars(self).get("_geometry_tracker")
+        save_now = getattr(tracker, "save_now", None)
+        if callable(save_now):
+            save_now()
 
     def run(self):
         self.root.mainloop()

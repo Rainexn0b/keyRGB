@@ -1,6 +1,32 @@
 from __future__ import annotations
 
+import pytest
+
 import keyrgb.gui.calibrator._app_bootstrap as calibrator_bootstrap
+
+
+class _NoRestoreTracker:
+    """Keep legacy geometry tests on the exact fallback path.
+
+    The real ``WindowGeometryTracker.restore`` reads the developer's
+    on-disk UI state; force the deterministic no-restore fallback here.
+    UX-06 restore behavior is covered in
+    ``test_calibrator_window_state_unit.py``.
+    """
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        pass
+
+    def restore(self) -> bool:
+        return False
+
+    def start_tracking(self) -> None:
+        pass
+
+
+@pytest.fixture(autouse=True)
+def _force_fallback_geometry(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(calibrator_bootstrap, "WindowGeometryTracker", _NoRestoreTracker)
 
 
 class _FakeApp:

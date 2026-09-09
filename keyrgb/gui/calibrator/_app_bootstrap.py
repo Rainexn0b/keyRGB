@@ -7,6 +7,12 @@ from typing import Any, Protocol, TypeAlias, cast
 from keyrgb.gui.theme import metrics as theme_metrics
 from keyrgb.gui.theme.focus import schedule_initial_focus
 from keyrgb.gui.utils.window_geometry import compute_centered_window_geometry
+from keyrgb.gui.utils.window_state import WindowGeometryTracker
+
+CALIBRATOR_WINDOW_ID = "calibrator"
+CALIBRATOR_MIN_WIDTH_PX = 1100
+CALIBRATOR_MIN_HEIGHT_PX = 650
+CALIBRATOR_SCREEN_RATIO_CAP = 0.95
 
 BindCallback: TypeAlias = Callable[[_tk.Event], None]
 AfterCallback: TypeAlias = Callable[[], None]
@@ -98,6 +104,8 @@ class _BuildWidgetsAppProtocol(Protocol):
     def _save(self) -> None: ...
 
     def _save_and_close(self) -> None: ...
+
+    def _on_close(self) -> None: ...
 
 
 class _WindowGeometryAppProtocol(Protocol):
@@ -241,14 +249,14 @@ def build_widgets(
     def _prev_from_event(_event: _tk.Event) -> None:
         app._prev()
 
-    def _destroy_from_event(_event: _tk.Event) -> None:
-        window.destroy()
+    def _close_from_event(_event: _tk.Event) -> None:
+        app._on_close()
 
     window.bind("<Return>", _assign_from_event)
     window.bind("<KP_Enter>", _assign_from_event)
     window.bind("<Right>", _next_from_event)
     window.bind("<Left>", _prev_from_event)
-    window.bind("<Escape>", _destroy_from_event)
+    window.bind("<Escape>", _close_from_event)
 
     # Intentional non-forcing initial focus: Assign is always present and
     # enabled, and matches the core probe loop (Step 3). The helper schedules
@@ -256,14 +264,37 @@ def build_widgets(
     schedule_initial_focus(cast(Any, window), cast(Any, assign_btn))
 
 
-def apply_window_geometry(app: _WindowGeometryAppProtocol) -> None:
+def apply_window_geometry(app: _WindowGeometryAppProtocol) -> bool:
+    """Apply the initial calibrator geometry.
+
+    Returns ``True`` when a stored geometry was restored (the centered
+    fallback is skipped so it cannot overwrite it); the resize floor is
+    still re-asserted in that case. Returns ``False`` when the exact
+    legacy centered fallback was applied.
+    """
     app.update_idletasks()
     screen_width = int(app.winfo_screenwidth())
     screen_height = int(app.winfo_screenheight())
-    max_width = int(screen_width * 0.95)
-    max_height = int(screen_height * 0.95)
+    max_width = int(screen_width * CALIBRATOR_SCREEN_RATIO_CAP)
+    max_height = int(screen_height * CALIBRATOR_SCREEN_RATIO_CAP)
     requested_width = int(app.winfo_reqwidth())
     requested_height = int(app.winfo_reqheight())
+    min_width = min(max(requested_width, CALIBRATOR_MIN_WIDTH_PX), max_width)
+    min_height = min(max(requested_height + 32, CALIBRATOR_MIN_HEIGHT_PX), max_height)
+
+    tracker = WindowGeometryTracker(
+        app,
+        CALIBRATOR_WINDOW_ID,
+        min_width,
+        min_height,
+        screen_ratio_cap=CALIBRATOR_SCREEN_RATIO_CAP,
+    )
+    vars(app)["_window_geometry_tracker"] = tracker
+    if tracker.restore():
+        # The tracker clamps restored size to the content-derived resize floor;
+        # re-assert that floor without moving the restored window.
+        app.minsize(min_width, min_height)
+        return True
 
     app.geometry(
         compute_centered_window_geometry(
@@ -274,10 +305,11 @@ def apply_window_geometry(app: _WindowGeometryAppProtocol) -> None:
             chrome_padding_px=32,
             default_w=1400,
             default_h=860,
-            screen_ratio_cap=0.95,
+            screen_ratio_cap=CALIBRATOR_SCREEN_RATIO_CAP,
         )
     )
-    app.minsize(min(max(requested_width, 1100), max_width), min(max(requested_height + 32, 650), max_height))
+    app.minsize(min_width, min_height)
+    return False
 
 
 def finish_init(app: _FinishInitAppProtocol, *, tk_runtime_errors: tuple[type[BaseException], ...]) -> None:
@@ -290,5 +322,11 @@ def finish_init(app: _FinishInitAppProtocol, *, tk_runtime_errors: tuple[type[Ba
             app.lift()
         except tk_runtime_errors:
             pass
+        # Start <Configure> persistence only after the withdraw/deiconify
+        # startup callbacks so restored geometry cannot be overwritten.
+        tracker = vars(app).get("_window_geometry_tracker")
+        start_tracking = getattr(tracker, "start_tracking", None)
+        if callable(start_tracking):
+            app.after(50, start_tracking)
 
     app.after(0, _finish)

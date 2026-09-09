@@ -72,6 +72,30 @@ class _Config:
         self.battery_perkey_profile_name = ""
 
 
+class _NoRestoreTracker:
+    """Keep legacy bootstrap tests on the exact fallback path.
+
+    The real ``WindowGeometryTracker.restore`` reads the developer's
+    on-disk UI state; force the deterministic no-restore fallback here.
+    UX-06 restore behavior is covered in
+    ``tests/gui/perkey/editor/window/test_perkey_window_state_unit.py``.
+    """
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        pass
+
+    def restore(self) -> bool:
+        return False
+
+    def start_tracking(self) -> None:
+        pass
+
+
+@pytest.fixture(autouse=True)
+def _force_fallback_geometry(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(bootstrap, "WindowGeometryTracker", _NoRestoreTracker)
+
+
 def test_initialize_editor_wires_state_ui_and_initial_selection(monkeypatch: pytest.MonkeyPatch) -> None:
     marked: list[object] = []
     monkeypatch.setattr(bootstrap.dirty_state, "mark_saved", lambda editor: marked.append(editor))

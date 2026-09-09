@@ -22,7 +22,7 @@ from typing import TypeAlias
 from keyrgb.core import config as core_config
 from keyrgb.gui import theme as gui_theme
 from keyrgb.gui.theme import metrics as theme_metrics
-from keyrgb.gui.utils import tk_async, window_geometry, window_icon
+from keyrgb.gui.utils import tk_async, window_geometry, window_icon, window_state
 
 from . import (
     _settings_window_constants as _swc,
@@ -57,6 +57,7 @@ apply_keyrgb_window_icon = window_icon.apply_keyrgb_window_icon
 load_settings_values = settings_state.load_settings_values
 SettingsValues: TypeAlias = settings_state.SettingsValues
 compute_centered_window_geometry = window_geometry.compute_centered_window_geometry
+WindowGeometryTracker = window_state.WindowGeometryTracker
 schedule_initial_focus = gui_theme.schedule_initial_focus
 build_settings_navigation = settings_navigation.build_navigation
 DEFAULT_SETTINGS_CATEGORY_ID = settings_navigation.DEFAULT_CATEGORY_ID
@@ -71,6 +72,12 @@ _SETTINGS_MIN_WIDTH = _swc.SETTINGS_MIN_WIDTH
 _SETTINGS_MIN_HEIGHT = _swc.SETTINGS_MIN_HEIGHT
 _SETTINGS_DEFAULT_WIDTH = _swc.SETTINGS_DEFAULT_WIDTH
 _SETTINGS_DEFAULT_HEIGHT = _swc.SETTINGS_DEFAULT_HEIGHT
+# UX-06: persisted-geometry identity, screen cap (mirrors the fallback
+# centering cap below), and deferred tracking delay (later than the final
+# 350ms initial pass so startup geometry is never written back).
+_SETTINGS_GEOMETRY_WINDOW_ID = "settings"
+_SETTINGS_SCREEN_RATIO_CAP = 0.95
+_SETTINGS_GEOMETRY_TRACK_DELAY_MS = 400
 
 _FOOTER_HARDWARE_PROBE_ERRORS = (AttributeError, ImportError, OSError, RuntimeError, TypeError, ValueError)
 _FOOTER_HARDWARE_HINT_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
@@ -81,12 +88,24 @@ _OS_AUTOSTART_WRITE_ERRORS = (OSError, RuntimeError)
 
 
 class PowerSettingsGUI:
+    _geometry_restored = False
+
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("KeyRGB - Settings")
         apply_keyrgb_window_icon(self.root)
         self.root.minsize(_SETTINGS_MIN_WIDTH, _SETTINGS_MIN_HEIGHT)
         self.root.resizable(True, True)
+        self._geometry_tracker = WindowGeometryTracker(
+            self.root,
+            _SETTINGS_GEOMETRY_WINDOW_ID,
+            _SETTINGS_MIN_WIDTH,
+            _SETTINGS_MIN_HEIGHT,
+            _SETTINGS_SCREEN_RATIO_CAP,
+        )
+        # Route the window-manager close button through the same orderly
+        # close path as the Close button so geometry is saved first.
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
         bg_color, _fg_color = apply_clam_theme(self.root)
 
@@ -293,14 +312,21 @@ class PowerSettingsGUI:
         for scroll in self.scroll_areas.values():
             scroll.bind_mousewheel(self.root)
 
-        # Map at the default size immediately: if the first paint runs with a
-        # narrow page, the dynamic wrap sync temporarily wraps the
-        # description labels into many extra lines, which inflates the
-        # measured content height (and thus the computed window height).
-        try:
-            self.root.geometry(f"{_SETTINGS_DEFAULT_WIDTH}x{_SETTINGS_DEFAULT_HEIGHT}")
-        except _SCROLLREGION_CONFIGURE_ERRORS:
-            pass
+        # Restore the persisted geometry before any initial programmatic
+        # pass. When restoration succeeds the fallback centering passes are
+        # suppressed entirely so the saved size/position wins.
+        restored = bool(self._geometry_tracker.restore())
+        self._geometry_restored = restored
+
+        if not restored:
+            # Map at the default size immediately: if the first paint runs with a
+            # narrow page, the dynamic wrap sync temporarily wraps the
+            # description labels into many extra lines, which inflates the
+            # measured content height (and thus the computed window height).
+            try:
+                self.root.geometry(f"{_SETTINGS_DEFAULT_WIDTH}x{_SETTINGS_DEFAULT_HEIGHT}")
+            except _SCROLLREGION_CONFIGURE_ERRORS:
+                pass
 
         # Initial geometry is applied via _apply_geometry after a short delay
         # to ensure it overrides any window manager restoration/defaults.
@@ -315,12 +341,16 @@ class PowerSettingsGUI:
         for scroll in self.scroll_areas.values():
             scroll.finalize_initial_scrollbar_state()
 
-        # Defer geometry application to ensure it overrides any WM defaults.
-        self.root.after(50, self._apply_geometry)
-        # Second pass after async content (wrap syncs, version check, footer
-        # hardware hint) settles, trimming any transient height over-estimate
-        # so the window hugs the actual page content.
-        self.root.after(350, self._apply_geometry)
+        if not restored:
+            # Defer geometry application to ensure it overrides any WM defaults.
+            self.root.after(50, self._apply_geometry)
+            # Second pass after async content (wrap syncs, version check, footer
+            # hardware hint) settles, trimming any transient height over-estimate
+            # so the window hugs the actual page content.
+            self.root.after(350, self._apply_geometry)
+        # Start Configure tracking only after the final initial programmatic
+        # pass (later than 350ms) so startup geometry is never written back.
+        self.root.after(_SETTINGS_GEOMETRY_TRACK_DELAY_MS, self._geometry_tracker.start_tracking)
 
     def _apply_geometry(self) -> None:
         self.root.update_idletasks()
@@ -336,7 +366,7 @@ class PowerSettingsGUI:
             chrome_padding_px=40,
             default_w=_SETTINGS_DEFAULT_WIDTH,
             default_h=_SETTINGS_DEFAULT_HEIGHT,
-            screen_ratio_cap=0.95,
+            screen_ratio_cap=_SETTINGS_SCREEN_RATIO_CAP,
         )
         self.root.geometry(geometry)
 
@@ -409,7 +439,14 @@ class PowerSettingsGUI:
         self.root.after(1500, lambda: self.status.configure(text=""))
 
     def _on_close(self) -> None:
-        self.root.destroy()
+        # Persist the latest geometry synchronously without allowing an
+        # unexpected storage failure to skip window teardown.
+        tracker = vars(self).get("_geometry_tracker")
+        try:
+            if tracker is not None:
+                tracker.save_now()
+        finally:
+            self.root.destroy()
 
     def run(self) -> None:
         self.root.mainloop()

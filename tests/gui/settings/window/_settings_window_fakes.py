@@ -61,6 +61,8 @@ class _FakeRoot:
         self.resizable_calls: list[tuple[bool, bool]] = []
         self.after_calls: list[tuple[int, object]] = []
         self.geometry_calls: list[str] = []
+        self.protocol_calls: list[tuple[str, object]] = []
+        self.bind_calls: list[tuple[str, object, object | None]] = []
         self.update_calls = 0
         self.mainloop_calls = 0
         self.destroy_calls = 0
@@ -78,6 +80,12 @@ class _FakeRoot:
     def after(self, delay: int, callback) -> None:
         self.after_calls.append((delay, callback))
 
+    def protocol(self, name: str, callback) -> None:
+        self.protocol_calls.append((name, callback))
+
+    def bind(self, sequence: str, callback, add=None) -> None:
+        self.bind_calls.append((sequence, callback, add))
+
     def focus_get(self) -> object:
         return self._focused
 
@@ -92,6 +100,46 @@ class _FakeRoot:
 
     def destroy(self) -> None:
         self.destroy_calls += 1
+
+
+class _FakeGeometryTracker:
+    """Scriptable stand-in for WindowGeometryTracker (wiring tests only)."""
+
+    def __init__(
+        self,
+        root,
+        window_id: str,
+        min_width: int,
+        min_height: int,
+        screen_ratio_cap: float = 0.95,
+        *,
+        restore_result: bool = False,
+        events: list[str] | None = None,
+    ) -> None:
+        self.root = root
+        self.window_id = window_id
+        self.min_width = min_width
+        self.min_height = min_height
+        self.screen_ratio_cap = screen_ratio_cap
+        self.restore_result = restore_result
+        self.events = events if events is not None else []
+        self.restore_calls = 0
+        self.start_tracking_calls = 0
+        self.save_now_calls = 0
+
+    def restore(self) -> bool:
+        self.restore_calls += 1
+        self.events.append("restore")
+        return self.restore_result
+
+    def start_tracking(self) -> None:
+        self.start_tracking_calls += 1
+        self.events.append("start_tracking")
+
+    def save_now(self) -> bool:
+        self.save_now_calls += 1
+        self.events.append("save_now")
+        return True
 
 
 class _FakeBottomBarPanel:

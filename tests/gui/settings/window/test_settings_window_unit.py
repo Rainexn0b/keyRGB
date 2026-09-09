@@ -10,6 +10,7 @@ import keyrgb.gui.settings.window as settings_window
 from keyrgb.gui.theme import metrics as theme_metrics
 from tests.gui.settings.window._settings_window_fakes import (
     _FakeBottomBarPanel,
+    _FakeGeometryTracker,
     _FakePanel,
     _FakeRoot,
     _FakeScrollArea,
@@ -58,6 +59,9 @@ def test_init_sets_up_root_and_calls_init_steps(monkeypatch: pytest.MonkeyPatch)
     assert root.title_calls == ["KeyRGB - Settings"]
     assert root.minsize_calls == [(680, 560)]
     assert root.resizable_calls == [(True, True)]
+    # The window-manager close button shares the orderly close path so the
+    # persisted geometry is saved before destruction.
+    assert root.protocol_calls == [("WM_DELETE_WINDOW", gui._on_close)]
     assert calls == [
         ("icon", (root,), {}),
         ("theme", (root,), {}),
@@ -420,6 +424,7 @@ def test_init_vars_uses_canonical_night_start_fallback_when_empty(monkeypatch: p
 def test_finalize_layout_applies_state_scroll_and_geometry(monkeypatch: pytest.MonkeyPatch) -> None:
     gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
     gui.root = _FakeRoot()
+    gui._geometry_tracker = _FakeGeometryTracker(gui.root, "settings", 680, 560, 0.95)
     area_lighting = _FakeScrollArea(None, bg_color="#000", padding=10)
     area_automation = _FakeScrollArea(None, bg_color="#000", padding=10)
     gui.scroll_areas = {"lighting_power": area_lighting, "automation": area_automation}
@@ -436,12 +441,19 @@ def test_finalize_layout_applies_state_scroll_and_geometry(monkeypatch: pytest.M
         assert area.canvas.bbox_calls == ["all"]
         assert area.finalize_calls == 1
     assert gui.root.update_calls == 1
-    assert gui.root.after_calls == [(50, gui._apply_geometry), (350, gui._apply_geometry)]
+    assert gui._geometry_tracker.restore_calls == 1
+    assert gui._geometry_tracker.start_tracking_calls == 0
+    assert gui.root.after_calls == [
+        (50, gui._apply_geometry),
+        (350, gui._apply_geometry),
+        (400, gui._geometry_tracker.start_tracking),
+    ]
 
 
 def test_finalize_layout_swallows_scrollregion_errors() -> None:
     gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
     gui.root = _FakeRoot()
+    gui._geometry_tracker = _FakeGeometryTracker(gui.root, "settings", 680, 560, 0.95)
     failing = _FakeScrollArea(None, bg_color="#000", padding=10)
     failing.canvas.configure = lambda **kwargs: (_ for _ in ()).throw(RuntimeError("boom"))
     passing = _FakeScrollArea(None, bg_color="#000", padding=10)
@@ -453,7 +465,11 @@ def test_finalize_layout_swallows_scrollregion_errors() -> None:
     assert passing.canvas.configure_calls == [{"scrollregion": (1, 2, 3, 4)}]
     assert passing.finalize_calls == 1
     assert failing.finalize_calls == 1
-    assert gui.root.after_calls == [(50, gui._apply_geometry), (350, gui._apply_geometry)]
+    assert gui.root.after_calls == [
+        (50, gui._apply_geometry),
+        (350, gui._apply_geometry),
+        (400, gui._geometry_tracker.start_tracking),
+    ]
 
 
 def test_apply_geometry_sizes_from_default_page_only(monkeypatch: pytest.MonkeyPatch) -> None:
