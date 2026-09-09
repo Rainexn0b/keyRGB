@@ -122,10 +122,10 @@ outcome.
 | UX-03 | Simplify the per-key editor's default view | P2 | L | deferred | UX-01, UX-02, UX-05–UX-09, and dedicated UX discussion |
 | UX-04 | Turn keyboard setup and calibration into a guided workflow | P2 | L | deferred | UX-03 direction and dedicated UX discussion |
 | UX-05 | Establish consistent spacing, typography, focus, and disabled contrast | P1 | M | done | UX-07 |
-| UX-06 | Persist and safely restore main-window geometry | P1 | M | accepted | UX-09 |
+| UX-06 | Persist and safely restore main-window geometry | P1 | M | active | UX-09 |
 | UX-07 | Replace custom dropdowns with standard Tk controls | P1 | M | done | UX-00 |
 | UX-08 | Add accelerators and keyboard-access contracts | P1 | M | accepted | UX-05 and UX-07 |
-| UX-09 | Prevent duplicate instances of the same GUI | P1 | M | active | UX-00 |
+| UX-09 | Prevent duplicate instances of the same GUI | P1 | M | done | UX-00 |
 
 ## UX-00 — Baseline characterization and review matrix
 
@@ -1077,3 +1077,38 @@ coverage.
   are now instant and responsive.
 - UX-07 is complete. UX-09 duplicate-instance prevention is now the only active
   implementation item.
+
+### 2026-09-09 — UX-09 duplicate-instance prevention implemented
+
+- Added Tk-free `keyrgb/gui/single_instance.py` with validated per-window lock
+  identities, Linux non-blocking advisory `flock`, process-lifetime descriptor
+  ownership, PID diagnostics, `atexit` cleanup, and clean duplicate exit code 0.
+  Lock paths use `config_dir()/keyrgb-gui-<identity>.lock`; the tray/hardware
+  `keyrgb.lock` is untouched.
+- Added lock-first guards before Tk construction or hardware acquisition for
+  Settings, Reactive Color, Power Mode, Support Tools, Per-key Editor, Keymap
+  Calibrator, and Uniform Color.
+- Uniform Color uses route-scoped identities so keyboard, lightbar, mouse, logo,
+  neon, and vent editors do not incorrectly block different valid targets.
+- Tests cover identity/path validation, XDG/config isolation, real exclusion and
+  release, stale-path recovery, forced subprocess death, missing-`fcntl`
+  fail-open behavior, all entrypoint ordering/duplicate exits, and Uniform route
+  resolution.
+- Validation:
+  - pre-change focused baseline: `7 passed`;
+  - focused lock/entrypoint/tray suite: `77 passed`;
+  - `.venv/bin/python -m pytest tests/gui tests/tray/ui/test_gui_launch_unit.py -q -o addopts=`:
+    `959 passed`;
+  - Ruff and Ruff Format across `keyrgb/gui`, `tests/gui`, and the tray-launch
+    test: passed (`279` files formatted);
+  - Black across all `10` changed or new Python files: passed;
+  - `.venv/bin/python -m buildpython --run-steps=1,4,13,16,17,19,20`:
+    `7 passed`; all `8/8` import probes passed, architecture checked `24` rules
+    across `616` files with zero findings, and Dead Code reported zero actionable
+    candidates;
+  - `git diff --check`: passed;
+  - independent final review found no blocker, high-, or medium-severity issue.
+- A live subprocess smoke held each lock and launched every guarded module. All
+  eight cases (including keyboard and logo Uniform identities) emitted the
+  duplicate diagnostic and exited 0 before constructing a window.
+- UX-09 is complete. UX-06 geometry persistence is now the only active item.

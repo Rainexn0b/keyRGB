@@ -227,6 +227,9 @@ class KeymapCalibrator(tk.Tk):
 
 
 def main() -> None:
+    from keyrgb.gui import single_instance
+
+    single_instance.acquire_gui_instance_or_exit("calibrator")
     # Ensure config dir exists early (for saving)
     Config.CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     app = KeymapCalibrator()

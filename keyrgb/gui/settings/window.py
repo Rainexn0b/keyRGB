@@ -433,6 +433,9 @@ class PowerSettingsGUI:
 
 
 def main() -> None:
+    from keyrgb.gui import single_instance
+
+    single_instance.acquire_gui_instance_or_exit("settings")
     PowerSettingsGUI().run()
 
 

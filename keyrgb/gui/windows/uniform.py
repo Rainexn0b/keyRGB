@@ -44,6 +44,37 @@ route_for_backend_name = uniform_color_bootstrap.route_for_backend_name
 route_for_device_type = uniform_color_bootstrap.route_for_device_type
 
 
+def uniform_instance_identity(
+    *,
+    target_context: str | None = None,
+    requested_backend: str | None = None,
+) -> str:
+    """Return the UX-09 single-instance identity for the Uniform Color window.
+
+    Uses the same route resolution as :class:`UniformColorGUI` so the lock
+    matches the window that would actually open: ``uniform-keyboard`` for the
+    primary keyboard target, otherwise ``uniform-<route.state_key>`` with
+    underscores normalized to hyphens (e.g. ``uniform-lightbar``,
+    ``uniform-ite8258-chassis-logo``). ``None`` arguments fall back to the
+    ``KEYRGB_UNIFORM_TARGET_CONTEXT``/``KEYRGB_UNIFORM_BACKEND`` environment,
+    mirroring GUI construction. The explicit backend wins over the context,
+    matching ``resolve_secondary_route`` priority.
+    """
+    raw_context = (
+        target_context if target_context is not None else os.environ.get("KEYRGB_UNIFORM_TARGET_CONTEXT", "keyboard")
+    )
+    raw_backend = requested_backend if requested_backend is not None else os.environ.get("KEYRGB_UNIFORM_BACKEND", "")
+    route = uniform_color_bootstrap.resolve_secondary_route(
+        target_context=str(raw_context or "keyboard"),
+        requested_backend=str(raw_backend or ""),
+        route_for_backend_name_fn=route_for_backend_name,
+        route_for_device_type_fn=route_for_device_type,
+    )
+    if route is None:
+        return "uniform-keyboard"
+    return f"uniform-{str(route.state_key).strip().lower().replace('_', '-')}"
+
+
 class UniformColorGUI:
     """Simple GUI for selecting a uniform keyboard color."""
 
@@ -272,6 +303,9 @@ class UniformColorGUI:
 
 
 def main() -> None:
+    from keyrgb.gui import single_instance
+
+    single_instance.acquire_gui_instance_or_exit(uniform_instance_identity())
     level = logging.DEBUG if os.environ.get("KEYRGB_DEBUG") else logging.INFO
     logging.basicConfig(level=level, format="%(levelname)s %(name)s: %(message)s")
     UniformColorGUI().run()

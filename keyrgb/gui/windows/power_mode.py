@@ -360,6 +360,9 @@ class PowerModeSettingsGUI:
 
 
 def main() -> None:
+    from keyrgb.gui import single_instance
+
+    single_instance.acquire_gui_instance_or_exit("power-mode")
     level = logging.DEBUG if os.environ.get("KEYRGB_DEBUG") else logging.INFO
     logging.basicConfig(level=level, format="%(levelname)s %(name)s: %(message)s")
     PowerModeSettingsGUI().run()

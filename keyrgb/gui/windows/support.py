@@ -316,6 +316,9 @@ class SupportToolsGUI(support_session_bridge.SupportWindowSessionBridgeMixin):
 
 
 def main() -> None:
+    from keyrgb.gui import single_instance
+
+    single_instance.acquire_gui_instance_or_exit("support")
     level = logging.DEBUG if os.environ.get("KEYRGB_DEBUG") else logging.INFO
     logging.basicConfig(level=level, format="%(levelname)s %(name)s: %(message)s")
     SupportToolsGUI().run()
