@@ -305,21 +305,36 @@ def test_blocking_exclusive_lock_serializes_slow_writer() -> None:
 
 def test_prepare_clamps_to_min_and_screen_cap() -> None:
     prepared = prepare_restored_geometry(WindowGeometry(width=100, height=100), 1920, 1080, 460, 520, 0.95)
-    assert prepared == WindowGeometry(width=460, height=520)
+    assert prepared == WindowGeometry(width=460, height=520, x=(1920 - 460) // 2, y=(1080 - 520) // 2)
     prepared = prepare_restored_geometry(WindowGeometry(width=5000, height=5000), 1920, 1080, 460, 520, 0.95)
-    assert prepared == WindowGeometry(width=int(1920 * 0.95), height=int(1080 * 0.95))
+    assert prepared == WindowGeometry(
+        width=int(1920 * 0.95),
+        height=int(1080 * 0.95),
+        x=(1920 - int(1920 * 0.95)) // 2,
+        y=(1080 - int(1080 * 0.95)) // 2,
+    )
 
 
 def test_prepare_tiny_screen_keeps_window_within_screen_cap() -> None:
     prepared = prepare_restored_geometry(WindowGeometry(width=800, height=600), 400, 300, 460, 520, 0.95)
-    assert prepared == WindowGeometry(width=380, height=285)
+    assert prepared == WindowGeometry(width=380, height=285, x=10, y=7)
 
 
-def test_prepare_size_only_returns_size_only() -> None:
+def test_prepare_size_only_returns_centered() -> None:
     prepared = prepare_restored_geometry(WindowGeometry(width=800, height=600), 1920, 1080, 460, 520, 0.95)
     assert prepared is not None
-    assert prepared.x is None and prepared.y is None
-    assert geometry_string(prepared) == f"{prepared.width}x{prepared.height}"
+    assert prepared.width == 800 and prepared.height == 600
+    assert (prepared.x, prepared.y) == ((1920 - 800) // 2, (1080 - 600) // 2)
+    assert geometry_string(prepared) == f"{prepared.width}x{prepared.height}{prepared.x:+d}{prepared.y:+d}"
+    assert geometry_string(prepared) == "800x600+560+240"
+
+
+def test_prepare_size_only_centers_clamped_dimensions_on_smaller_screen() -> None:
+    prepared = prepare_restored_geometry(WindowGeometry(width=800, height=600), 400, 300, 460, 520, 0.95)
+    assert prepared is not None
+    assert (prepared.width, prepared.height) == (380, 285)
+    assert (prepared.x, prepared.y) == ((400 - 380) // 2, (300 - 285) // 2)
+    assert geometry_string(prepared) == "380x285+10+7"
 
 
 @pytest.mark.parametrize(
@@ -365,6 +380,20 @@ def test_tracker_restore_applies_clamped_geometry() -> None:
     tracker = WindowGeometryTracker(root, "settings", 460, 520)
     assert tracker.restore() is True
     assert root.applied == [f"{int(1920 * 0.95)}x{int(1080 * 0.95)}+50+60"]
+
+
+def test_tracker_restore_size_only_centers_on_current_screen() -> None:
+    assert save_window_geometry("settings", WindowGeometry(width=800, height=600)) is True
+    root = _FakeRoot(screen=(1920, 1080))
+    assert WindowGeometryTracker(root, "settings", 460, 520).restore() is True
+    assert root.applied == ["800x600+560+240"]
+
+
+def test_tracker_restore_size_only_centers_clamped_dimensions_on_smaller_screen() -> None:
+    assert save_window_geometry("support", WindowGeometry(width=800, height=600)) is True
+    root = _FakeRoot(screen=(400, 300))
+    assert WindowGeometryTracker(root, "support", 460, 520).restore() is True
+    assert root.applied == ["380x285+10+7"]
 
 
 def test_tracker_restore_falls_back_when_missing_or_offscreen() -> None:

@@ -337,7 +337,8 @@ def prepare_restored_geometry(
     Malformed/absurd sizes, unusable screen/minimum inputs, and wholly
     off-screen positions return ``None`` so callers fall back to centered
     geometry. Valid sizes are clamped up to the window minimum and down to the
-    screen work-area cap; size-only entries restore without coordinates.
+    screen work-area cap; size-only entries are centered on the current screen
+    so Wayland restores do not land top-left.
     """
     if saved is None or not isinstance(saved, WindowGeometry):
         return None
@@ -369,7 +370,9 @@ def prepare_restored_geometry(
     clamped_h = min(max(saved.height, floor_h), max_h)
 
     if saved.x is None and saved.y is None:
-        return WindowGeometry(width=clamped_w, height=clamped_h)
+        centered_x = (screen_w - clamped_w) // 2
+        centered_y = (screen_h - clamped_h) // 2
+        return WindowGeometry(width=clamped_w, height=clamped_h, x=centered_x, y=centered_y)
     if saved.x is None or saved.y is None:
         return None
     if not _is_valid_coord(saved.x) or not _is_valid_coord(saved.y):
