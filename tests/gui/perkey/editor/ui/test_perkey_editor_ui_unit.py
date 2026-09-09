@@ -139,10 +139,18 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
         next(button for button in registry["buttons"] if button.options["text"] == "Reset Backdrop").parent
         is editor._advanced_backdrop_frame
     )
-    # Calibrator launcher lives in Setup and uses the exact existing callback.
+    # Calibrator launcher lives in Setup's right column and uses the exact existing callback.
     calibrator = next(button for button in registry["buttons"] if button.options["text"] == "Run Keymap Calibrator")
     assert calibrator.parent is editor._setup_tab
-    assert calibrator.grid_calls == [{"row": 1, "column": 0, "sticky": "ew", "pady": (10, 0)}]
+    assert calibrator.grid_calls == [{"row": 1, "column": 1, "sticky": "ew", "padx": (6, 0), "pady": (10, 0)}]
+    assert editor._run_calibrator_button is calibrator
+    assert calibrator.options["command"].__self__ is editor
+    assert calibrator.options["command"].__func__.__name__ == "_run_calibrator"
+    # Set as Default keeps its callback but lives in the right Profiles group.
+    set_default = next(button for button in registry["buttons"] if button.options["text"] == "Set as Default")
+    assert set_default.parent is editor._profiles_auto_frame
+    assert set_default.options["command"].__self__ is editor
+    assert set_default.options["command"].__func__.__name__ == "_set_default_profile"
 
     button_texts = [button.options["text"] for button in registry["buttons"]]
     assert not any(text.startswith(("1.", "2.", "3.", "4.")) for text in button_texts)
@@ -205,22 +213,36 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
     assert editor._profiles_tab.parent is notebook
     assert editor._setup_tab.parent is notebook
     assert editor._advanced_tab.parent is notebook
-    # Default build has no secondaries: the left column spans both columns
-    # and column 1 carries no weight.
+    # Default build has no secondaries: Advanced still uses two columns
+    # (backdrop left, overlay right) instead of full-width spans.
+    assert editor._profiles_tab.columnconfigure_calls == [
+        {"index": 0, "weight": 1},
+        {"index": 1, "weight": 1},
+    ]
+    assert editor._setup_tab.columnconfigure_calls == [
+        {"index": 0, "weight": 1},
+        {"index": 1, "weight": 1},
+    ]
     assert editor._advanced_tab.columnconfigure_calls == [
         {"index": 0, "weight": 1},
         {"index": 1, "weight": 1},
-        {"index": 1, "weight": 0},
     ]
     assert [call[0] for call in notebook.bind_calls] == ["<<NotebookTabChanged>>"]
     assert notebook.bind_calls[0][2] == "+"
-    assert editor._advanced_backdrop_frame.grid_calls == [{"row": 0, "column": 0, "columnspan": 2, "sticky": "nsew"}]
+    assert editor._advanced_backdrop_frame.grid_calls == [{"row": 0, "column": 0, "sticky": "nsew", "padx": (0, 6)}]
 
     assert editor._profiles_frame.options["text"] == "Lighting profiles"
     assert editor._profiles_frame.options["padding"] == 10
     assert editor._profiles_frame.parent is editor._profiles_tab
-    assert editor._profiles_frame.grid_calls == [{"row": 0, "column": 0, "sticky": "nsew"}]
+    assert editor._profiles_frame.grid_calls == [{"row": 0, "column": 0, "sticky": "nsew", "padx": (0, 6)}]
     assert editor._profiles_frame.columnconfigure_calls == [{"index": 1, "weight": 1}]
+    # UX-03 refinement: automatic selection lives in the right column.
+    assert editor._profiles_auto_frame.options["text"] == "Automatic selection"
+    assert editor._profiles_auto_frame.options["padding"] == 10
+    assert editor._profiles_auto_frame.parent is editor._profiles_tab
+    assert editor._profiles_auto_frame.grid_calls == [{"row": 0, "column": 1, "sticky": "nsew", "padx": (6, 0)}]
+    assert editor._profiles_auto_frame.columnconfigure_calls == [{"index": 1, "weight": 1}]
+    assert editor._profiles_tab.bind_calls != []
 
     combo = editor._profiles_combo
     assert combo in registry["comboboxes"]
@@ -241,14 +263,16 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
     battery_combo = editor._battery_power_source_profile_combo
     assert ac_combo in registry["comboboxes"]
     assert battery_combo in registry["comboboxes"]
+    assert ac_combo.parent is editor._profiles_auto_frame
+    assert battery_combo.parent is editor._profiles_auto_frame
     assert ac_combo.options["textvariable"] is editor._ac_power_source_profile_var
     assert battery_combo.options["textvariable"] is editor._battery_power_source_profile_var
     assert ac_combo.options["width"] == 22
     assert battery_combo.options["width"] == 22
     assert ac_combo.options["state"] == "readonly"
     assert battery_combo.options["state"] == "readonly"
-    assert ac_combo.grid_calls == [{"row": 3, "column": 1, "sticky": "ew", "padx": (8, 0), "pady": (10, 0)}]
-    assert battery_combo.grid_calls == [{"row": 4, "column": 1, "sticky": "ew", "padx": (8, 0), "pady": (8, 0)}]
+    assert ac_combo.grid_calls == [{"row": 1, "column": 1, "sticky": "ew", "padx": (8, 0), "pady": (10, 0)}]
+    assert battery_combo.grid_calls == [{"row": 2, "column": 1, "sticky": "ew", "padx": (8, 0), "pady": (8, 0)}]
     assert editor._ac_power_source_profile_var.get() == "movie"
     assert editor._battery_power_source_profile_var.get() == "Keep current profile"
     assert ac_combo.options["values"] == (
@@ -279,19 +303,25 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
     assert editor._save_power_source_profile_policy_calls == 2
 
     layout_controls = editor._layout_setup_controls
+    optional_controls = editor._optional_keys_controls
     overlay_controls = editor.overlay_controls
     overlay_panel = editor._overlay_setup_panel
     assert layout_controls is registry["layout_controls"][0]
+    assert optional_controls is registry["optional_keys_controls"][0]
     assert overlay_controls is registry["overlay_controls"][0]
     assert layout_controls.editor is editor
+    assert optional_controls.editor is editor
     assert overlay_controls.editor is editor
     assert layout_controls.parent is editor._setup_tab
+    assert optional_controls.parent is editor._setup_tab
     assert overlay_panel.parent is editor._advanced_tab
     assert overlay_controls.parent is overlay_panel
-    assert layout_controls.grid_calls == [{"row": 0, "column": 0, "sticky": "nsew"}]
+    assert layout_controls.grid_calls == [{"row": 0, "column": 0, "sticky": "nsew", "padx": (0, 6)}]
+    assert optional_controls.grid_calls == [{"row": 0, "column": 1, "sticky": "nsew", "padx": (6, 0)}]
     assert overlay_controls.grid_calls == [{"row": 0, "column": 0, "sticky": "nsew"}]
     assert layout_controls.grid_remove_calls == 0
-    assert overlay_panel.grid_calls == [{"row": 1, "column": 0, "columnspan": 2, "sticky": "nsew", "pady": (10, 0)}]
+    assert optional_controls.grid_remove_calls == 0
+    assert overlay_panel.grid_calls == [{"row": 0, "column": 1, "sticky": "nsew", "padx": (6, 0)}]
     assert overlay_panel.grid_remove_calls == 0
     assert overlay_controls.sync_calls == 1
     assert editor.lightbar_controls is None

@@ -154,6 +154,33 @@ def test_build_ui_creates_layout_controls_and_refreshes_slots(monkeypatch: pytes
     assert button_factory.created[0].kwargs["command"] == editor._reset_layout_defaults
     assert editor._layout_combo is combo_instances[0]
     assert editor._legend_pack_combo is combo_instances[1]
+    # UX-03 refinement: optional-keys slots live in OptionalKeysControls
+    # (right Setup column), not inside LayoutSetupControls.
+    assert not hasattr(editor, "_layout_slots_body")
+    assert refresh_calls == []
+
+
+def test_optional_keys_controls_creates_slots_body_and_refreshes(monkeypatch: pytest.MonkeyPatch) -> None:
+    frame_factory = _FakeFrameFactory()
+
+    monkeypatch.setattr(
+        layout_setup,
+        "ttk",
+        SimpleNamespace(
+            LabelFrame=frame_factory,
+            Frame=frame_factory,
+        ),
+    )
+
+    refresh_calls: list[object] = []
+    monkeypatch.setattr(layout_setup, "refresh_layout_slots_ui", lambda editor: refresh_calls.append(editor))
+
+    editor = SimpleNamespace()
+    fake_self = SimpleNamespace(editor=editor, columnconfigure=lambda index, *, weight: None)
+    # Build without instantiating Tk widgets: exercise the same builder the
+    # production __init__ delegates to.
+    layout_setup.OptionalKeysControls._build_ui(fake_self)
+
     assert editor._layout_slots_body is frame_factory.created[-1]
     assert editor._layout_slots_body.columnconfigure_calls == [(0, 1)]
     assert refresh_calls == [editor]

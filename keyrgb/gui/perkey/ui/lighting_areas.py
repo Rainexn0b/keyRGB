@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import tkinter as tk
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from tkinter import ttk
 from typing import TYPE_CHECKING, cast
 
@@ -55,6 +55,10 @@ class LightingAreasPanel:
 
     def grid_remove(self) -> None:
         self._frame.grid_remove()
+
+    def record_hidden_placement(self, options: Mapping[str, object]) -> None:
+        """Update the saved grid placement without re-showing a hidden panel."""
+        self._grid_options = dict(options)
 
     @property
     def should_show(self) -> bool:

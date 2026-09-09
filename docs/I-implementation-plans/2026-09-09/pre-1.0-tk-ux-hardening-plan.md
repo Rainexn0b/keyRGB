@@ -1245,3 +1245,30 @@ coverage.
     after notebook synchronization and conditional-layout corrections.
 - UX-03 is `monitoring` pending an owner-visible restart and tab/resizing check.
   UX-04 remains deferred until this shell is accepted.
+
+### 2026-09-09 — UX-03 owner review prompted two-column refinement
+
+- The owner confirmed that the redesigned editor window works, but the
+  full-width notebook controls looked excessively stretched at the normal
+  desktop width shown in the acceptance screenshot.
+- The approved refinement keeps the notebook full-width while arranging each
+  tab's task groups side-by-side: profile management and automatic selection;
+  keyboard layout and optional keys/calibrator; backdrop and advanced alignment
+  or lighting controls.
+- The tab groups fall back to a vertical stack below a narrow-width threshold.
+  This changes presentation only; existing callbacks and persisted profile,
+  layout, and device-routing state remain unchanged.
+- The Advanced tab uses stable cells whether lighting areas are currently
+  available or not, so a later device refresh cannot place lighting controls on
+  top of overlay controls. Hidden panels also retain the correct placement for
+  the current responsive mode.
+- Validation:
+  - `.venv/bin/python -m pytest tests/gui -q -o addopts=`: `1119 passed`;
+  - Ruff and Ruff Format across per-key sources/tests: passed (`115` files
+    formatted);
+  - `.venv/bin/python -m buildpython --run-steps=1,4,13,16,17,19,20`:
+    `7 passed`; architecture checked `24` rules across `620` files with zero
+    findings;
+  - `git diff --check`: passed.
+- UX-03 remains `monitoring` pending owner confirmation of the refined
+  side-by-side presentation. UX-04 remains deferred.

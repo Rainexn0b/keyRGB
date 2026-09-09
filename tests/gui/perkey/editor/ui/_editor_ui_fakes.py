@@ -168,6 +168,9 @@ class _FakeLightingAreasPanel(_FakeLayoutSetupControls):
             self._grid_options = dict(kwargs)
         self.grid_calls.append(dict(self._grid_options))
 
+    def record_hidden_placement(self, options) -> None:
+        self._grid_options = dict(options)
+
 
 class _FakeOverlayControls(_FakeLayoutSetupControls):
     def __init__(self, parent=None, *, editor):
@@ -176,6 +179,10 @@ class _FakeOverlayControls(_FakeLayoutSetupControls):
 
     def sync_vars_from_scope(self) -> None:
         self.sync_calls += 1
+
+
+class _FakeOptionalKeysControls(_FakeLayoutSetupControls):
+    pass
 
 
 class _FakeLightbarControls(_FakeLayoutSetupControls):
@@ -292,6 +299,7 @@ def _install_fake_ui(
         "canvases": [],
         "wheels": [],
         "layout_controls": [],
+        "optional_keys_controls": [],
         "overlay_controls": [],
         "lightbar_controls": [],
         "lighting_areas_panels": [],
@@ -452,6 +460,11 @@ def _install_fake_ui(
         registry["layout_controls"].append(controls)
         return controls
 
+    def fake_optional_keys_controls(parent=None, *, editor):
+        controls = _FakeOptionalKeysControls(parent, editor=editor)
+        registry["optional_keys_controls"].append(controls)
+        return controls
+
     def fake_overlay_controls(parent=None, *, editor):
         controls = _FakeOverlayControls(parent, editor=editor)
         registry["overlay_controls"].append(controls)
@@ -474,6 +487,7 @@ def _install_fake_ui(
     monkeypatch.setattr(editor_ui, "KeyboardCanvas", fake_keyboard_canvas)
     monkeypatch.setattr(editor_ui, "ColorWheel", fake_color_wheel)
     monkeypatch.setattr(editor_ui, "LayoutSetupControls", fake_layout_controls)
+    monkeypatch.setattr(editor_ui, "OptionalKeysControls", fake_optional_keys_controls)
     monkeypatch.setattr(editor_ui, "OverlayControls", fake_overlay_controls)
     monkeypatch.setattr(editor_ui, "LightbarControls", fake_lightbar_controls)
     monkeypatch.setattr(editor_ui, "LightingAreasPanel", fake_lighting_areas_panel)

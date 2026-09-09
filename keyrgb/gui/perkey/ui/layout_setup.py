@@ -41,12 +41,15 @@ class _LayoutSetupEditorProtocol(Protocol):
     _legend_pack_var: _StringVarProtocol
     _layout_combo: _ComboboxProtocol
     _legend_pack_combo: _ComboboxProtocol
-    _layout_slots_body: _GridFrameProtocol
     _reset_layout_defaults: Callable[[], None]
 
     def _on_layout_changed(self) -> None: ...
 
     def _on_layout_legend_pack_changed(self) -> None: ...
+
+
+class _OptionalKeysEditorProtocol(Protocol):
+    _layout_slots_body: _GridFrameProtocol
 
 
 _LAYOUT_LABELS = [layout.label for layout in LAYOUT_CATALOG]
@@ -135,17 +138,6 @@ class LayoutSetupControls(ttk.LabelFrame):
             command=editor._reset_layout_defaults,
         ).grid(row=3, column=0, columnspan=2, sticky="ew", pady=(10, 0))
 
-        layout_slots_frame = ttk.LabelFrame(self, text="Optional keys", padding=10)
-        layout_slots_frame.grid(row=4, column=0, columnspan=2, sticky="ew", pady=(10, 0))
-        layout_slots_frame.columnconfigure(0, weight=1)
-
-        layout_slots_body = ttk.Frame(layout_slots_frame)
-        editor._layout_slots_body = cast(_GridFrameProtocol, layout_slots_body)
-        layout_slots_body.grid(row=0, column=0, sticky="ew")
-        layout_slots_body.columnconfigure(0, weight=1)
-
-        refresh_layout_slots_ui(editor)
-
     def refresh_legend_pack_choices(self) -> None:
         editor = self.editor
         choices = _legend_pack_choices(editor._physical_layout)
@@ -178,3 +170,23 @@ class LayoutSetupControls(ttk.LabelFrame):
         selected = editor._legend_pack_combo.get()
         editor._legend_pack_var.set(self._legend_pack_label_to_id.get(selected, _AUTO_LEGEND_PACK_ID))
         editor._on_layout_legend_pack_changed()
+
+
+class OptionalKeysControls(ttk.LabelFrame):
+    """Right-column Setup panel owning the optional-keys slot checkboxes."""
+
+    def __init__(self, parent: ttk.Frame, editor: object, **kwargs) -> None:
+        super().__init__(parent, text="Optional keys", padding=10, **kwargs)
+        self.editor = cast(_OptionalKeysEditorProtocol, editor)
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        editor = self.editor
+        self.columnconfigure(0, weight=1)
+
+        layout_slots_body = ttk.Frame(self)
+        editor._layout_slots_body = cast(_GridFrameProtocol, layout_slots_body)
+        layout_slots_body.grid(row=0, column=0, sticky="ew")
+        layout_slots_body.columnconfigure(0, weight=1)
+
+        refresh_layout_slots_ui(editor)

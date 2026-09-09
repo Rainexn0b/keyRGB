@@ -12,8 +12,9 @@ from keyrgb.gui.widgets.color_wheel import ColorWheel
 from ..canvas import KeyboardCanvas
 from ..lightbar_controls import LightbarControls
 from ..overlay import OverlayControls
-from ..ui.layout_setup import LayoutSetupControls
+from ..ui.layout_setup import LayoutSetupControls, OptionalKeysControls
 from ..ui.lighting_areas import LightingAreasPanel
+from ..ui.responsive_columns import ResponsiveEntry, install_responsive_columns
 
 _BACKDROP_MODE_LABELS = {
     "none": "No backdrop",
@@ -197,7 +198,9 @@ def build_editor_ui(editor) -> None:
     editor._editor_notebook.add(editor._setup_tab, text="Setup")
     editor._editor_notebook.add(editor._advanced_tab, text="Advanced")
     editor._profiles_tab.columnconfigure(0, weight=1)
+    editor._profiles_tab.columnconfigure(1, weight=1)
     editor._setup_tab.columnconfigure(0, weight=1)
+    editor._setup_tab.columnconfigure(1, weight=1)
     editor._advanced_tab.columnconfigure(0, weight=1)
     editor._advanced_tab.columnconfigure(1, weight=1)
 
@@ -225,9 +228,14 @@ def build_editor_ui(editor) -> None:
     except _TK_CALLBACK_SETUP_ERRORS:
         pass
 
+    # UX-03 refinement: tab interiors use two side-by-side columns when wide
+    # so controls no longer stretch across ~1500px; narrow tabs stack.
     editor._profiles_frame = ttk.LabelFrame(editor._profiles_tab, text="Lighting profiles", padding=10)
-    editor._profiles_frame.grid(row=0, column=0, sticky="nsew")
+    editor._profiles_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
     editor._profiles_frame.columnconfigure(1, weight=1)
+    editor._profiles_auto_frame = ttk.LabelFrame(editor._profiles_tab, text="Automatic selection", padding=10)
+    editor._profiles_auto_frame.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
+    editor._profiles_auto_frame.columnconfigure(1, weight=1)
 
     ttk.Label(editor._profiles_frame, text="Lighting profile").grid(row=0, column=0, sticky="w")
     # Single shared scan at construction, cached on the editor: no
@@ -265,50 +273,87 @@ def build_editor_ui(editor) -> None:
     ).grid(row=0, column=3, sticky="ew", padx=(3, 0))
 
     ttk.Button(
-        editor._profiles_frame,
+        editor._profiles_auto_frame,
         text="Set as Default",
         command=editor._set_default_profile,
     ).grid(
-        row=2,
+        row=0,
         column=0,
         columnspan=2,
         sticky="ew",
-        pady=(8, 0),
     )
 
-    ttk.Label(editor._profiles_frame, text="Use on AC").grid(row=3, column=0, sticky="w", pady=(10, 0))
+    ttk.Label(editor._profiles_auto_frame, text="Use on AC").grid(row=1, column=0, sticky="w", pady=(10, 0))
     editor._ac_power_source_profile_combo = ttk.Combobox(
-        editor._profiles_frame,
+        editor._profiles_auto_frame,
         textvariable=editor._ac_power_source_profile_var,
         width=22,
         state="readonly",
     )
-    editor._ac_power_source_profile_combo.grid(row=3, column=1, sticky="ew", padx=(8, 0), pady=(10, 0))
+    editor._ac_power_source_profile_combo.grid(row=1, column=1, sticky="ew", padx=(8, 0), pady=(10, 0))
     editor._ac_power_source_profile_combo.bind(
         "<<ComboboxSelected>>", lambda _e: editor._save_power_source_profile_policy()
     )
 
-    ttk.Label(editor._profiles_frame, text="Use on battery").grid(row=4, column=0, sticky="w", pady=(8, 0))
+    ttk.Label(editor._profiles_auto_frame, text="Use on battery").grid(row=2, column=0, sticky="w", pady=(8, 0))
     editor._battery_power_source_profile_combo = ttk.Combobox(
-        editor._profiles_frame,
+        editor._profiles_auto_frame,
         textvariable=editor._battery_power_source_profile_var,
         width=22,
         state="readonly",
     )
-    editor._battery_power_source_profile_combo.grid(row=4, column=1, sticky="ew", padx=(8, 0), pady=(8, 0))
+    editor._battery_power_source_profile_combo.grid(row=2, column=1, sticky="ew", padx=(8, 0), pady=(8, 0))
     editor._battery_power_source_profile_combo.bind(
         "<<ComboboxSelected>>",
         lambda _e: editor._save_power_source_profile_policy(),
     )
     profile_action_ui.sync_power_source_profile_policy_controls(editor, profile_names_snapshot)
+    install_responsive_columns(
+        editor._profiles_tab,
+        [
+            ResponsiveEntry(
+                widget=editor._profiles_frame,
+                wide={"row": 0, "column": 0, "sticky": "nsew", "padx": (0, 6)},
+                narrow={"row": 0, "column": 0, "columnspan": 2, "sticky": "nsew"},
+            ),
+            ResponsiveEntry(
+                widget=editor._profiles_auto_frame,
+                wide={"row": 0, "column": 1, "sticky": "nsew", "padx": (6, 0)},
+                narrow={"row": 1, "column": 0, "columnspan": 2, "sticky": "nsew", "pady": (10, 0)},
+            ),
+        ],
+    )
 
     editor._layout_setup_controls = LayoutSetupControls(editor._setup_tab, editor=editor)
-    editor._layout_setup_controls.grid(row=0, column=0, sticky="nsew")
-    ttk.Button(
+    editor._layout_setup_controls.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+    editor._optional_keys_controls = OptionalKeysControls(editor._setup_tab, editor=editor)
+    editor._optional_keys_controls.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
+    editor._run_calibrator_button = ttk.Button(
         editor._setup_tab,
         text="Run Keymap Calibrator",
         command=editor._run_calibrator,
-    ).grid(row=1, column=0, sticky="ew", pady=(10, 0))
+    )
+    editor._run_calibrator_button.grid(row=1, column=1, sticky="ew", padx=(6, 0), pady=(10, 0))
+    install_responsive_columns(
+        editor._setup_tab,
+        [
+            ResponsiveEntry(
+                widget=editor._layout_setup_controls,
+                wide={"row": 0, "column": 0, "sticky": "nsew", "padx": (0, 6)},
+                narrow={"row": 0, "column": 0, "columnspan": 2, "sticky": "nsew"},
+            ),
+            ResponsiveEntry(
+                widget=editor._optional_keys_controls,
+                wide={"row": 0, "column": 1, "sticky": "nsew", "padx": (6, 0)},
+                narrow={"row": 1, "column": 0, "columnspan": 2, "sticky": "nsew", "pady": (10, 0)},
+            ),
+            ResponsiveEntry(
+                widget=editor._run_calibrator_button,
+                wide={"row": 1, "column": 1, "sticky": "ew", "padx": (6, 0), "pady": (10, 0)},
+                narrow={"row": 2, "column": 0, "columnspan": 2, "sticky": "ew", "pady": (10, 0)},
+            ),
+        ],
+    )
 
     editor._advanced_backdrop_frame = ttk.LabelFrame(editor._advanced_tab, text="Backdrop", padding=10)
     editor._advanced_backdrop_frame.columnconfigure(0, weight=1)
@@ -349,18 +394,40 @@ def build_editor_ui(editor) -> None:
         editor.lightbar_controls.grid(row=1, column=0, sticky="ew", pady=(10, 0))
 
     editor._lighting_areas_panel = LightingAreasPanel(editor._advanced_tab, editor=editor, tk_module=tk, ttk_module=ttk)
-    # H1: always record the canonical two-column grid options so a later
-    # sync_from_editor() re-show (grid() with no args) restores column 1
-    # instead of overlapping the backdrop at row 0 / column 0.
-    editor._lighting_areas_panel.grid(row=0, column=1, rowspan=2, sticky="nsew", padx=(6, 0))
+    # Stable two-column Advanced layout regardless of visibility: backdrop
+    # left row 0, overlay/tools right row 0, lighting areas right row 1.
+    # A later sync_from_editor() re-show (grid() with no args) therefore
+    # lands below the overlay instead of overlapping it, even when lighting
+    # availability changes without a resize. The responsive helper keeps
+    # the hidden stored options in sync so narrow re-shows stack.
+    editor._lighting_areas_panel.grid(row=1, column=1, sticky="nsew", padx=(6, 0), pady=(10, 0))
     if not editor._lighting_areas_panel.should_show:
         editor._lighting_areas_panel.grid_remove()
-        editor._advanced_tab.columnconfigure(1, weight=0)
-        editor._advanced_backdrop_frame.grid(row=0, column=0, columnspan=2, sticky="nsew")
-        editor._overlay_setup_panel.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(10, 0))
-    else:
-        editor._advanced_backdrop_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
-        editor._overlay_setup_panel.grid(row=1, column=0, sticky="nsew", pady=(10, 0), padx=(0, 6))
+    editor._advanced_backdrop_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+    editor._overlay_setup_panel.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
+    lighting_panel = editor._lighting_areas_panel
+    install_responsive_columns(
+        editor._advanced_tab,
+        [
+            ResponsiveEntry(
+                widget=editor._advanced_backdrop_frame,
+                wide={"row": 0, "column": 0, "sticky": "nsew", "padx": (0, 6)},
+                narrow={"row": 0, "column": 0, "columnspan": 2, "sticky": "nsew"},
+            ),
+            ResponsiveEntry(
+                widget=editor._overlay_setup_panel,
+                wide={"row": 0, "column": 1, "sticky": "nsew", "padx": (6, 0)},
+                narrow={"row": 1, "column": 0, "columnspan": 2, "sticky": "nsew", "pady": (10, 0)},
+            ),
+            ResponsiveEntry(
+                widget=lighting_panel,
+                wide={"row": 1, "column": 1, "sticky": "nsew", "padx": (6, 0), "pady": (10, 0)},
+                narrow={"row": 2, "column": 0, "columnspan": 2, "sticky": "nsew", "pady": (10, 0)},
+                is_hidden=lambda: not lighting_panel.should_show,
+                record_hidden=lighting_panel.record_hidden_placement,
+            ),
+        ],
+    )
 
     editor.overlay_controls.sync_vars_from_scope()
     if editor.lightbar_controls is not None:
