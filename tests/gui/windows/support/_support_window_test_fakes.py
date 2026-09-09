@@ -68,6 +68,9 @@ class FakeRoot:
         self.clipboard_cleared = 0
         self.clipboard_values: list[str] = []
         self.after_calls: list[tuple[int, object]] = []
+        self.protocol_calls: list[tuple[str, object]] = []
+        self.bind_calls: list[tuple[str, object, object | None]] = []
+        self.destroy_calls = 0
         self.title_text = ""
         self.geometry_value = ""
         self.minsize_value: tuple[int, int] | None = None
@@ -89,6 +92,15 @@ class FakeRoot:
 
     def after(self, delay_ms: int, callback) -> None:
         self.after_calls.append((delay_ms, callback))
+
+    def protocol(self, name: str, callback) -> None:
+        self.protocol_calls.append((name, callback))
+
+    def bind(self, sequence: str, callback, add=None) -> None:
+        self.bind_calls.append((sequence, callback, add))
+
+    def destroy(self) -> None:
+        self.destroy_calls += 1
 
     def focus_get(self) -> object | None:
         return self.focused

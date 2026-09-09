@@ -13,6 +13,7 @@ from .profile_backdrop_storage import (
     save_backdrop_image,
 )
 from .tk_async import TkAsyncCoordinator, TkAsyncJob, run_in_thread, submit_gui_work
+from .window_bindings import install_window_bindings
 from .window_centering import center_window_on_screen
 from .window_geometry import compute_centered_window_geometry
 from .window_icon import apply_keyrgb_window_icon, find_keyrgb_logo_path
@@ -38,6 +39,7 @@ __all__ = [
     "compute_centered_window_geometry",
     "find_keyrgb_logo_path",
     "geometry_string",
+    "install_window_bindings",
     "key_draw_style",
     "load_backdrop_image",
     "load_window_geometry",

@@ -124,7 +124,7 @@ outcome.
 | UX-05 | Establish consistent spacing, typography, focus, and disabled contrast | P1 | M | done | UX-07 |
 | UX-06 | Persist and safely restore main-window geometry | P1 | M | monitoring | UX-09 |
 | UX-07 | Replace custom dropdowns with standard Tk controls | P1 | M | done | UX-00 |
-| UX-08 | Add accelerators and keyboard-access contracts | P1 | M | active | UX-05 and UX-07 |
+| UX-08 | Add accelerators and keyboard-access contracts | P1 | M | monitoring | UX-05 and UX-07 |
 | UX-09 | Prevent duplicate instances of the same GUI | P1 | M | done | UX-00 |
 
 ## UX-00 — Baseline characterization and review matrix
@@ -1148,3 +1148,37 @@ coverage.
   confirms size restoration for all seven windows and records position behavior
   as best-effort. UX-08 keyboard access is now the only active implementation
   item.
+
+### 2026-09-09 — UX-08 keyboard access implemented
+
+- Added the Tk-free `install_window_bindings` helper with additive Ctrl+W,
+  optional Escape, and explicit-save-only Ctrl+S routes. The helper does not
+  bind Tab, Shift+Tab, Return, arrows, or combobox events, preserving native
+  traversal and UX-07 combobox navigation.
+- Settings, Uniform Color, Reactive Color, Power Mode, Support Tools, Per-key
+  Editor, and Keymap Calibrator now share their existing orderly close routes.
+  Power Mode, Per-key, and Calibrator Ctrl+S bindings invoke the exact methods
+  used by their Save buttons; Settings remains auto-save. Per-key intentionally
+  leaves Escape unbound and Ctrl+W still passes through dirty confirmation.
+- Calibrator Return/KP Enter assignment and Left/Right probe navigation remain
+  intact. Its Escape route is no longer separately implemented.
+- Support probe dialogs now use additive Escape cancellation and documented
+  Enter defaults. Choice-dialog Enter honors the focused button, close routes
+  are idempotent, and the notes dialog deliberately leaves Return/KP Enter to
+  ScrolledText. Manual RGB fields also accept keypad Enter.
+- Automated validation:
+  - `.venv/bin/python -m pytest tests/gui -q -o addopts=`: `1085 passed`;
+  - Ruff and Ruff Format across `keyrgb/gui` and `tests/gui`: passed (`291`
+    files formatted);
+  - `.venv/bin/python -m buildpython --run-steps=1,4,13,16,17,19,20`:
+    `7 passed`; all `8/8` import probes passed, architecture checked `24` rules
+    across `619` files with zero findings, and Dead Code reported zero
+    actionable candidates;
+  - `git diff --check`: passed;
+  - independent final review found no blocker- or high-severity issue; its two
+    medium dialog findings were corrected with idempotent close and
+    focused-choice routing.
+- UX-08 is `monitoring` pending a keyboard-only desktop walkthrough of every
+  standard form control and native combobox popup behavior. No implementation
+  item is activated next: UX-03 and UX-04 remain deferred at their required
+  dedicated UX discussion gate.

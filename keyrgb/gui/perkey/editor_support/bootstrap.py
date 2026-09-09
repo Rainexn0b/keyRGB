@@ -6,6 +6,7 @@ from typing import Protocol, cast
 
 from keyrgb.core.backends.base import KeyboardDevice
 from keyrgb.core.config import Config
+from keyrgb.gui.utils.window_bindings import install_window_bindings
 from keyrgb.gui.utils.window_state import WindowGeometryTracker
 
 from ..commit_pipeline import PerKeyCommitPipeline
@@ -140,6 +141,8 @@ class _PerKeyEditorBootstrapApp(Protocol):
     canvas: _CanvasProtocol
 
     def _on_close(self) -> None: ...
+
+    def _save_profile(self) -> None: ...
 
     def _detect_lightbar_device(self) -> bool: ...
 
@@ -296,6 +299,16 @@ def initialize_editor(
     protocol = getattr(editor.root, "protocol", None)
     if callable(protocol):
         protocol("WM_DELETE_WINDOW", editor._on_close)
+    # UX-08 shared shortcuts: Ctrl+W closes (via dirty-checked _on_close),
+    # Ctrl+S saves. Escape is intentionally not bound here so combobox and
+    # entry editing keep native cancel behavior. Initial focus stays owned
+    # by build_editor_ui (UX-05 backdrop selector).
+    install_window_bindings(
+        editor.root,
+        on_close=editor._on_close,
+        on_save=editor._save_profile,
+        close_on_escape=False,
+    )
     dirty_state.mark_saved(editor)
     if restored_geometry:
         # Theme/font layout can require more space than the pre-widget grid

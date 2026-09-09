@@ -204,9 +204,9 @@ def test_create_widgets_builds_slider_preview_and_manual_inputs(monkeypatch: pyt
     assert wheel.rgb_g_entry.grid_calls == [{"row": 0, "column": 3, "sticky": "w"}]
     assert comma_labels[1].grid_calls == [{"row": 0, "column": 4, "sticky": "w", "padx": (2, 2)}]
     assert wheel.rgb_b_entry.grid_calls == [{"row": 0, "column": 5, "sticky": "w"}]
-    assert [event for event, _ in wheel.rgb_r_entry.bind_calls] == ["<Return>"]
-    assert [event for event, _ in wheel.rgb_g_entry.bind_calls] == ["<Return>"]
-    assert [event for event, _ in wheel.rgb_b_entry.bind_calls] == ["<Return>"]
+    assert [event for event, _ in wheel.rgb_r_entry.bind_calls] == ["<Return>", "<KP_Enter>"]
+    assert [event for event, _ in wheel.rgb_g_entry.bind_calls] == ["<Return>", "<KP_Enter>"]
+    assert [event for event, _ in wheel.rgb_b_entry.bind_calls] == ["<Return>", "<KP_Enter>"]
     assert buttons[0].kwargs["text"] == "Set"
     assert buttons[0].kwargs["command"] == wheel._on_manual_rgb_set
     assert buttons[0].grid_calls == [{"row": 0, "column": 6, "sticky": "w", "padx": (10, 0)}]

@@ -187,6 +187,7 @@ def _run_initialize_editor(
         ],
         select_slot_id=MagicMock(),
         _on_close=MagicMock(),
+        _save_profile=MagicMock(),
         canvas=SimpleNamespace(redraw=MagicMock()),
     )
     profiles = SimpleNamespace(

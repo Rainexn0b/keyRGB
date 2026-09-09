@@ -541,3 +541,35 @@ def test_tab_switch_has_no_rebuild_path_and_probes_once(monkeypatch: pytest.Monk
     monkeypatch.setattr(settings_window, "run_in_thread", lambda *args, **kwargs: probe_runs.append(1) or None)
     gui._start_footer_hardware_probe()
     assert len(probe_runs) == 1
+
+
+def test_shortcuts_route_to_orderly_close_without_save(monkeypatch: pytest.MonkeyPatch) -> None:
+    root = _FakeRoot()
+    values = _values()
+    monkeypatch.setattr(settings_window.tk, "Tk", lambda: root)
+    monkeypatch.setattr(settings_window, "apply_keyrgb_window_icon", lambda _root: None)
+    monkeypatch.setattr(settings_window, "apply_clam_theme", lambda _root, **_kwargs: ("#111", "#eee"))
+    monkeypatch.setattr(settings_window, "Config", lambda: SimpleNamespace(physical_layout="auto"))
+    monkeypatch.setattr(settings_window, "detect_os_autostart_enabled", lambda: False)
+    monkeypatch.setattr(settings_window, "load_settings_values", lambda **_kwargs: values)
+    monkeypatch.setattr(settings_window.PowerSettingsGUI, "_init_layout", lambda self, **_kwargs: None)
+    monkeypatch.setattr(settings_window.PowerSettingsGUI, "_init_vars", lambda self, _values: None)
+    monkeypatch.setattr(settings_window.PowerSettingsGUI, "_init_panels", lambda self: None)
+    monkeypatch.setattr(settings_window.PowerSettingsGUI, "_finalize_layout", lambda self: None)
+    monkeypatch.setattr(settings_window.PowerSettingsGUI, "_start_footer_hardware_probe", lambda self: None)
+    monkeypatch.setattr(settings_window, "WindowGeometryTracker", _FakeGeometryTracker)
+
+    gui = settings_window.PowerSettingsGUI()
+
+    # WM protocol is preserved on the exact orderly close path.
+    assert root.protocol_calls == [("WM_DELETE_WINDOW", gui._on_close)]
+    # Exact shortcut set: close-only, additive, no save, no native navigation.
+    assert [sequence for sequence, _, _ in root.bind_calls] == ["<Control-w>", "<Escape>"]
+    assert all(add == "+" for _, _, add in root.bind_calls)
+    assert all("Tab" not in sequence for sequence, _, _ in root.bind_calls)
+    assert "<Control-s>" not in [sequence for sequence, _, _ in root.bind_calls]
+    # Both shortcuts share the same close wrapper.
+    assert root.bind_calls[0][1] is root.bind_calls[1][1]
+    # The wrapper returns break and invokes the orderly close exactly once.
+    assert root.bind_calls[0][1](object()) == "break"
+    assert gui.root.destroy_calls == 1

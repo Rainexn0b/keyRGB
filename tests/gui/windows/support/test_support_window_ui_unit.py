@@ -399,3 +399,59 @@ def test_set_status_clears_message_after_delay() -> None:
     assert window.status_label.options["text"] == "Ready"
     _flush_after(window.root)
     assert window.status_label.options["text"] == ""
+
+
+def test_shortcuts_route_to_orderly_close_without_save(monkeypatch: pytest.MonkeyPatch) -> None:
+    created_roots: list[_FakeRoot] = []
+
+    class _ConstructText(_FakeText):
+        def __init__(self, *args, **kwargs) -> None:
+            super().__init__("")
+            self.options.update(kwargs)
+
+        def pack(self, *args, **kwargs) -> None:
+            return
+
+    def _make_root() -> _FakeRoot:
+        root = _FakeRoot()
+        created_roots.append(root)
+        return root
+
+    class _FakeStyle:
+        def __init__(self, *args, **kwargs) -> None:
+            self.configured: list[tuple[str, dict[str, object]]] = []
+            self.mapped: list[tuple[str, dict[str, object]]] = []
+
+        def configure(self, name: str, **kwargs) -> None:
+            self.configured.append((name, dict(kwargs)))
+
+        def map(self, name: str, **kwargs) -> None:
+            self.mapped.append((name, dict(kwargs)))
+
+    monkeypatch.setattr(support_window.tk, "Tk", _make_root)
+    monkeypatch.setattr(support_window.ttk, "Frame", lambda *args, **kwargs: _FakeWidget(**kwargs))
+    monkeypatch.setattr(support_window.ttk, "Label", lambda *args, **kwargs: _FakeWidget(**kwargs))
+    monkeypatch.setattr(support_window.ttk, "LabelFrame", lambda *args, **kwargs: _FakeWidget(**kwargs))
+    monkeypatch.setattr(support_window.ttk, "Button", lambda *args, **kwargs: _FakeWidget(**kwargs))
+    monkeypatch.setattr(support_window.ttk, "Style", lambda *args, **kwargs: _FakeStyle(*args, **kwargs))
+    monkeypatch.setattr(
+        support_window.scrolledtext, "ScrolledText", lambda *args, **kwargs: _ConstructText(*args, **kwargs)
+    )
+    monkeypatch.setattr(support_window, "apply_keyrgb_window_icon", lambda root: None)
+    monkeypatch.setattr(support_window, "apply_clam_theme", lambda root, **kwargs: ("#111111", "#eeeeee"))
+    monkeypatch.setattr(support_window, "center_window_on_screen", lambda root: None)
+
+    window = support_window.SupportToolsGUI()
+    root = created_roots[0]
+
+    # WM protocol is preserved on the exact orderly close path.
+    assert root.protocol_calls == [("WM_DELETE_WINDOW", window._on_close)]
+    # Exact shortcut set: close-only, additive, no save, no native navigation.
+    assert [sequence for sequence, _, _ in root.bind_calls] == ["<Control-w>", "<Escape>"]
+    assert all(add == "+" for _, _, add in root.bind_calls)
+    assert all("Tab" not in sequence for sequence, _, _ in root.bind_calls)
+    assert root.bind_calls[0][1] is root.bind_calls[1][1]
+    # Existing close/geometry ordering stays: delayed centered pass still runs.
+    assert any(delay == 50 for delay, _callback in root.after_calls)
+    assert root.bind_calls[0][1](object()) == "break"
+    assert root.destroy_calls == 1

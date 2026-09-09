@@ -7,6 +7,7 @@ import webbrowser
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 from typing import TYPE_CHECKING
 
+from keyrgb.gui.utils.window_bindings import install_window_bindings
 from keyrgb.gui.utils.window_state import WindowGeometryTracker
 
 from ._support import (
@@ -114,6 +115,9 @@ class SupportToolsGUI(support_session_bridge.SupportWindowSessionBridgeMixin):
         protocol = getattr(self.root, "protocol", None)
         if callable(protocol):
             protocol("WM_DELETE_WINDOW", self._on_close)
+        # UX-08: Ctrl+W/Escape share the exact orderly close above (additive,
+        # focus-preserving; no save shortcut in Support).
+        install_window_bindings(self.root, on_close=self._on_close)
 
         self._sync_button_state()
 

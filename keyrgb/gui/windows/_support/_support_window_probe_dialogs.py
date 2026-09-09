@@ -7,7 +7,7 @@ from . import _support_window_probe_dialog_layout as _dialog_layout
 
 _GridPadding: TypeAlias = tuple[int, int]
 _DialogAction: TypeAlias = Callable[[], None]
-_DialogBindCallback: TypeAlias = Callable[[object | None], None]
+_DialogBindCallback: TypeAlias = Callable[[object | None], object]
 _ChoiceValueT = TypeVar("_ChoiceValueT")
 
 
@@ -109,6 +109,8 @@ class _DialogWidget(_BindableWidget, Protocol):
 
     def wait_window(self) -> None: ...
 
+    def focus_get(self) -> object: ...
+
 
 class _FrameFactory(Protocol):
     def __call__(self, parent: object, *, padding: int | None = None) -> _DialogContainer: ...
@@ -163,6 +165,15 @@ _build_dialog_button_row = _dialog_layout._build_dialog_button_row
 _probe_dialog_geometry = _dialog_layout._probe_dialog_geometry
 
 
+def _bind_probe_dialog_keys(
+    dialog: _BindableWidget,
+    bindings: Sequence[tuple[str, _DialogBindCallback]],
+) -> None:
+    """Bind dialog shortcut keys additively without bypassing close routes."""
+    for sequence, handler in bindings:
+        dialog.bind(sequence, handler, add="+")
+
+
 def _show_probe_message_dialog(
     window: _ThemedProbeDialogWindow,
     *,
@@ -191,9 +202,13 @@ def _show_probe_message_dialog(
     body.configure(state="disabled")
 
     confirmed = False
+    closed = False
 
     def close(*, ok: bool) -> None:
-        nonlocal confirmed
+        nonlocal closed, confirmed
+        if closed:
+            return
+        closed = True
         confirmed = bool(ok)
         _dialog_layout._dismiss_probe_dialog(dialog)
 
@@ -208,13 +223,29 @@ def _show_probe_message_dialog(
     ok_btn = created_buttons[0]
 
     dialog.protocol("WM_DELETE_WINDOW", lambda: close(ok=False))
+
+    def _on_escape(_event: object | None = None) -> str:
+        close(ok=False)
+        return "break"
+
+    def _on_confirm(_event: object | None = None) -> str:
+        close(ok=True)
+        return "break"
+
+    _bind_probe_dialog_keys(
+        dialog,
+        [
+            ("<Escape>", _on_escape),
+            ("<Return>", _on_confirm),
+            ("<KP_Enter>", _on_confirm),
+        ],
+    )
     try:
         dialog.grab_set()
     except _PROBE_DIALOG_ERRORS:
         pass
     try:
         ok_btn.focus_set()
-        body.focus_set()
     except _PROBE_DIALOG_ERRORS:
         pass
     dialog.wait_window()
@@ -241,9 +272,13 @@ def _ask_probe_choice_dialog(
     _bind_dialog_prompt_wrap(dialog, prompt_label, container, padding=72, minimum=220)
 
     selected_value: _ChoiceValueT | None = None
+    closed = False
 
     def close(value: _ChoiceValueT | None) -> None:
-        nonlocal selected_value
+        nonlocal closed, selected_value
+        if closed:
+            return
+        closed = True
         selected_value = value
         _dialog_layout._dismiss_probe_dialog(dialog)
 
@@ -260,6 +295,30 @@ def _ask_probe_choice_dialog(
     )
 
     dialog.protocol("WM_DELETE_WINDOW", lambda: close(None))
+
+    def _on_escape(_event: object | None = None) -> str:
+        close(None)
+        return "break"
+
+    def _on_confirm_default(_event: object | None = None) -> str:
+        if choices:
+            focused = dialog.focus_get()
+            for button, (_label, value) in zip(created_buttons, choices, strict=False):
+                if focused is button:
+                    close(value)
+                    break
+            else:
+                close(choices[0][1])
+        return "break"
+
+    _bind_probe_dialog_keys(
+        dialog,
+        [
+            ("<Escape>", _on_escape),
+            ("<Return>", _on_confirm_default),
+            ("<KP_Enter>", _on_confirm_default),
+        ],
+    )
     try:
         dialog.grab_set()
     except _PROBE_DIALOG_ERRORS:
@@ -303,9 +362,13 @@ def _ask_probe_notes_dialog(
     notes_box.grid(row=1, column=0, sticky="nsew")
 
     notes_value: str | None = None
+    closed = False
 
     def close(*, ok: bool) -> None:
-        nonlocal notes_value
+        nonlocal closed, notes_value
+        if closed:
+            return
+        closed = True
         if ok:
             notes_value = str(notes_box.get("1.0", "end")).strip()
         _dialog_layout._dismiss_probe_dialog(dialog)
@@ -320,6 +383,15 @@ def _ask_probe_notes_dialog(
     )
 
     dialog.protocol("WM_DELETE_WINDOW", lambda: close(ok=False))
+
+    def _on_escape(_event: object | None = None) -> str:
+        close(ok=False)
+        return "break"
+
+    # NOTE: no bare <Return>/<KP_Enter> binding here: the ScrolledText
+    # notes box needs newline keys, so only the existing OK/Cancel
+    # buttons confirm or cancel.
+    _bind_probe_dialog_keys(dialog, [("<Escape>", _on_escape)])
     try:
         dialog.grab_set()
         notes_box.focus_set()

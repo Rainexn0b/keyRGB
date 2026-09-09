@@ -81,7 +81,7 @@ class _FakeRoot:
         self.resizable_calls: list[tuple[bool, bool]] = []
         self.protocol_calls: list[tuple[str, object]] = []
         self.after_calls: list[tuple[int, object]] = []
-        self.bind_calls: list[tuple[str, object]] = []
+        self.bind_calls: list[tuple[str, object, object | None]] = []
         self.destroy_calls = 0
         self.report_callback_exception = lambda *_args: None
         self.update_idletasks_calls = 0
@@ -104,8 +104,8 @@ class _FakeRoot:
     def after(self, delay: int, callback) -> None:
         self.after_calls.append((delay, callback))
 
-    def bind(self, sequence: str, callback) -> None:
-        self.bind_calls.append((sequence, callback))
+    def bind(self, sequence: str, callback, add=None) -> None:
+        self.bind_calls.append((sequence, callback, add))
 
     def update_idletasks(self) -> None:
         self.update_idletasks_calls += 1
@@ -352,3 +352,59 @@ def test_probe_color_support_fails_closed_when_backend_probe_fails() -> None:
     )
 
     assert result is False
+
+
+def test_shortcuts_route_to_orderly_close_without_save(monkeypatch) -> None:
+    root = _FakeRoot()
+    config = SimpleNamespace(
+        reactive_use_manual_color=False,
+        reactive_visual_mode="subtle",
+        reactive_color=(12, 34, 56),
+        reactive_brightness=14,
+        brightness=14,
+    )
+
+    def _frame(parent=None, **kwargs):
+        return _FakeWidget(parent, **kwargs)
+
+    def _label(parent=None, **kwargs):
+        return _FakeWidget(parent, **kwargs)
+
+    def _checkbutton(parent=None, **kwargs):
+        return _FakeWidget(parent, **kwargs)
+
+    def _separator(parent=None, **kwargs):
+        return _FakeWidget(parent, **kwargs)
+
+    def _scale(parent=None, **kwargs):
+        return _FakeWidget(parent, **kwargs)
+
+    monkeypatch.setattr(reactive_color.tk, "Tk", lambda: root)
+    monkeypatch.setattr(reactive_color.tk, "BooleanVar", _FakeVar)
+    monkeypatch.setattr(reactive_color.tk, "DoubleVar", _FakeVar)
+    monkeypatch.setattr(reactive_color.ttk, "Frame", _frame)
+    monkeypatch.setattr(reactive_color.ttk, "Label", _label)
+    monkeypatch.setattr(reactive_color.ttk, "Checkbutton", _checkbutton)
+    monkeypatch.setattr(reactive_color.ttk, "Separator", _separator)
+    monkeypatch.setattr(reactive_color.ttk, "Scale", _scale)
+    monkeypatch.setattr(reactive_color, "ColorWheel", _FakeColorWheelWithCallback)
+    monkeypatch.setattr(reactive_color, "Config", lambda: config)
+    monkeypatch.setattr(reactive_color, "select_backend", lambda: None)
+    monkeypatch.setattr(reactive_color, "apply_clam_theme", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(reactive_color, "apply_keyrgb_window_icon", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(reactive_color.signal, "signal", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(reactive_color.time, "monotonic", lambda: 0.0)
+
+    gui = reactive_color.ReactiveColorGUI()
+
+    # WM protocol is preserved on the exact orderly close path.
+    assert root.protocol_calls == [("WM_DELETE_WINDOW", gui._on_close)]
+    # Exact shortcut set: close-only, additive, no save, no native navigation.
+    assert [sequence for sequence, _, _ in root.bind_calls] == ["<Control-w>", "<Escape>"]
+    assert all(add == "+" for _, _, add in root.bind_calls)
+    assert all("Tab" not in sequence for sequence, _, _ in root.bind_calls)
+    assert root.bind_calls[0][1] is root.bind_calls[1][1]
+    # Existing close/geometry ordering stays: centered fallback still runs.
+    assert any(delay == 50 for delay, _callback in root.after_calls)
+    assert root.bind_calls[0][1](object()) == "break"
+    assert root.destroy_calls == 1

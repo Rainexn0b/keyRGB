@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, cast
 
 from keyrgb.gui.theme import metrics as theme_metrics
 from keyrgb.gui.theme.focus import schedule_initial_focus
+from keyrgb.gui.utils.window_bindings import install_window_bindings
 from keyrgb.gui.utils.window_state import WindowGeometryTracker
 from keyrgb.gui.windows import (
     _reactive_color_geometry,
@@ -139,6 +140,9 @@ class ReactiveColorGUI:
             signal_module=signal,
             sigint=signal.SIGINT,
         )
+        # UX-08: Ctrl+W/Escape share the exact orderly close above (additive,
+        # focus-preserving; no save shortcut in Reactive).
+        install_window_bindings(self.root, on_close=self._on_close)
 
     def _get_settings_adapter(self) -> ReactiveColorSettingsAdapter:
         adapter = self._settings_adapter

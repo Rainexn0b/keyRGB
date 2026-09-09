@@ -21,9 +21,9 @@ specs for larger changes.
 - `2026-09-09/pre-1.0-tk-ux-hardening-plan.md` — active Tkinter UX campaign;
   categorized Settings and shared visual, spacing, contrast, and focus behavior
   and native per-key controls are complete; duplicate-instance prevention is
-  complete; geometry persistence is monitoring pending a Plasma Wayland
-  walkthrough, and keyboard access is active; the per-key editor/calibration
-  redesign remains explicitly deferred pending dedicated UX discussion
+  complete; geometry persistence and keyboard access are monitoring pending
+  desktop walkthroughs, while the per-key editor/calibration redesign remains
+  explicitly deferred pending dedicated UX discussion
 - `2026-08-11/architecture-concerns-plan.md` — confirmation and remediation
   tracker for the 2026-08-11 architecture review; one finding per pass, with
   test-first contracts and explicit confirmed/rejected status

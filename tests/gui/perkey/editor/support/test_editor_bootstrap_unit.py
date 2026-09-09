@@ -38,8 +38,8 @@ class _Root:
     def protocol(self, name: str, func: object) -> None:
         self.protocols[name] = func
 
-    def bind(self, sequence: str, func: object) -> None:
-        self.binds.append((sequence, func))
+    def bind(self, sequence: str, func: object, add: object = None) -> None:
+        self.binds.append((sequence, func, add))
 
     def after(self, delay_ms: int, callback: object) -> str:
         self.after_calls.append((delay_ms, callback))
@@ -113,6 +113,7 @@ def test_initialize_editor_wires_state_ui_and_initial_selection(monkeypatch: pyt
         ],
         select_slot_id=MagicMock(),
         _on_close=MagicMock(),
+        _save_profile=MagicMock(),
         canvas=SimpleNamespace(redraw=MagicMock()),
     )
 
@@ -178,7 +179,7 @@ def test_initialize_editor_wires_state_ui_and_initial_selection(monkeypatch: pyt
     app.canvas.redraw.assert_called()
     assert status_msgs == []  # keymap present
     app.select_slot_id.assert_called_once_with("slot_esc")
-    assert all(seq != "<FocusIn>" for seq, _ in app.root.binds)
+    assert all(seq != "<FocusIn>" for seq, *_ in app.root.binds)
 
 
 def test_initialize_editor_handles_missing_secondary_lighting_and_empty_keymap(
@@ -195,6 +196,7 @@ def test_initialize_editor_handles_missing_secondary_lighting_and_empty_keymap(
         _get_visible_layout_keys=list,
         select_slot_id=MagicMock(),
         _on_close=MagicMock(),
+        _save_profile=MagicMock(),
         canvas=SimpleNamespace(redraw=MagicMock()),
     )
     profiles = SimpleNamespace(
@@ -217,7 +219,7 @@ def test_initialize_editor_handles_missing_secondary_lighting_and_empty_keymap(
         def update_idletasks(self) -> None:
             pass
 
-        def bind(self, sequence: str, func: object) -> None:
+        def bind(self, sequence: str, func: object, add: object = None) -> None:
             pass
 
         def after(self, delay_ms: int, callback: object) -> None:

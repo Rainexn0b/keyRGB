@@ -52,8 +52,8 @@ class _FakeWidget:
     def grid(self, **kwargs) -> None:
         self.grid_calls.append(dict(kwargs))
 
-    def bind(self, sequence: str, callback) -> None:
-        self.bind_calls.append((sequence, callback))
+    def bind(self, sequence: str, callback, add=None) -> None:
+        self.bind_calls.append((sequence, callback, add))
 
     def configure(self, **kwargs) -> None:
         self.configure_calls.append(dict(kwargs))
@@ -87,7 +87,7 @@ class _FakeRoot:
         self.resizable_calls: list[tuple[bool, bool]] = []
         self.protocol_calls: list[tuple[str, object]] = []
         self.after_calls: list[tuple[int, object]] = []
-        self.bind_calls: list[tuple[str, object]] = []
+        self.bind_calls: list[tuple[str, object, object | None]] = []
         self.destroy_calls = 0
         self.report_callback_exception = lambda *_args: None
         self.update_idletasks_calls = 0
@@ -113,8 +113,8 @@ class _FakeRoot:
     def focus_get(self) -> object:
         return self._focused
 
-    def bind(self, sequence: str, callback) -> None:
-        self.bind_calls.append((sequence, callback))
+    def bind(self, sequence: str, callback, add=None) -> None:
+        self.bind_calls.append((sequence, callback, add))
 
     def update_idletasks(self) -> None:
         self.update_idletasks_calls += 1

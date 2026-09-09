@@ -62,6 +62,7 @@ class _FakeRoot:
         self.destroy_calls = 0
         self.update_idletasks_calls = 0
         self.protocol_calls: list[tuple[str, object]] = []
+        self.bind_calls: list[tuple[str, object, object | None]] = []
 
     def title(self, text: str) -> None:
         self.title_calls.append(text)
@@ -95,6 +96,9 @@ class _FakeRoot:
 
     def protocol(self, name: str, callback) -> None:
         self.protocol_calls.append((name, callback))
+
+    def bind(self, sequence: str, callback, add=None) -> None:
+        self.bind_calls.append((sequence, callback, add))
 
 
 class _FakeColorWheel:
@@ -163,6 +167,49 @@ def test_constructor_uses_content_driven_geometry(monkeypatch) -> None:
     assert apply_button.grid_calls == [{"row": 0, "column": 0, "sticky": "ew", "padx": (0, 8)}]
     assert close_button.grid_calls == [{"row": 0, "column": 1, "sticky": "ew", "padx": (8, 0)}]
     assert [name for name, _callback in root.protocol_calls] == ["WM_DELETE_WINDOW"]
+
+
+def test_shortcuts_route_to_orderly_close_without_save(monkeypatch) -> None:
+    root = _FakeRoot()
+    config = SimpleNamespace(color=(12, 34, 56), brightness=25, effect="none")
+
+    def _frame(parent=None, **kwargs):
+        return _FakeWidget(parent, **kwargs)
+
+    def _label(parent=None, **kwargs):
+        return _FakeWidget(parent, **kwargs)
+
+    def _button(parent=None, **kwargs):
+        return _FakeWidget(parent, **kwargs)
+
+    monkeypatch.setattr(uniform.tk, "Tk", lambda: root)
+    monkeypatch.setattr(uniform.ttk, "Frame", _frame)
+    monkeypatch.setattr(uniform.ttk, "Label", _label)
+    monkeypatch.setattr(uniform.ttk, "Button", _button)
+    monkeypatch.setattr(uniform, "ColorWheel", _FakeColorWheel)
+    monkeypatch.setattr(uniform, "Config", lambda: config)
+    monkeypatch.setattr(uniform, "select_backend", lambda **_kwargs: None)
+    monkeypatch.setattr(uniform, "route_for_backend_name", lambda _name: None)
+    monkeypatch.setattr(uniform, "route_for_device_type", lambda _name: None)
+    monkeypatch.setattr(uniform, "apply_clam_theme", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(uniform, "apply_keyrgb_window_icon", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(uniform, "compute_centered_window_geometry", lambda *_args, **_kwargs: "520x570+10+20")
+    monkeypatch.setattr(uniform, "acquire_hardware_control_lock", lambda: False)
+    monkeypatch.setattr(uniform, "release_hardware_control_lock", lambda: None)
+
+    gui = uniform.UniformColorGUI()
+
+    # WM protocol is preserved on the exact orderly close path.
+    assert root.protocol_calls == [("WM_DELETE_WINDOW", gui._on_close)]
+    # Exact shortcut set: close-only, additive, no save, no native navigation.
+    assert [sequence for sequence, _, _ in root.bind_calls] == ["<Control-w>", "<Escape>"]
+    assert all(add == "+" for _, _, add in root.bind_calls)
+    assert all("Tab" not in sequence for sequence, _, _ in root.bind_calls)
+    assert root.bind_calls[0][1] is root.bind_calls[1][1]
+    # Existing close/geometry ordering stays: centered fallback still runs.
+    assert root.geometry_calls == ["520x570+10+20"]
+    assert root.bind_calls[0][1](object()) == "break"
+    assert root.destroy_calls == 1
 
 
 def test_constructor_delegates_bootstrap_state_to_adapter(monkeypatch) -> None:

@@ -12,6 +12,7 @@ from keyrgb.core.power import system as _power_system
 from keyrgb.gui import theme as gui_theme
 from keyrgb.gui.theme import metrics as theme_metrics
 from keyrgb.gui.utils.tk_async import TkAsyncCoordinator, submit_gui_work
+from keyrgb.gui.utils.window_bindings import install_window_bindings
 from keyrgb.gui.utils.window_geometry import compute_centered_window_geometry
 from keyrgb.gui.utils.window_icon import apply_keyrgb_window_icon
 from keyrgb.gui.utils.window_state import WindowGeometryTracker
@@ -152,6 +153,9 @@ class PowerModeSettingsGUI:
         protocol = getattr(self.root, "protocol", None)
         if callable(protocol):
             protocol("WM_DELETE_WINDOW", self._close)
+        # UX-08: Ctrl+W/Escape share the exact orderly close above; Ctrl+S
+        # shares the exact Save-button handler (additive, focus-preserving).
+        install_window_bindings(self.root, on_close=self._close, on_save=self._save)
         self.root.after(_LIVE_PREVIEW_INTERVAL_MS, self._refresh_live_freq_preview)
 
     def _configured_cap_khz(self) -> int:

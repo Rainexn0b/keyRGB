@@ -88,6 +88,9 @@ class _Widget:
     def focus_set(self) -> None:
         self.focus += 1
 
+    def focus_get(self) -> object | None:
+        return None
+
     def title(self, value: str) -> None:
         self.kwargs["title"] = value
 

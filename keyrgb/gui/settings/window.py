@@ -23,6 +23,7 @@ from keyrgb.core import config as core_config
 from keyrgb.gui import theme as gui_theme
 from keyrgb.gui.theme import metrics as theme_metrics
 from keyrgb.gui.utils import tk_async, window_geometry, window_icon, window_state
+from keyrgb.gui.utils.window_bindings import install_window_bindings
 
 from . import (
     _settings_window_constants as _swc,
@@ -106,6 +107,9 @@ class PowerSettingsGUI:
         # Route the window-manager close button through the same orderly
         # close path as the Close button so geometry is saved first.
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+        # UX-08: Ctrl+W/Escape share the exact orderly close above (additive,
+        # focus-preserving; no save shortcut in Settings).
+        install_window_bindings(self.root, on_close=self._on_close)
 
         bg_color, _fg_color = apply_clam_theme(self.root)
 

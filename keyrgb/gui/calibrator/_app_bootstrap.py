@@ -6,6 +6,7 @@ from typing import Any, Protocol, TypeAlias, cast
 
 from keyrgb.gui.theme import metrics as theme_metrics
 from keyrgb.gui.theme.focus import schedule_initial_focus
+from keyrgb.gui.utils.window_bindings import install_window_bindings
 from keyrgb.gui.utils.window_geometry import compute_centered_window_geometry
 from keyrgb.gui.utils.window_state import WindowGeometryTracker
 
@@ -249,14 +250,13 @@ def build_widgets(
     def _prev_from_event(_event: _tk.Event) -> None:
         app._prev()
 
-    def _close_from_event(_event: _tk.Event) -> None:
-        app._on_close()
-
     window.bind("<Return>", _assign_from_event)
     window.bind("<KP_Enter>", _assign_from_event)
     window.bind("<Right>", _next_from_event)
     window.bind("<Left>", _prev_from_event)
-    window.bind("<Escape>", _close_from_event)
+    # UX-08 shared shortcuts: Ctrl+W/Escape close, Ctrl+S saves via _save
+    # (not save-and-close). Probe navigation above is unchanged.
+    install_window_bindings(window, on_close=app._on_close, on_save=app._save)
 
     # Intentional non-forcing initial focus: Assign is always present and
     # enabled, and matches the core probe loop (Step 3). The helper schedules

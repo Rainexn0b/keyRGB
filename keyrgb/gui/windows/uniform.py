@@ -15,6 +15,7 @@ from keyrgb.core.utils.exceptions import is_device_busy
 from keyrgb.gui.theme import apply_clam_theme
 from keyrgb.gui.theme.focus import schedule_initial_focus
 from keyrgb.gui.utils.tk_async import TkAsyncCoordinator, submit_gui_work
+from keyrgb.gui.utils.window_bindings import install_window_bindings
 from keyrgb.gui.utils.window_geometry import compute_centered_window_geometry
 from keyrgb.gui.utils.window_icon import apply_keyrgb_window_icon
 from keyrgb.gui.utils.window_state import WindowGeometryTracker
@@ -161,6 +162,9 @@ class UniformColorGUI:
         protocol = getattr(self.root, "protocol", None)
         if callable(protocol):
             protocol("WM_DELETE_WINDOW", self._on_close)
+        # UX-08: Ctrl+W/Escape share the exact orderly close above (additive,
+        # focus-preserving; no save shortcut in Uniform).
+        install_window_bindings(self.root, on_close=self._on_close)
 
     def _schedule_initial_focus(self) -> None:
         # Intentional non-forcing initial focus (UX-05): Apply is the primary

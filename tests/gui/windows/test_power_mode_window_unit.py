@@ -48,6 +48,8 @@ class _FakeRoot:
         self.minsize_calls: list[tuple[int, int]] = []
         self.resizable_calls: list[tuple[bool, bool]] = []
         self.after_calls: list[tuple[int, object]] = []
+        self.protocol_calls: list[tuple[str, object]] = []
+        self.bind_calls: list[tuple[str, object, object | None]] = []
         self.update_idletasks_calls = 0
         self.destroy_calls = 0
 
@@ -65,6 +67,12 @@ class _FakeRoot:
 
     def after(self, delay: int, callback) -> None:
         self.after_calls.append((delay, callback))
+
+    def protocol(self, name: str, callback) -> None:
+        self.protocol_calls.append((name, callback))
+
+    def bind(self, sequence: str, callback, add=None) -> None:
+        self.bind_calls.append((sequence, callback, add))
 
     def update_idletasks(self) -> None:
         self.update_idletasks_calls += 1
@@ -395,3 +403,94 @@ def test_apply_geometry_swallows_errors(monkeypatch) -> None:
         lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("geo")),
     )
     power_mode.PowerModeSettingsGUI._apply_geometry(gui)
+
+
+def test_shortcuts_route_close_and_save_to_exact_handlers(monkeypatch) -> None:
+    root = _FakeRoot()
+    registry: dict[str, list[_FakeWidget]] = {
+        "labels": [],
+        "frames": [],
+        "labelframes": [],
+        "buttons": [],
+        "scales": [],
+    }
+    config = SimpleNamespace(system_power_extreme_cap_khz=1_300_000)
+
+    def _frame(parent=None, **kwargs):
+        widget = _FakeWidget(parent, **kwargs)
+        registry["frames"].append(widget)
+        return widget
+
+    def _labelframe(parent=None, **kwargs):
+        widget = _FakeWidget(parent, **kwargs)
+        registry["labelframes"].append(widget)
+        return widget
+
+    def _label(parent=None, **kwargs):
+        widget = _FakeWidget(parent, **kwargs)
+        registry["labels"].append(widget)
+        return widget
+
+    def _button(parent=None, **kwargs):
+        widget = _FakeWidget(parent, **kwargs)
+        registry["buttons"].append(widget)
+        return widget
+
+    def _scale(parent=None, **kwargs):
+        widget = _FakeWidget(parent, **kwargs)
+        registry["scales"].append(widget)
+        return widget
+
+    monkeypatch.setattr(power_mode.tk, "Tk", lambda: root)
+    monkeypatch.setattr(power_mode.tk, "DoubleVar", _FakeVar)
+    monkeypatch.setattr(power_mode.tk, "StringVar", _FakeVar)
+    monkeypatch.setattr(power_mode.ttk, "Frame", _frame)
+    monkeypatch.setattr(power_mode.ttk, "LabelFrame", _labelframe)
+    monkeypatch.setattr(power_mode.ttk, "Label", _label)
+    monkeypatch.setattr(power_mode.ttk, "Button", _button)
+    monkeypatch.setattr(power_mode.ttk, "Scale", _scale)
+    monkeypatch.setattr(power_mode, "Config", lambda: config)
+    monkeypatch.setattr(power_mode, "apply_clam_theme", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(power_mode, "apply_keyrgb_window_icon", lambda *_args, **_kwargs: None)
+    focus_calls: list[tuple[object, object]] = []
+    monkeypatch.setattr(
+        power_mode, "schedule_initial_focus", lambda root_arg, target: focus_calls.append((root_arg, target))
+    )
+    monkeypatch.setattr(power_mode, "get_current_freq_stats_khz", lambda: (1_025_000, 1_300_000))
+    monkeypatch.setattr(
+        power_mode,
+        "get_status",
+        lambda: SimpleNamespace(
+            supported=True,
+            mode=SimpleNamespace(value="balanced"),
+            reason="ok",
+            identifiers={},
+        ),
+    )
+    monkeypatch.setattr(power_mode, "compute_centered_window_geometry", lambda *_args, **_kwargs: "760x520+10+20")
+
+    gui = power_mode.PowerModeSettingsGUI()
+
+    # WM protocol is preserved on the exact orderly close path.
+    assert root.protocol_calls == [("WM_DELETE_WINDOW", gui._close)]
+    # Exact shortcut set with save, all additive, no native navigation.
+    assert [sequence for sequence, _, _ in root.bind_calls] == ["<Control-w>", "<Escape>", "<Control-s>"]
+    assert all(add == "+" for _, _, add in root.bind_calls)
+    assert all("Tab" not in sequence for sequence, _, _ in root.bind_calls)
+    assert root.bind_calls[0][1] is root.bind_calls[1][1]
+    assert root.bind_calls[0][1] is not root.bind_calls[2][1]
+    # The Save shortcut shares the exact handler wired to the Save button.
+    save_button = next(widget for widget in registry["buttons"] if widget.kwargs.get("text") == "Save")
+    assert save_button.kwargs.get("command") == gui._save
+    # Existing close/geometry ordering stays: centered fallback still runs.
+    assert root.geometry_calls == ["760x520+10+20"]
+    # Save shortcut returns break and invokes the exact Save-button handler.
+    submits: list[tuple[object, object]] = []
+    monkeypatch.setattr(
+        power_mode, "submit_gui_work", lambda owner, root_arg, work, on_done: submits.append((work, on_done))
+    )
+    assert root.bind_calls[2][1](object()) == "break"
+    assert submits != []
+    # Close shortcuts return break and invoke the exact _close route once.
+    assert root.bind_calls[0][1](object()) == "break"
+    assert root.destroy_calls == 1

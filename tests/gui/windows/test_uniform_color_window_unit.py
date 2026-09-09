@@ -26,8 +26,8 @@ class _FakeWidget:
     def grid(self, **kwargs) -> None:
         self.grid_calls.append(dict(kwargs))
 
-    def bind(self, sequence: str, callback) -> None:
-        self.bind_calls.append((sequence, callback))
+    def bind(self, sequence: str, callback, add=None) -> None:
+        self.bind_calls.append((sequence, callback, add))
 
     def configure(self, **kwargs) -> None:
         self.configure_calls.append(dict(kwargs))
@@ -58,6 +58,7 @@ class _FakeRoot:
         self.destroy_calls = 0
         self.update_idletasks_calls = 0
         self.protocol_calls: list[tuple[str, object]] = []
+        self.bind_calls: list[tuple[str, object, object | None]] = []
 
     def title(self, text: str) -> None:
         self.title_calls.append(text)
@@ -88,6 +89,9 @@ class _FakeRoot:
 
     def protocol(self, name: str, callback) -> None:
         self.protocol_calls.append((name, callback))
+
+    def bind(self, sequence: str, callback, add=None) -> None:
+        self.bind_calls.append((sequence, callback, add))
 
 
 class _FakeColorWheel:

@@ -190,6 +190,7 @@ class _ColorWheelUIMixin:
 
         for ent in (self.rgb_r_entry, self.rgb_g_entry, self.rgb_b_entry):
             ent.bind("<Return>", lambda _e: self._on_manual_rgb_set())
+            ent.bind("<KP_Enter>", lambda _e: self._on_manual_rgb_set())
 
         self._update_preview()
 
