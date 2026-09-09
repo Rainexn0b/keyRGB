@@ -122,9 +122,9 @@ outcome.
 | UX-03 | Simplify the per-key editor's default view | P2 | L | deferred | UX-01, UX-02, UX-05–UX-09, and dedicated UX discussion |
 | UX-04 | Turn keyboard setup and calibration into a guided workflow | P2 | L | deferred | UX-03 direction and dedicated UX discussion |
 | UX-05 | Establish consistent spacing, typography, focus, and disabled contrast | P1 | M | done | UX-07 |
-| UX-06 | Persist and safely restore main-window geometry | P1 | M | monitoring | UX-09 |
+| UX-06 | Persist and safely restore main-window geometry | P1 | M | done | UX-09 |
 | UX-07 | Replace custom dropdowns with standard Tk controls | P1 | M | done | UX-00 |
-| UX-08 | Add accelerators and keyboard-access contracts | P1 | M | monitoring | UX-05 and UX-07 |
+| UX-08 | Add accelerators and keyboard-access contracts | P1 | M | done | UX-05 and UX-07 |
 | UX-09 | Prevent duplicate instances of the same GUI | P1 | M | done | UX-00 |
 
 ## UX-00 — Baseline characterization and review matrix
@@ -1182,3 +1182,16 @@ coverage.
   standard form control and native combobox popup behavior. No implementation
   item is activated next: UX-03 and UX-04 remain deferred at their required
   dedicated UX discussion gate.
+
+### 2026-09-09 — UX-06 and UX-08 owner acceptance
+
+- The owner opened all main windows after the geometry and keyboard-access
+  changes and reported that they work correctly.
+- This owner walkthrough closes the remaining desktop acceptance gate for
+  UX-06 and UX-08; both items are now `done`.
+- No X11-specific position-restoration claim is added. Wayland position remains
+  explicitly best-effort, while persisted size and orderly shortcut routes are
+  the supported contracts.
+- The campaign is now at the UX-03 dedicated design-discussion gate. Production
+  implementation remains deferred until an updated per-key editor screenshot
+  and a low-fidelity default/setup/advanced layout direction are approved.
