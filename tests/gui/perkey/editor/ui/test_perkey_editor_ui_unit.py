@@ -180,6 +180,25 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
     assert button_styles["Set as Default"] is None
     assert button_styles["Set Backdrop..."] is None
     assert button_styles["Reset Backdrop"] is None
+    profile_buttons = {
+        button.options["text"]: button
+        for button in registry["buttons"]
+        if button.options["text"] in {"New", "Activate", "Save", "Delete"}
+    }
+    profile_actions = profile_buttons["New"].parent
+    assert all(button.parent is profile_actions for button in profile_buttons.values())
+    assert profile_actions.columnconfigure_calls == [
+        {"index": 0, "weight": 1},
+        {"index": 1, "weight": 1},
+    ]
+    assert profile_buttons["New"].grid_calls == [{"row": 0, "column": 0, "sticky": "ew", "padx": (0, 3)}]
+    assert profile_buttons["Activate"].grid_calls == [{"row": 0, "column": 1, "sticky": "ew", "padx": (3, 0)}]
+    assert profile_buttons["Save"].grid_calls == [
+        {"row": 1, "column": 0, "sticky": "ew", "padx": (0, 3), "pady": (6, 0)}
+    ]
+    assert profile_buttons["Delete"].grid_calls == [
+        {"row": 1, "column": 1, "sticky": "ew", "padx": (3, 0), "pady": (6, 0)}
+    ]
     assert "font" not in editor.status_label.options
     assert all("font" not in label.options for label in registry["labels"])
     assert len(registry["separators"]) == 1

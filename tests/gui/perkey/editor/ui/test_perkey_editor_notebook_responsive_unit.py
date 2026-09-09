@@ -28,12 +28,19 @@ def test_profiles_tab_stacks_narrow_and_restores_wide(monkeypatch: pytest.Monkey
 
     tab.width = NARROW_WIDTH
     _sync(tab)(None)
-    assert editor._profiles_frame.grid_calls[-1] == {"row": 0, "column": 0, "columnspan": 2, "sticky": "nsew"}
+    assert editor._profiles_frame.grid_calls[-1] == {
+        "row": 0,
+        "column": 0,
+        "columnspan": 2,
+        "sticky": "nsew",
+        "padx": 0,
+    }
     assert editor._profiles_auto_frame.grid_calls[-1] == {
         "row": 1,
         "column": 0,
         "columnspan": 2,
         "sticky": "nsew",
+        "padx": 0,
         "pady": (10, 0),
     }
 
@@ -46,8 +53,21 @@ def test_profiles_tab_stacks_narrow_and_restores_wide(monkeypatch: pytest.Monkey
 
     tab.width = WIDE_WIDTH
     _sync(tab)(None)
-    assert editor._profiles_frame.grid_calls[-1] == {"row": 0, "column": 0, "sticky": "nsew", "padx": (0, 6)}
-    assert editor._profiles_auto_frame.grid_calls[-1] == {"row": 0, "column": 1, "sticky": "nsew", "padx": (6, 0)}
+    assert editor._profiles_frame.grid_calls[-1] == {
+        "row": 0,
+        "column": 0,
+        "sticky": "nsew",
+        "padx": (0, 6),
+        "columnspan": 1,
+    }
+    assert editor._profiles_auto_frame.grid_calls[-1] == {
+        "row": 0,
+        "column": 1,
+        "sticky": "nsew",
+        "padx": (6, 0),
+        "columnspan": 1,
+        "pady": 0,
+    }
     # Management stays left, automatic selection stays right with callbacks intact.
     assert editor._profiles_combo.parent is editor._profiles_frame
     assert editor._ac_power_source_profile_combo.parent is editor._profiles_auto_frame
@@ -70,15 +90,24 @@ def test_setup_tab_stacks_narrow_and_restores_wide(monkeypatch: pytest.MonkeyPat
         "column": 0,
         "columnspan": 2,
         "sticky": "nsew",
+        "padx": 0,
     }
     assert editor._optional_keys_controls.grid_calls[-1] == {
         "row": 1,
         "column": 0,
         "columnspan": 2,
         "sticky": "nsew",
+        "padx": 0,
         "pady": (10, 0),
     }
-    assert calibrator.grid_calls[-1] == {"row": 2, "column": 0, "columnspan": 2, "sticky": "ew", "pady": (10, 0)}
+    assert calibrator.grid_calls[-1] == {
+        "row": 2,
+        "column": 0,
+        "columnspan": 2,
+        "sticky": "ew",
+        "pady": (10, 0),
+        "padx": 0,
+    }
 
     calls = (
         len(editor._layout_setup_controls.grid_calls),
@@ -99,14 +128,24 @@ def test_setup_tab_stacks_narrow_and_restores_wide(monkeypatch: pytest.MonkeyPat
         "column": 0,
         "sticky": "nsew",
         "padx": (0, 6),
+        "columnspan": 1,
     }
     assert editor._optional_keys_controls.grid_calls[-1] == {
         "row": 0,
         "column": 1,
         "sticky": "nsew",
         "padx": (6, 0),
+        "columnspan": 1,
+        "pady": 0,
     }
-    assert calibrator.grid_calls[-1] == {"row": 1, "column": 1, "sticky": "ew", "padx": (6, 0), "pady": (10, 0)}
+    assert calibrator.grid_calls[-1] == {
+        "row": 1,
+        "column": 1,
+        "sticky": "ew",
+        "padx": (6, 0),
+        "pady": (10, 0),
+        "columnspan": 1,
+    }
 
 
 def test_advanced_tab_without_secondaries_uses_two_columns_and_stacks(
@@ -130,21 +169,30 @@ def test_advanced_tab_without_secondaries_uses_two_columns_and_stacks(
         "column": 0,
         "columnspan": 2,
         "sticky": "nsew",
+        "padx": 0,
     }
     assert editor._overlay_setup_panel.grid_calls[-1] == {
         "row": 1,
         "column": 0,
         "columnspan": 2,
         "sticky": "nsew",
+        "padx": 0,
         "pady": (10, 0),
     }
     # Hidden conditional must not be re-shown; only its stored canonical
     # options track the narrow stacked placement.
     assert len(panel.grid_calls) == panel_calls
     assert panel.grid_remove_calls == 1
-    assert panel._grid_options == {"row": 2, "column": 0, "columnspan": 2, "sticky": "nsew", "pady": (10, 0)}
+    assert panel._grid_options == {
+        "row": 2,
+        "column": 0,
+        "columnspan": 2,
+        "sticky": "nsew",
+        "pady": (10, 0),
+        "padx": 0,
+    }
     panel.grid()
-    assert panel.grid_calls[-1] == {"row": 2, "column": 0, "columnspan": 2, "sticky": "nsew", "pady": (10, 0)}
+    assert panel.grid_calls[-1] == panel._grid_options
 
     tab.width = WIDE_WIDTH
     _sync(tab)(None)
@@ -153,10 +201,25 @@ def test_advanced_tab_without_secondaries_uses_two_columns_and_stacks(
         "column": 0,
         "sticky": "nsew",
         "padx": (0, 6),
+        "columnspan": 1,
     }
-    assert editor._overlay_setup_panel.grid_calls[-1] == {"row": 0, "column": 1, "sticky": "nsew", "padx": (6, 0)}
+    assert editor._overlay_setup_panel.grid_calls[-1] == {
+        "row": 0,
+        "column": 1,
+        "sticky": "nsew",
+        "padx": (6, 0),
+        "columnspan": 1,
+        "pady": 0,
+    }
     # Wide restore keeps the canonical right-column placement for re-show.
-    assert panel._grid_options == {"row": 1, "column": 1, "sticky": "nsew", "padx": (6, 0), "pady": (10, 0)}
+    assert panel._grid_options == {
+        "row": 1,
+        "column": 1,
+        "sticky": "nsew",
+        "padx": (6, 0),
+        "pady": (10, 0),
+        "columnspan": 1,
+    }
 
 
 def test_advanced_tab_with_secondaries_stacks_narrow_and_restores_wide(
@@ -178,15 +241,24 @@ def test_advanced_tab_with_secondaries_stacks_narrow_and_restores_wide(
         "column": 0,
         "columnspan": 2,
         "sticky": "nsew",
+        "padx": 0,
     }
     assert editor._overlay_setup_panel.grid_calls[-1] == {
         "row": 1,
         "column": 0,
         "columnspan": 2,
         "sticky": "nsew",
+        "padx": 0,
         "pady": (10, 0),
     }
-    assert panel.grid_calls[-1] == {"row": 2, "column": 0, "columnspan": 2, "sticky": "nsew", "pady": (10, 0)}
+    assert panel.grid_calls[-1] == {
+        "row": 2,
+        "column": 0,
+        "columnspan": 2,
+        "sticky": "nsew",
+        "pady": (10, 0),
+        "padx": 0,
+    }
 
     tab.width = WIDE_WIDTH
     _sync(tab)(None)
@@ -195,6 +267,21 @@ def test_advanced_tab_with_secondaries_stacks_narrow_and_restores_wide(
         "column": 0,
         "sticky": "nsew",
         "padx": (0, 6),
+        "columnspan": 1,
     }
-    assert editor._overlay_setup_panel.grid_calls[-1] == {"row": 0, "column": 1, "sticky": "nsew", "padx": (6, 0)}
-    assert panel.grid_calls[-1] == {"row": 1, "column": 1, "sticky": "nsew", "padx": (6, 0), "pady": (10, 0)}
+    assert editor._overlay_setup_panel.grid_calls[-1] == {
+        "row": 0,
+        "column": 1,
+        "sticky": "nsew",
+        "padx": (6, 0),
+        "columnspan": 1,
+        "pady": 0,
+    }
+    assert panel.grid_calls[-1] == {
+        "row": 1,
+        "column": 1,
+        "sticky": "nsew",
+        "padx": (6, 0),
+        "pady": (10, 0),
+        "columnspan": 1,
+    }

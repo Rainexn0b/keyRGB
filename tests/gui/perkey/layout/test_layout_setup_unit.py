@@ -118,11 +118,13 @@ def test_build_ui_creates_layout_controls_and_refreshes_slots(monkeypatch: pytes
 
     refresh_calls: list[object] = []
     monkeypatch.setattr(layout_setup, "refresh_layout_slots_ui", lambda editor: refresh_calls.append(editor))
+    layout_changed_calls: list[str] = []
 
     editor = SimpleNamespace(
-        _physical_layout=layout_setup.LAYOUT_CATALOG[0].layout_id,
+        _physical_layout="ansi",
         _layout_legend_pack="auto",
         _legend_pack_var=SimpleNamespace(set=lambda value: None),
+        _on_layout_changed=lambda: layout_changed_calls.append("changed"),
         _on_layout_legend_pack_changed=lambda: None,
         _reset_layout_defaults=lambda: None,
     )
@@ -142,6 +144,9 @@ def test_build_ui_creates_layout_controls_and_refreshes_slots(monkeypatch: pytes
     assert combo_instances[0].kwargs["values"] == layout_setup._LAYOUT_LABELS
     assert combo_instances[0].kwargs["state"] == "readonly"
     assert combo_instances[0].value == layout_setup._ID_TO_LABEL[editor._physical_layout]
+    # Programmatic initialization must display persisted state without
+    # invoking the user-selection path that writes config.physical_layout.
+    assert layout_changed_calls == []
     assert [call[0] for call in combo_instances[0].bind_calls] == ["<<ComboboxSelected>>"]
     assert combo_instances[0].bind_calls[0][1] == fake_self._on_layout_select
     assert combo_instances[1].kwargs["state"] == "readonly"

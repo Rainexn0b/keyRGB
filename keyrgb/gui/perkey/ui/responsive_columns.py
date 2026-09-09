@@ -10,6 +10,12 @@ from typing import Literal, Protocol
 WIDE_THRESHOLD_PX = 900
 
 _TK_ERRORS = (RuntimeError, TclError)
+_GRID_OPTION_DEFAULTS: dict[str, object] = {
+    "columnspan": 1,
+    "rowspan": 1,
+    "padx": 0,
+    "pady": 0,
+}
 
 GridOptions = dict[str, object]
 ResponsiveMode = Literal["wide", "narrow"]
@@ -43,6 +49,21 @@ class ResponsiveEntry:
     record_hidden: Callable[[Mapping[str, object]], None] | None = None
 
 
+def _completed_placements(
+    wide: Mapping[str, object],
+    narrow: Mapping[str, object],
+) -> tuple[GridOptions, GridOptions]:
+    """Fill options that Tk's grid retains when a later call omits them."""
+    completed_wide = dict(wide)
+    completed_narrow = dict(narrow)
+    for option, default in _GRID_OPTION_DEFAULTS.items():
+        if option not in completed_wide and option not in completed_narrow:
+            continue
+        completed_wide.setdefault(option, default)
+        completed_narrow.setdefault(option, default)
+    return completed_wide, completed_narrow
+
+
 def install_responsive_columns(
     container: ResponsiveContainer,
     entries: Sequence[ResponsiveEntry],
@@ -56,16 +77,18 @@ def install_responsive_columns(
     only re-grids on a genuine narrow/wide transition so ``<Configure>``
     traffic cannot oscillate or issue redundant grids.
     """
-    snapshot = tuple(
-        ResponsiveEntry(
-            widget=entry.widget,
-            wide=dict(entry.wide),
-            narrow=dict(entry.narrow),
-            is_hidden=entry.is_hidden,
-            record_hidden=entry.record_hidden,
+    snapshot: list[ResponsiveEntry] = []
+    for entry in entries:
+        wide, narrow = _completed_placements(entry.wide, entry.narrow)
+        snapshot.append(
+            ResponsiveEntry(
+                widget=entry.widget,
+                wide=wide,
+                narrow=narrow,
+                is_hidden=entry.is_hidden,
+                record_hidden=entry.record_hidden,
+            )
         )
-        for entry in entries
-    )
     current_mode = initial_mode
 
     def sync(_event: object | None = None) -> None:

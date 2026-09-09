@@ -254,23 +254,21 @@ def build_editor_ui(editor) -> None:
     pbtns.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(10, 0))
     pbtns.columnconfigure(0, weight=1)
     pbtns.columnconfigure(1, weight=1)
-    pbtns.columnconfigure(2, weight=1)
-    pbtns.columnconfigure(3, weight=1)
 
     ttk.Button(pbtns, text="New", command=editor._new_profile).grid(row=0, column=0, sticky="ew", padx=(0, 3))
-    ttk.Button(pbtns, text="Activate", command=editor._activate_profile).grid(row=0, column=1, sticky="ew", padx=(3, 3))
+    ttk.Button(pbtns, text="Activate", command=editor._activate_profile).grid(row=0, column=1, sticky="ew", padx=(3, 0))
     ttk.Button(
         pbtns,
         text="Save",
         command=editor._save_profile,
         style=theme_metrics.PRIMARY_BUTTON_STYLE,
-    ).grid(row=0, column=2, sticky="ew", padx=(3, 3))
+    ).grid(row=1, column=0, sticky="ew", padx=(0, 3), pady=(6, 0))
     ttk.Button(
         pbtns,
         text="Delete",
         command=editor._delete_profile,
         style=theme_metrics.DESTRUCTIVE_BUTTON_STYLE,
-    ).grid(row=0, column=3, sticky="ew", padx=(3, 0))
+    ).grid(row=1, column=1, sticky="ew", padx=(3, 0), pady=(6, 0))
 
     ttk.Button(
         editor._profiles_auto_frame,

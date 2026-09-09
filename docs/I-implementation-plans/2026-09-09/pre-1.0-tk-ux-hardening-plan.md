@@ -119,7 +119,7 @@ outcome.
 | UX-00 | Record the automated/manual UX baseline | P1 | S | done | none |
 | UX-01 | Reorganize Settings into clear categories/tabs | P0 | M | done | UX-00 |
 | UX-02 | Separate basic and advanced settings | P0 | M | done | UX-01 |
-| UX-03 | Simplify the per-key editor's default view | P2 | L | monitoring | UX-01, UX-02, UX-05–UX-09, and dedicated UX discussion |
+| UX-03 | Simplify the per-key editor's default view | P2 | L | done | UX-01, UX-02, UX-05–UX-09, and dedicated UX discussion |
 | UX-04 | Turn keyboard setup and calibration into a guided workflow | P2 | L | deferred | UX-03 direction and dedicated UX discussion |
 | UX-05 | Establish consistent spacing, typography, focus, and disabled contrast | P1 | M | done | UX-07 |
 | UX-06 | Persist and safely restore main-window geometry | P1 | M | done | UX-09 |
@@ -1272,3 +1272,42 @@ coverage.
   - `git diff --check`: passed.
 - UX-03 remains `monitoring` pending owner confirmation of the refined
   side-by-side presentation. UX-04 remains deferred.
+- Follow-up owner review found that the four profile action buttons retained
+  their old single-row geometry inside the new half-width management panel,
+  clipping Save and Delete beneath the automatic-selection panel. The approved
+  correction uses a compact two-by-two New/Activate and Save/Delete grid while
+  leaving Setup and Advanced unchanged.
+- The next screenshot confirmed the two-by-two action change was loaded but
+  exposed the actual overlap cause: Tk retains an earlier `columnspan=2` when a
+  later `grid()` call omits that option during narrow-to-wide reflow. Responsive
+  placements now explicitly reset spans and padding that differ between modes,
+  preventing a previously stacked panel from continuing beneath its neighbour.
+
+### 2026-09-09 — UX-03 owner acceptance and layout-state audit
+
+- The owner confirmed that the corrected Profiles tab no longer overlaps and
+  accepted the two-column editor shell.
+- A follow-up audit examined an observed KS/Hangul layout on one restart. Editor
+  construction copies `config.physical_layout`, programmatic Combobox setup does
+  not generate `<<ComboboxSelected>>`, and profile activation, tab selection,
+  optional-key refresh, and calibrator completion do not write the physical
+  layout. Only an explicit Layout Combobox selection reaches the persistence
+  path. The current local config records `physical_layout: ansi` with automatic
+  legends after the owner's correction.
+- The recent notebook extraction and responsive-grid changes do not touch the
+  layout identifier, Combobox value mapping, or persistence callbacks. The
+  evidence therefore indicates previously persisted user state rather than a
+  layout-selection regression.
+- Added a regression assertion that Layout Setup construction displays the
+  persisted ANSI value without invoking the layout-change callback.
+- Validation:
+  - `.venv/bin/python -m pytest tests/gui/perkey tests/core/config/secondary/test_config_secondary_layout_unit.py -q -o addopts=`:
+    `390 passed`;
+  - Ruff and Ruff Format across the audited per-key/config sources and tests:
+    passed (`116` files formatted);
+  - `.venv/bin/python -m buildpython --run-steps=1,4,13,16,17,19,20`:
+    `7 passed`; architecture checked `24` rules across `620` files with zero
+    findings;
+  - `git diff --check`: passed.
+- UX-03 is `done`. UX-04 remains deferred until its dedicated workflow
+  discussion begins.

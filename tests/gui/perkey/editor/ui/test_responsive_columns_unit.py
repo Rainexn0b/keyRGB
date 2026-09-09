@@ -113,4 +113,4 @@ def test_threshold_boundary_is_wide() -> None:
 
     container.width = WIDE_THRESHOLD_PX
     sync(None)
-    assert widget.grid_calls[-1] == dict(_WIDE)
+    assert widget.grid_calls[-1] == {**_WIDE, "columnspan": 1}
