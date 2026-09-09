@@ -96,11 +96,7 @@ class KeymapCalibrator(tk.Tk):
         except _TK_RUNTIME_ERRORS:
             pass
 
-        self.bg_color, self.fg_color = apply_clam_theme(
-            self,
-            include_checkbuttons=True,
-            map_checkbutton_state=True,
-        )
+        self.bg_color, self.fg_color = apply_clam_theme(self)
 
         self.cfg = Config()
         self.preview = KeyboardPreviewSession(self.cfg, rows=MATRIX_ROWS, cols=MATRIX_COLS)

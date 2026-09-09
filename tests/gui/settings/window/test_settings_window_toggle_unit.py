@@ -234,3 +234,69 @@ def test_on_close_and_run_delegate_to_root() -> None:
 
     assert gui.root.destroy_calls == 1
     assert gui.root.mainloop_calls == 1
+
+
+def test_basic_toggle_preserves_advanced_values_without_opening_advanced(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """UX-02: a basic Automation toggle must round-trip Advanced values.
+
+    The window is built with fakes and the Advanced tab is never opened or
+    selected (no notebook interaction); the full SettingsValues transaction
+    must still carry the pre-existing advanced values unchanged.
+    """
+    gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
+    gui.config = SimpleNamespace(physical_layout="auto")
+    gui.root = _FakeRoot()
+    gui.status = _FakeWidget()
+    gui.var_enabled = _FakeVar(True)
+    gui.var_off_suspend = _FakeVar(False)
+    gui.var_off_lid = _FakeVar(True)
+    gui.var_restore_resume = _FakeVar(False)
+    gui.var_restore_lid = _FakeVar(True)
+    gui.var_autostart = _FakeVar(True)
+    gui.var_experimental_backends = _FakeVar(True)
+    gui.var_ac_enabled = _FakeVar(True)
+    gui.var_battery_enabled = _FakeVar(False)
+    gui.var_ac_brightness = _FakeVar(21.0)
+    gui.var_battery_brightness = _FakeVar(9.0)
+    gui.var_ac_power_mode = _FakeVar("Balanced")
+    gui.var_battery_power_mode = _FakeVar("Keep current power mode")
+    # Basic Automation change under test.
+    gui.var_dim_sync_enabled = _FakeVar(False)
+    gui.var_dim_sync_mode = _FakeVar("off")
+    gui.var_dim_temp_brightness = _FakeVar(7.0)
+    # Pre-existing Advanced values; the tab is never opened.
+    gui.var_controller_sleep_respect = _FakeVar(True)
+    gui.var_debounce_enter = _FakeVar(2.5)
+    gui.var_debounce_exit = _FakeVar(7.5)
+    gui.var_idle_fade_duration = _FakeVar(1.2)
+    gui.var_scheduler_enabled = _FakeVar(False)
+    gui.var_day_start = _FakeVar("08:00")
+    gui.var_night_start = _FakeVar("20:00")
+    gui.var_day_base = _FakeVar(40.0)
+    gui.var_day_reactive = _FakeVar(50.0)
+    gui.var_night_base = _FakeVar(20.0)
+    gui.var_night_reactive = _FakeVar(50.0)
+    gui.var_os_autostart = _FakeVar(False)
+    apply_calls: list[SettingsValues] = []
+    monkeypatch.setattr(
+        settings_window, "apply_settings_values_to_config", lambda *, config, values: apply_calls.append(values)
+    )
+    monkeypatch.setattr(settings_window, "set_os_autostart", lambda enabled: None)
+    enabled_calls: list[str] = []
+    gui._apply_enabled_state = lambda: enabled_calls.append("enabled")
+
+    gui._on_toggle()
+
+    assert enabled_calls == ["enabled"]
+    assert gui.status.configure_calls[0] == {"text": "✓ Saved"}
+    assert len(apply_calls) == 1
+    saved = apply_calls[0]
+    assert saved.controller_sleep_respect is True
+    assert saved.idle_dim_debounce_enter_polls == 5
+    assert saved.idle_dim_debounce_exit_polls == 15
+    assert saved.idle_fade_duration_s == 1.2
+    assert saved.experimental_backends_enabled is True
+    assert saved.screen_dim_sync_enabled is False
+    assert saved.screen_dim_sync_mode == "off"

@@ -5,6 +5,8 @@ from collections.abc import Callable
 from types import TracebackType
 from typing import Protocol, TypeAlias, cast
 
+from keyrgb.gui.theme import metrics as theme_metrics
+
 _BACKEND_CAPABILITY_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _DESCRIPTION_TEXT = (
     "Sets a manual highlight color used by Reactive Typing effects.\n"
@@ -95,11 +97,11 @@ def build_description_section(
     desc = ttk_module.Label(
         main,
         text=_DESCRIPTION_TEXT,
-        font=("Sans", 9),
+        style=theme_metrics.BODY_LABEL_STYLE,
         justify="left",
         wraplength=520,
     )
-    desc.pack(pady=(0, 10), fill="x")
+    desc.pack(pady=(0, theme_metrics.SECTION_GAP_Y), fill="x")
 
     wrap_labels = gui._wrap_labels
     wrap_labels.append(desc)

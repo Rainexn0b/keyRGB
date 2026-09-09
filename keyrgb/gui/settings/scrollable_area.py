@@ -20,6 +20,7 @@ def _log_boundary_exception(key: str, msg: str, exc: Exception) -> None:
 
 class ScrollableArea:
     def __init__(self, parent: ttk.Frame, *, bg_color: str, padding: int = 16):
+        self._container = parent
         self._canvas = tk.Canvas(parent, highlightthickness=0, bg=bg_color)
         self._vscroll = ttk.Scrollbar(parent, orient="vertical", command=self._canvas.yview)
         self._canvas.configure(yscrollcommand=self._vscroll.set)
@@ -128,6 +129,16 @@ class ScrollableArea:
             return None
 
     def bind_mousewheel(self, root: tk.Tk, *, priority_scroll_widget: tk.Misc | None = None) -> None:
+        # Each ScrollableArea registers its own additive handler and ignores
+        # events whose pointer target is outside its own container, so any
+        # number of areas (e.g. one per Settings tab) can coexist on one root.
+        container = self._container
+
+        def _in_scope(target: tk.Misc) -> bool:
+            if target == container:
+                return True
+            return bool(self._is_descendant(target, container))
+
         def _on_mousewheel(event) -> str | None:
             x_root = getattr(event, "x_root", None)
             y_root = getattr(event, "y_root", None)
@@ -145,6 +156,9 @@ class ScrollableArea:
                 return None
 
             if target is None:
+                return None
+
+            if not _in_scope(target):
                 return None
 
             try:
@@ -188,9 +202,9 @@ class ScrollableArea:
 
             return None
 
-        root.bind_all("<MouseWheel>", _on_mousewheel)
-        root.bind_all("<Button-4>", _on_mousewheel)
-        root.bind_all("<Button-5>", _on_mousewheel)
+        root.bind_all("<MouseWheel>", _on_mousewheel, add="+")
+        root.bind_all("<Button-4>", _on_mousewheel, add="+")
+        root.bind_all("<Button-5>", _on_mousewheel, add="+")
 
     def finalize_initial_scrollbar_state(self) -> None:
         try:

@@ -13,6 +13,7 @@ from keyrgb.core.config import Config
 from keyrgb.core.runtime.hardware_ownership import acquire_hardware_control_lock, release_hardware_control_lock
 from keyrgb.core.utils.exceptions import is_device_busy
 from keyrgb.gui.theme import apply_clam_theme
+from keyrgb.gui.theme.focus import schedule_initial_focus
 from keyrgb.gui.utils.tk_async import TkAsyncCoordinator, submit_gui_work
 from keyrgb.gui.utils.window_geometry import compute_centered_window_geometry
 from keyrgb.gui.utils.window_icon import apply_keyrgb_window_icon
@@ -49,6 +50,8 @@ class UniformColorGUI:
     _secondary_route: SecondaryDeviceRoute | None = None
     _main_frame: ttk.Frame
     status_label: _UniformStatusLabel
+    _apply_button: ttk.Button
+    _close_button: ttk.Button
 
     def __init__(self):
         target_state = uniform_init_adapter.resolve_target_route_state(
@@ -99,6 +102,7 @@ class UniformColorGUI:
             wrap_sync_errors=_WRAP_SYNC_ERRORS,
             tk_widget_state_errors=_TK_WIDGET_STATE_ERRORS,
         )
+        self._schedule_initial_focus()
 
         self._apply_geometry()
         self.root.after(50, self._apply_geometry)
@@ -107,6 +111,16 @@ class UniformColorGUI:
         protocol = getattr(self.root, "protocol", None)
         if callable(protocol):
             protocol("WM_DELETE_WINDOW", self._on_close)
+
+    def _schedule_initial_focus(self) -> None:
+        # Intentional non-forcing initial focus (UX-05): Apply is the primary
+        # action when RGB is supported, otherwise Close is the only enabled
+        # standard control. The helper schedules via `after`, never grabs,
+        # and never steals an already-focused child.
+        target = vars(self).get("_apply_button") if self._color_supported else vars(self).get("_close_button")
+        if target is None:
+            return
+        schedule_initial_focus(self.root, target)
 
     def _apply_geometry(self) -> None:
         try:

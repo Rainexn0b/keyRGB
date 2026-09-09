@@ -97,12 +97,12 @@ class _FakeRoot:
     ) -> None:
         self._target = target
         self._containing_error = containing_error
-        self.bind_all_calls: list[tuple[str, object]] = []
+        self.bind_all_calls: list[tuple[str, object, object | None]] = []
         self.bound_callbacks: dict[str, object] = {}
         self.containing_calls: list[tuple[int, int]] = []
 
-    def bind_all(self, event: str, callback: object) -> None:
-        self.bind_all_calls.append((event, callback))
+    def bind_all(self, event: str, callback: object, add: object = None) -> None:
+        self.bind_all_calls.append((event, callback, add))
         self.bound_callbacks[event] = callback
 
     def winfo_containing(self, x_root: int, y_root: int) -> object | None:
@@ -117,11 +117,13 @@ def _make_area(
     canvas: _FakeCanvas | None = None,
     scrollbar: _FakeScrollbar | None = None,
     vscroll_visible: bool = True,
+    container: object | None = None,
 ) -> scrollable_area.ScrollableArea:
     area = scrollable_area.ScrollableArea.__new__(scrollable_area.ScrollableArea)
     area._canvas = canvas or _FakeCanvas()
     area._vscroll = scrollbar or _FakeScrollbar()
     area._vscroll_visible = vscroll_visible
+    area._container = container if container is not None else area._canvas
     return area
 
 
@@ -249,15 +251,21 @@ def test_finalize_initial_scrollbar_state_leaves_visible_scrollbar_when_needed_o
 
 def test_bind_mousewheel_registers_handlers_and_prioritizes_descendant_widget() -> None:
     root = _FakeRoot()
-    priority = _FakeWidget(toplevel=root)
+    container = _FakeWidget(toplevel=root)
+    priority = _FakeWidget(master=container, toplevel=root)
     target = _FakeWidget(master=priority, toplevel=root)
     root._target = target
     canvas = _FakeCanvas(bbox_result=(0, 0, 10, 300), height=80)
-    area = _make_area(canvas=canvas)
+    area = _make_area(canvas=canvas, container=container)
 
     area.bind_mousewheel(root, priority_scroll_widget=priority)
 
-    assert [event for event, _callback in root.bind_all_calls] == ["<MouseWheel>", "<Button-4>", "<Button-5>"]
+    assert [event for event, _callback, _add in root.bind_all_calls] == [
+        "<MouseWheel>",
+        "<Button-4>",
+        "<Button-5>",
+    ]
+    assert {add for _event, _callback, add in root.bind_all_calls} == {"+"}
 
     callback = root.bound_callbacks["<MouseWheel>"]
     result = callback(SimpleNamespace(x_root=10, y_root=20, delta=120))
@@ -267,11 +275,37 @@ def test_bind_mousewheel_registers_handlers_and_prioritizes_descendant_widget() 
     assert canvas.yview_scroll_calls == []
 
 
+def test_bind_mousewheel_ignores_targets_outside_own_container() -> None:
+    root = _FakeRoot()
+    container_a = _FakeWidget(toplevel=root)
+    container_b = _FakeWidget(toplevel=root)
+    root._target = _FakeWidget(master=container_b, toplevel=root)
+    canvas_a = _FakeCanvas(bbox_result=(0, 0, 10, 300), height=80)
+    canvas_b = _FakeCanvas(bbox_result=(0, 0, 10, 300), height=80)
+    area_a = _make_area(canvas=canvas_a, container=container_a)
+    area_b = _make_area(canvas=canvas_b, container=container_b)
+
+    area_a.bind_mousewheel(root)
+    handler_a = root.bound_callbacks["<MouseWheel>"]
+    area_b.bind_mousewheel(root)
+    handler_b = root.bound_callbacks["<MouseWheel>"]
+
+    # Additive registration keeps both handlers; only the area containing
+    # the pointer target scrolls.
+    assert [add for _event, _callback, add in root.bind_all_calls] == ["+", "+", "+", "+", "+", "+"]
+    event = SimpleNamespace(x_root=3, y_root=4, delta=120)
+    assert handler_a(event) is None
+    assert canvas_a.yview_scroll_calls == []
+    assert handler_b(event) == "break"
+    assert canvas_b.yview_scroll_calls == [(-1, "units")]
+
+
 def test_bind_mousewheel_routes_button_events_to_canvas_when_content_needs_scroll() -> None:
     root = _FakeRoot()
-    root._target = _FakeWidget(toplevel=root)
+    container = _FakeWidget(toplevel=root)
+    root._target = _FakeWidget(master=container, toplevel=root)
     canvas = _FakeCanvas(bbox_result=(0, 0, 10, 300), height=80)
-    area = _make_area(canvas=canvas)
+    area = _make_area(canvas=canvas, container=container)
 
     area.bind_mousewheel(root)
 
@@ -285,7 +319,8 @@ def test_bind_mousewheel_routes_button_events_to_canvas_when_content_needs_scrol
 
 def test_bind_mousewheel_returns_none_when_no_target_or_no_scroll_units() -> None:
     root = _FakeRoot(target=None)
-    area = _make_area(canvas=_FakeCanvas(bbox_result=(0, 0, 10, 300), height=80))
+    container = _FakeWidget(toplevel=root)
+    area = _make_area(canvas=_FakeCanvas(bbox_result=(0, 0, 10, 300), height=80), container=container)
 
     area.bind_mousewheel(root)
 
@@ -293,7 +328,7 @@ def test_bind_mousewheel_returns_none_when_no_target_or_no_scroll_units() -> Non
 
     assert callback(SimpleNamespace(x_root=5, y_root=6, delta=120)) is None
 
-    root._target = _FakeWidget(toplevel=root)
+    root._target = _FakeWidget(master=container, toplevel=root)
 
     assert callback(SimpleNamespace(x_root=5, y_root=6, delta=0)) is None
     assert area._canvas.yview_scroll_calls == []
@@ -310,9 +345,12 @@ def test_bind_mousewheel_swallows_lookup_and_scroll_failures(monkeypatch: pytest
     assert lookup_callback(SimpleNamespace(x_root=1, y_root=2, delta=120)) is None
 
     priority_root = _FakeRoot()
-    broken_priority = _FakeWidget(toplevel=priority_root, yview_error=RuntimeError("priority failed"))
+    priority_container = _FakeWidget(toplevel=priority_root)
+    broken_priority = _FakeWidget(
+        master=priority_container, toplevel=priority_root, yview_error=RuntimeError("priority failed")
+    )
     priority_root._target = _FakeWidget(master=broken_priority, toplevel=priority_root)
-    priority_area = _make_area(canvas=_FakeCanvas(bbox_result=(0, 0, 10, 300), height=80))
+    priority_area = _make_area(canvas=_FakeCanvas(bbox_result=(0, 0, 10, 300), height=80), container=priority_container)
     priority_area.bind_mousewheel(priority_root, priority_scroll_widget=broken_priority)
 
     priority_callback = priority_root.bound_callbacks["<MouseWheel>"]
@@ -320,13 +358,15 @@ def test_bind_mousewheel_swallows_lookup_and_scroll_failures(monkeypatch: pytest
     assert priority_callback(SimpleNamespace(x_root=1, y_root=2, delta=120)) is None
 
     canvas_root = _FakeRoot()
-    canvas_root._target = _FakeWidget(toplevel=canvas_root)
+    canvas_container = _FakeWidget(toplevel=canvas_root)
+    canvas_root._target = _FakeWidget(master=canvas_container, toplevel=canvas_root)
     canvas_area = _make_area(
         canvas=_FakeCanvas(
             bbox_result=(0, 0, 10, 300),
             height=80,
             yview_error=RuntimeError("canvas failed"),
-        )
+        ),
+        container=canvas_container,
     )
     canvas_area.bind_mousewheel(canvas_root)
 

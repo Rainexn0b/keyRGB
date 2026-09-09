@@ -13,6 +13,7 @@ from urllib.request import Request, urlopen
 
 from keyrgb.core.runtime.imports import launch_module_subprocess, repo_root_from
 from keyrgb.core.utils.version_check import compare_versions, normalize_version_text
+from keyrgb.gui.theme import metrics as theme_metrics
 from keyrgb.gui.utils.tk_async import run_in_thread
 
 from ._wrap_sync import bind_wraplength_sync
@@ -40,15 +41,15 @@ class VersionPanel:
         self._get_status_label = get_status_label
         self._wrap_labels: list[ttk.Label] = []
 
-        title = ttk.Label(parent, text="Version", font=("Sans", 11, "bold"))
-        title.pack(anchor="w", pady=(0, 6))
+        title = ttk.Label(parent, text="Version", style=theme_metrics.SECTION_LABEL_STYLE)
+        title.pack(anchor="w", pady=(0, theme_metrics.CONTROL_GAP_Y))
 
         desc = ttk.Label(
             parent,
             text=(
                 "Shows the installed KeyRGB version and checks GitHub for the latest stable and pre-release versions."
             ),
-            font=("Sans", 9),
+            style=theme_metrics.BODY_LABEL_STYLE,
             justify="left",
             wraplength=400,
         )
@@ -62,19 +63,25 @@ class VersionPanel:
         except _WRAP_SYNC_ERRORS:
             pass
 
-        ttk.Label(grid, text="Installed", font=("Sans", 9)).grid(row=0, column=0, sticky="w")
-        self.lbl_installed_version = ttk.Label(grid, text="?", font=("Sans", 9))
+        ttk.Label(grid, text="Installed", style=theme_metrics.BODY_LABEL_STYLE).grid(row=0, column=0, sticky="w")
+        self.lbl_installed_version = ttk.Label(grid, text="?", style=theme_metrics.VALUE_LABEL_STYLE)
         self.lbl_installed_version.grid(row=0, column=1, sticky="w", padx=(10, 0))
 
-        ttk.Label(grid, text="Latest (stable)", font=("Sans", 9)).grid(row=1, column=0, sticky="w", pady=(4, 0))
-        self.lbl_latest_stable_version = ttk.Label(grid, text="Checking…", font=("Sans", 9))
+        ttk.Label(grid, text="Latest (stable)", style=theme_metrics.BODY_LABEL_STYLE).grid(
+            row=1, column=0, sticky="w", pady=(4, 0)
+        )
+        self.lbl_latest_stable_version = ttk.Label(grid, text="Checking…", style=theme_metrics.VALUE_LABEL_STYLE)
         self.lbl_latest_stable_version.grid(row=1, column=1, sticky="w", padx=(10, 0), pady=(4, 0))
 
-        ttk.Label(grid, text="Latest (pre-release)", font=("Sans", 9)).grid(row=2, column=0, sticky="w", pady=(4, 0))
-        self.lbl_latest_prerelease_version = ttk.Label(grid, text="Checking…", font=("Sans", 9))
+        ttk.Label(grid, text="Latest (pre-release)", style=theme_metrics.BODY_LABEL_STYLE).grid(
+            row=2, column=0, sticky="w", pady=(4, 0)
+        )
+        self.lbl_latest_prerelease_version = ttk.Label(grid, text="Checking…", style=theme_metrics.VALUE_LABEL_STYLE)
         self.lbl_latest_prerelease_version.grid(row=2, column=1, sticky="w", padx=(10, 0), pady=(4, 0))
 
-        self.lbl_update_status = ttk.Label(parent, text="", font=("Sans", 9), justify="left", wraplength=400)
+        self.lbl_update_status = ttk.Label(
+            parent, text="", style=theme_metrics.STATUS_LABEL_STYLE, justify="left", wraplength=400
+        )
         self.lbl_update_status.pack(anchor="w", fill="x", pady=(0, 8))
         self._wrap_labels.append(self.lbl_update_status)
         bind_wraplength_sync(parent, self._wrap_labels)

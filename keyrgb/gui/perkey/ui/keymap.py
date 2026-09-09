@@ -117,5 +117,4 @@ def reload_keymap_ui(editor: object) -> None:
             set_status(editor, keymap_reloaded())
         else:
             set_status(editor, no_keymap_found())
-
-    cast(_CanvasOwner, editor).canvas.redraw()
+        cast(_CanvasOwner, editor).canvas.redraw()

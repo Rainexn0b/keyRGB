@@ -4,6 +4,8 @@ import tkinter as tk
 from collections.abc import Callable
 from tkinter import ttk
 
+from keyrgb.gui.theme import metrics as theme_metrics
+
 from ._wrap_sync import bind_wraplength_sync
 
 _LABEL_VALUE_ERRORS = (TypeError, ValueError, OverflowError)
@@ -26,13 +28,13 @@ class PowerSourcePanel:
     ) -> None:
         self._on_toggle = on_toggle
 
-        ps_title = ttk.Label(parent, text="Plugged In vs Battery", font=("Sans", 11, "bold"))
-        ps_title.pack(anchor="w", pady=(0, 6))
+        ps_title = ttk.Label(parent, text="Plugged In vs Battery", style=theme_metrics.SECTION_LABEL_STYLE)
+        ps_title.pack(anchor="w", pady=(0, theme_metrics.CONTROL_GAP_Y))
 
         ps_desc = ttk.Label(
             parent,
             text="Choose whether keyboard lighting stays on, and what brightness to use on AC and on battery.",
-            font=("Sans", 9),
+            style=theme_metrics.BODY_LABEL_STYLE,
             justify="left",
             wraplength=400,
         )
@@ -54,12 +56,14 @@ class PowerSourcePanel:
         )
         self.chk_ac_enabled.grid(row=0, column=0, sticky="w")
 
-        ttk.Label(ac_head, text="Brightness", font=("Sans", 9)).grid(row=0, column=1, sticky="e", padx=(12, 6))
+        ttk.Label(ac_head, text="Brightness", style=theme_metrics.BODY_LABEL_STYLE).grid(
+            row=0, column=1, sticky="e", padx=(12, 6)
+        )
 
         self.lbl_ac_brightness_val = ttk.Label(
             ac_head,
             text=str(int(float(var_ac_brightness.get()))),
-            font=("Sans", 9),
+            style=theme_metrics.VALUE_LABEL_STYLE,
         )
         self.lbl_ac_brightness_val.grid(row=0, column=2, sticky="e")
 
@@ -71,14 +75,16 @@ class PowerSourcePanel:
             variable=var_ac_brightness,
             command=lambda v: self._set_label_int(self.lbl_ac_brightness_val, v),
         )
-        self.scale_ac_brightness.pack(fill="x", pady=(6, 0))
+        self.scale_ac_brightness.pack(fill="x", pady=(theme_metrics.CONTROL_GAP_Y, 0))
         self.scale_ac_brightness.bind("<ButtonRelease-1>", lambda _e: self._on_toggle())
 
         ac_profile_row = ttk.Frame(ac_row)
-        ac_profile_row.pack(fill="x", pady=(6, 0))
+        ac_profile_row.pack(fill="x", pady=(theme_metrics.CONTROL_GAP_Y, 0))
         ac_profile_row.columnconfigure(1, weight=1)
 
-        ttk.Label(ac_profile_row, text="Power mode", font=("Sans", 9)).grid(row=0, column=0, sticky="w", padx=(0, 8))
+        ttk.Label(ac_profile_row, text="Power mode", style=theme_metrics.BODY_LABEL_STYLE).grid(
+            row=0, column=0, sticky="w", padx=(0, 8)
+        )
         self.combo_ac_power_mode = ttk.Combobox(
             ac_profile_row,
             textvariable=var_ac_power_mode,
@@ -103,12 +109,14 @@ class PowerSourcePanel:
         )
         self.chk_battery_enabled.grid(row=0, column=0, sticky="w")
 
-        ttk.Label(batt_head, text="Brightness", font=("Sans", 9)).grid(row=0, column=1, sticky="e", padx=(12, 6))
+        ttk.Label(batt_head, text="Brightness", style=theme_metrics.BODY_LABEL_STYLE).grid(
+            row=0, column=1, sticky="e", padx=(12, 6)
+        )
 
         self.lbl_battery_brightness_val = ttk.Label(
             batt_head,
             text=str(int(float(var_battery_brightness.get()))),
-            font=("Sans", 9),
+            style=theme_metrics.VALUE_LABEL_STYLE,
         )
         self.lbl_battery_brightness_val.grid(row=0, column=2, sticky="e")
 
@@ -120,14 +128,16 @@ class PowerSourcePanel:
             variable=var_battery_brightness,
             command=lambda v: self._set_label_int(self.lbl_battery_brightness_val, v),
         )
-        self.scale_battery_brightness.pack(fill="x", pady=(6, 0))
+        self.scale_battery_brightness.pack(fill="x", pady=(theme_metrics.CONTROL_GAP_Y, 0))
         self.scale_battery_brightness.bind("<ButtonRelease-1>", lambda _e: self._on_toggle())
 
         batt_profile_row = ttk.Frame(batt_row)
-        batt_profile_row.pack(fill="x", pady=(6, 0))
+        batt_profile_row.pack(fill="x", pady=(theme_metrics.CONTROL_GAP_Y, 0))
         batt_profile_row.columnconfigure(1, weight=1)
 
-        ttk.Label(batt_profile_row, text="Power mode", font=("Sans", 9)).grid(row=0, column=0, sticky="w", padx=(0, 8))
+        ttk.Label(batt_profile_row, text="Power mode", style=theme_metrics.BODY_LABEL_STYLE).grid(
+            row=0, column=0, sticky="w", padx=(0, 8)
+        )
         self.combo_battery_power_mode = ttk.Combobox(
             batt_profile_row,
             textvariable=var_battery_power_mode,

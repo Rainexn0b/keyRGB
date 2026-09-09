@@ -38,8 +38,10 @@ POWER_MODE_LABEL_TO_VALUE = {
 }
 POWER_MODE_VALUE_TO_LABEL = {value: label for label, value in POWER_MODE_LABEL_TO_VALUE.items()}
 
-SETTINGS_MIN_WIDTH = 1000
-SETTINGS_MIN_HEIGHT = 620
-SETTINGS_DEFAULT_WIDTH = 1320
-SETTINGS_DEFAULT_HEIGHT = 820
-SETTINGS_COLUMN_GAP = 22
+SETTINGS_MIN_WIDTH = 680
+SETTINGS_MIN_HEIGHT = 560
+SETTINGS_DEFAULT_WIDTH = 880
+# Lighting & Power is the primary page and should have enough vertical room for
+# its complete controls without relying on the page scrollbar. Longer pages
+# remain independently scrollable.
+SETTINGS_DEFAULT_HEIGHT = 840

@@ -64,6 +64,7 @@ class _FakeRoot:
         self.update_calls = 0
         self.mainloop_calls = 0
         self.destroy_calls = 0
+        self._focused: object = None
 
     def title(self, text: str) -> None:
         self.title_calls.append(text)
@@ -76,6 +77,9 @@ class _FakeRoot:
 
     def after(self, delay: int, callback) -> None:
         self.after_calls.append((delay, callback))
+
+    def focus_get(self) -> object:
+        return self._focused
 
     def geometry(self, value: str) -> None:
         self.geometry_calls.append(value)

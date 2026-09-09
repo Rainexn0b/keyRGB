@@ -79,6 +79,7 @@ class FakeRoot:
         self.root_height = 920
         self.screen_width = 1920
         self.screen_height = 1080
+        self.focused: object | None = None
 
     def clipboard_clear(self) -> None:
         self.clipboard_cleared += 1
@@ -88,6 +89,9 @@ class FakeRoot:
 
     def after(self, delay_ms: int, callback) -> None:
         self.after_calls.append((delay_ms, callback))
+
+    def focus_get(self) -> object | None:
+        return self.focused
 
     def title(self, value: str) -> None:
         self.title_text = value

@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import tkinter as _tk
 from collections.abc import Callable
-from typing import Protocol, TypeAlias, cast
+from typing import Any, Protocol, TypeAlias, cast
 
+from keyrgb.gui.theme import metrics as theme_metrics
+from keyrgb.gui.theme.focus import schedule_initial_focus
 from keyrgb.gui.utils.window_geometry import compute_centered_window_geometry
 
 BindCallback: TypeAlias = Callable[[_tk.Event], None]
@@ -142,7 +144,7 @@ def build_widgets(
     window.columnconfigure(0, weight=1)
     window.rowconfigure(0, weight=1)
 
-    root = ttk_mod.Frame(app, padding=16)
+    root = ttk_mod.Frame(app, padding=theme_metrics.OUTER_PADDING)
     root.grid(row=0, column=0, sticky="nsew")
     root.columnconfigure(0, weight=1)
     root.columnconfigure(1, weight=0)
@@ -161,11 +163,11 @@ def build_widgets(
     side.grid(row=0, column=1, sticky="nsew", padx=(16, 0))
     side.columnconfigure(0, weight=1)
 
-    ttk_mod.Label(side, text="Keymap Calibrator", font=("Sans", 14, "bold"), anchor="w").grid(
+    ttk_mod.Label(side, text="Keymap Calibrator", style=theme_metrics.TITLE_LABEL_STYLE, anchor="w").grid(
         row=0, column=0, sticky="ew", pady=(0, 10)
     )
 
-    app.lbl_cell = ttk_mod.Label(side, text="", font=("Sans", 9), anchor="w")
+    app.lbl_cell = ttk_mod.Label(side, text="", style=theme_metrics.BODY_LABEL_STYLE, anchor="w")
     app.lbl_cell.grid(row=1, column=0, sticky="ew", pady=(0, 8))
 
     app.lbl_status = ttk_mod.Label(
@@ -175,6 +177,7 @@ def build_widgets(
             "Step 2: click that key on the image\n"
             "Step 3: click 'Assign selected key' (or press Enter)"
         ),
+        style=theme_metrics.STATUS_LABEL_STYLE,
         anchor="w",
         justify="left",
     )
@@ -204,9 +207,13 @@ def build_widgets(
     ttk_mod.Button(btns, text="Prev", command=app._prev).grid(row=0, column=0, sticky="ew", padx=(0, 6))
     ttk_mod.Button(btns, text="Next", command=app._next).grid(row=0, column=1, sticky="ew")
 
-    ttk_mod.Button(side, text="Assign selected key", command=app._assign).grid(
-        row=4, column=0, sticky="ew", pady=(10, 0)
+    assign_btn = ttk_mod.Button(
+        side,
+        text="Assign selected key",
+        command=app._assign,
+        style=theme_metrics.PRIMARY_BUTTON_STYLE,
     )
+    assign_btn.grid(row=4, column=0, sticky="ew", pady=(10, 0))
     ttk_mod.Button(side, text="Skip (nothing lit)", command=app._skip).grid(row=5, column=0, sticky="ew", pady=(6, 0))
 
     app._show_backdrop_var = tk_mod.BooleanVar(value=True)
@@ -242,6 +249,11 @@ def build_widgets(
     window.bind("<Right>", _next_from_event)
     window.bind("<Left>", _prev_from_event)
     window.bind("<Escape>", _destroy_from_event)
+
+    # Intentional non-forcing initial focus: Assign is always present and
+    # enabled, and matches the core probe loop (Step 3). The helper schedules
+    # via `after`, never grabs, and never steals an already-focused child.
+    schedule_initial_focus(cast(Any, window), cast(Any, assign_btn))
 
 
 def apply_window_geometry(app: _WindowGeometryAppProtocol) -> None:

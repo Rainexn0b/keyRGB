@@ -10,6 +10,8 @@ import tkinter as tk
 from tkinter import ttk
 from typing import TYPE_CHECKING, cast
 
+from keyrgb.gui.theme import metrics as theme_metrics
+from keyrgb.gui.theme.focus import schedule_initial_focus
 from keyrgb.gui.windows import (
     _reactive_color_geometry,
     _reactive_color_init_adapter,
@@ -75,7 +77,7 @@ class ReactiveColorGUI:
         self.root.minsize(520, 720)
         self.root.resizable(True, True)
 
-        apply_clam_theme(self.root, include_checkbuttons=True, map_checkbutton_state=True)
+        apply_clam_theme(self.root)
 
         self.config = Config()
         self._settings_adapter = None
@@ -88,13 +90,13 @@ class ReactiveColorGUI:
         )
         self._color_supported = init_state.color_supported
 
-        main = ttk.Frame(self.root, padding=20)
+        main = ttk.Frame(self.root, padding=theme_metrics.OUTER_PADDING)
         main.pack(fill="both", expand=True)
         self._main_frame = main
         self._wrap_labels = []
 
-        title = ttk.Label(main, text="Reactive Typing Settings", font=("Sans", 14, "bold"))
-        title.pack(pady=(0, 10))
+        title = ttk.Label(main, text="Reactive Typing Settings", style=theme_metrics.TITLE_LABEL_STYLE)
+        title.pack(pady=(0, theme_metrics.SECTION_GAP_Y))
 
         reactive_color_bootstrap.build_description_section(
             self,
@@ -116,6 +118,8 @@ class ReactiveColorGUI:
                 tk_error=tk.TclError,
             ),
         )
+
+        self._schedule_initial_focus()
 
         self._apply_geometry()
         self.root.after(50, self._apply_geometry)
@@ -145,6 +149,17 @@ class ReactiveColorGUI:
             )
             self._settings_adapter = adapter
         return adapter
+
+    def _schedule_initial_focus(self) -> None:
+        # Intentional non-forcing initial focus (UX-05): the vivid-visuals
+        # check is always enabled and is a meaningful standard control, unlike
+        # the manual-color check which is disabled on brightness-only
+        # backends. The helper schedules via `after`, never grabs, and never
+        # steals an already-focused child.
+        target = vars(self).get("_reactive_vivid_visuals_check")
+        if target is None:
+            return
+        schedule_initial_focus(self.root, target)
 
     def _apply_geometry(self) -> None:
         _geometry.apply_centered_geometry(

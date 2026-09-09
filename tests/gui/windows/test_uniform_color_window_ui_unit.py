@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from keyrgb.gui.theme import focus as theme_focus, metrics as theme_metrics
 from keyrgb.gui.windows import (
     _uniform_color_ui as uniform_color_ui,
     uniform,
@@ -17,6 +18,7 @@ class _FakeWidget:
         self.bind_calls: list[tuple[str, object]] = []
         self.configure_calls: list[dict[str, object]] = []
         self.columnconfigure_calls: list[tuple[int, int]] = []
+        self.focus_calls = 0
 
     def pack(self, **kwargs) -> None:
         self.pack_calls.append(dict(kwargs))
@@ -36,6 +38,9 @@ class _FakeWidget:
     def config(self, **kwargs) -> None:
         self.configure(**kwargs)
 
+    def focus_set(self) -> None:
+        self.focus_calls += 1
+
     def winfo_width(self) -> int:
         return int(self.kwargs.get("width_px", 560))
 
@@ -47,7 +52,8 @@ class _FakeWidget:
 
 
 class _FakeRoot:
-    def __init__(self) -> None:
+    def __init__(self, *, focused: object = None) -> None:
+        self._focused = focused
         self.title_calls: list[str] = []
         self.geometry_calls: list[str] = []
         self.minsize_calls: list[tuple[int, int]] = []
@@ -71,6 +77,9 @@ class _FakeRoot:
 
     def after(self, delay: int, callback) -> None:
         self.after_calls.append((delay, callback))
+
+    def focus_get(self) -> object:
+        return self._focused
 
     def update_idletasks(self) -> None:
         self.update_idletasks_calls += 1
@@ -391,3 +400,159 @@ def test_on_color_release_preserves_keyboard_effect_and_reports_applied_status(m
     assert gui._last_drag_committed_color == (7, 8, 9)
     assert gui._last_drag_commit_ts == 12.5
     assert statuses == [("✓ Applied Keyboard RGB(7, 8, 9)", True)]
+
+
+def _build_ui(color_supported: bool) -> tuple[_FakeRoot, dict[str, list[_FakeWidget]], SimpleNamespace]:
+    root = _FakeRoot()
+    registry: dict[str, list[_FakeWidget]] = {"frames": [], "labels": [], "buttons": []}
+
+    def _frame(parent=None, **kwargs):
+        widget = _FakeWidget(parent, **kwargs)
+        registry["frames"].append(widget)
+        return widget
+
+    def _label(parent=None, **kwargs):
+        widget = _FakeWidget(parent, **kwargs)
+        registry["labels"].append(widget)
+        return widget
+
+    def _button(parent=None, **kwargs):
+        widget = _FakeWidget(parent, **kwargs)
+        registry["buttons"].append(widget)
+        return widget
+
+    gui = SimpleNamespace(
+        root=root,
+        _target_label="Keyboard",
+        _color_supported=color_supported,
+        _initial_color=lambda: (12, 34, 56),
+        _on_color_change=lambda *_args, **_kwargs: None,
+        _on_color_release=lambda *_args, **_kwargs: None,
+        _on_apply=lambda: None,
+        _on_close=lambda: None,
+    )
+
+    def _wheel(parent, **kwargs):
+        return _FakeColorWheel(parent, **kwargs)
+
+    uniform_color_ui.build_uniform_window_ui(
+        gui,
+        ttk_module=SimpleNamespace(Frame=_frame, Label=_label, Button=_button),
+        color_wheel_cls=_wheel,
+        wrap_sync_errors=(RuntimeError,),
+        tk_widget_state_errors=(RuntimeError,),
+    )
+    return root, registry, gui
+
+
+def test_build_uniform_window_ui_uses_theme_styles_outer_padding_and_primary_apply() -> None:
+    _root, registry, gui = _build_ui(color_supported=True)
+
+    assert registry["frames"][0].kwargs.get("padding") == theme_metrics.OUTER_PADDING
+
+    title = registry["labels"][0]
+    assert title.kwargs.get("style") == theme_metrics.TITLE_LABEL_STYLE
+    assert "font" not in title.kwargs
+    assert title.pack_calls[0] == {"pady": (0, theme_metrics.SECTION_GAP_Y)}
+
+    status = registry["labels"][-1]
+    assert status.kwargs.get("style") == theme_metrics.STATUS_LABEL_STYLE
+    assert "font" not in status.kwargs
+
+    for widget in (*registry["frames"], *registry["labels"], *registry["buttons"]):
+        font = widget.kwargs.get("font")
+        assert not (isinstance(font, tuple) and font and font[0] == "Sans"), widget.kwargs
+
+    apply_button = registry["buttons"][0]
+    close_button = registry["buttons"][1]
+    assert apply_button.kwargs.get("style") == theme_metrics.PRIMARY_BUTTON_STYLE
+    assert "style" not in close_button.kwargs
+    assert apply_button.configure_calls == []
+    assert gui._apply_button is apply_button
+    assert gui._close_button is close_button
+
+
+def test_build_uniform_window_ui_styles_unsupported_body_and_disables_apply() -> None:
+    _root, registry, gui = _build_ui(color_supported=False)
+
+    assert registry["frames"][0].kwargs.get("padding") == theme_metrics.OUTER_PADDING
+    unsupported = registry["labels"][1]
+    assert unsupported.kwargs.get("style") == theme_metrics.BODY_LABEL_STYLE
+    assert "font" not in unsupported.kwargs
+    assert gui.color_wheel is None
+    assert registry["buttons"][0].configure_calls == [{"state": "disabled"}]
+    assert gui._apply_button is registry["buttons"][0]
+    assert gui._close_button is registry["buttons"][1]
+
+
+def test_schedule_initial_focus_targets_apply_when_enabled(monkeypatch) -> None:
+    gui = uniform.UniformColorGUI.__new__(uniform.UniformColorGUI)
+    gui.root = _FakeRoot()
+    gui._color_supported = True
+    gui._apply_button = _FakeWidget()
+    gui._close_button = _FakeWidget()
+    calls: list[tuple[object, object]] = []
+    monkeypatch.setattr(uniform, "schedule_initial_focus", lambda root, target: calls.append((root, target)))
+
+    gui._schedule_initial_focus()
+
+    assert calls == [(gui.root, gui._apply_button)]
+
+
+def test_schedule_initial_focus_targets_close_when_unsupported(monkeypatch) -> None:
+    gui = uniform.UniformColorGUI.__new__(uniform.UniformColorGUI)
+    gui.root = _FakeRoot()
+    gui._color_supported = False
+    gui._apply_button = _FakeWidget()
+    gui._close_button = _FakeWidget()
+    calls: list[tuple[object, object]] = []
+    monkeypatch.setattr(uniform, "schedule_initial_focus", lambda root, target: calls.append((root, target)))
+
+    gui._schedule_initial_focus()
+
+    assert calls == [(gui.root, gui._close_button)]
+
+
+def test_uniform_initial_focus_is_scheduled_non_forcing() -> None:
+    root = _FakeRoot()
+    apply_btn = _FakeWidget()
+    close_btn = _FakeWidget()
+    gui = SimpleNamespace(
+        root=root,
+        _target_label="Keyboard",
+        _color_supported=True,
+        _initial_color=lambda: (1, 2, 3),
+        _on_color_change=lambda *_args, **_kwargs: None,
+        _on_color_release=lambda *_args, **_kwargs: None,
+        _on_apply=lambda: None,
+        _on_close=lambda: None,
+    )
+
+    def _frame(parent=None, **kwargs):
+        return _FakeWidget(parent, **kwargs)
+
+    def _label(parent=None, **kwargs):
+        return _FakeWidget(parent, **kwargs)
+
+    buttons: list[_FakeWidget] = []
+
+    def _button(parent=None, **kwargs):
+        widget = _FakeWidget(parent, **kwargs)
+        buttons.append(widget)
+        return widget
+
+    uniform_color_ui.build_uniform_window_ui(
+        gui,
+        ttk_module=SimpleNamespace(Frame=_frame, Label=_label, Button=_button),
+        color_wheel_cls=_FakeColorWheel,
+        wrap_sync_errors=(RuntimeError,),
+        tk_widget_state_errors=(RuntimeError,),
+    )
+    # Window-level scheduling uses the stored Apply reference.
+    uniform.schedule_initial_focus(root, gui._apply_button)
+    _ = (apply_btn, close_btn)
+
+    focus_entries = [(delay, cb) for delay, cb in root.after_calls if delay == theme_focus.INITIAL_FOCUS_DELAY_MS]
+    assert focus_entries
+    focus_entries[0][1]()
+    assert gui._apply_button.focus_calls == 1

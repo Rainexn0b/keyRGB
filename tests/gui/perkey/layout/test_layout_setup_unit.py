@@ -45,14 +45,6 @@ class _FakeCombobox(_FakeWidget):
         return self.value
 
 
-class _FakeDropdown:
-    def __init__(self, **kwargs) -> None:
-        self.kwargs = kwargs
-
-    def open(self, _event=None):
-        return "break"
-
-
 class _FakeFactory:
     def __init__(self) -> None:
         self.created: list[_FakeWidget] = []
@@ -83,8 +75,6 @@ class _FakeSelf:
         self.width = 320
         self._on_layout_select = layout_setup.LayoutSetupControls._on_layout_select.__get__(self, _FakeSelf)
         self._on_legend_pack_select = layout_setup.LayoutSetupControls._on_legend_pack_select.__get__(self, _FakeSelf)
-        self._set_layout_label = layout_setup.LayoutSetupControls._set_layout_label.__get__(self, _FakeSelf)
-        self._set_legend_pack_label = layout_setup.LayoutSetupControls._set_legend_pack_label.__get__(self, _FakeSelf)
         self._sync_description_wrap = layout_setup.LayoutSetupControls._sync_description_wrap.__get__(self, _FakeSelf)
         self.refresh_legend_pack_choices = layout_setup.LayoutSetupControls.refresh_legend_pack_choices.__get__(
             self, _FakeSelf
@@ -108,7 +98,6 @@ def test_build_ui_creates_layout_controls_and_refreshes_slots(monkeypatch: pytes
     frame_factory = _FakeFrameFactory()
     button_factory = _FakeFactory()
     combo_instances: list[_FakeCombobox] = []
-    dropdown_instances: list[_FakeDropdown] = []
 
     def make_combo(parent=None, **kwargs):
         widget = _FakeCombobox(parent, **kwargs)
@@ -125,11 +114,6 @@ def test_build_ui_creates_layout_controls_and_refreshes_slots(monkeypatch: pytes
             LabelFrame=frame_factory,
             Frame=frame_factory,
         ),
-    )
-    monkeypatch.setattr(
-        layout_setup,
-        "UpwardListboxDropdown",
-        lambda **kwargs: dropdown_instances.append(_FakeDropdown(**kwargs)) or dropdown_instances[-1],
     )
 
     refresh_calls: list[object] = []
@@ -154,30 +138,22 @@ def test_build_ui_creates_layout_controls_and_refreshes_slots(monkeypatch: pytes
 
     assert fake_self.columnconfigure_calls == [(1, 1)]
     assert len(combo_instances) == 2
+    assert label_factory.created[2].kwargs["style"] == layout_setup.theme_metrics.BODY_LABEL_STYLE
     assert combo_instances[0].kwargs["values"] == layout_setup._LAYOUT_LABELS
     assert combo_instances[0].kwargs["state"] == "readonly"
     assert combo_instances[0].value == layout_setup._ID_TO_LABEL[editor._physical_layout]
-    assert [call[0] for call in combo_instances[0].bind_calls] == ["<<ComboboxSelected>>", "<Button-1>", "<Down>"]
+    assert [call[0] for call in combo_instances[0].bind_calls] == ["<<ComboboxSelected>>"]
     assert combo_instances[0].bind_calls[0][1] == fake_self._on_layout_select
     assert combo_instances[1].kwargs["state"] == "readonly"
     assert combo_instances[1].configure_calls == [{"values": ["Default legends", "ANSI Generic"]}]
     assert combo_instances[1].value == "Default legends"
-    assert [call[0] for call in combo_instances[1].bind_calls] == ["<<ComboboxSelected>>", "<Button-1>", "<Down>"]
+    assert [call[0] for call in combo_instances[1].bind_calls] == ["<<ComboboxSelected>>"]
+    assert combo_instances[1].bind_calls[0][1] == fake_self._on_legend_pack_select
     assert fake_self.bind_calls == [("<Configure>", fake_self._sync_description_wrap, True)]
     assert fake_self.after_idle_calls == [fake_self._sync_description_wrap]
     assert button_factory.created[0].kwargs["command"] == editor._reset_layout_defaults
     assert editor._layout_combo is combo_instances[0]
     assert editor._legend_pack_combo is combo_instances[1]
-    assert editor._layout_dropdown is dropdown_instances[0]
-    assert editor._legend_pack_dropdown is dropdown_instances[1]
-    assert dropdown_instances[0].kwargs["anchor"] is combo_instances[0]
-    assert dropdown_instances[0].kwargs["root"] is combo_instances[0]
-    assert dropdown_instances[0].kwargs["values_provider"]() == layout_setup._LAYOUT_LABELS
-    assert dropdown_instances[0].kwargs["get_current_value"]() == layout_setup._ID_TO_LABEL[editor._physical_layout]
-    assert dropdown_instances[1].kwargs["anchor"] is combo_instances[1]
-    assert dropdown_instances[1].kwargs["root"] is combo_instances[1]
-    assert dropdown_instances[1].kwargs["values_provider"]() == ["Default legends", "ANSI Generic"]
-    assert dropdown_instances[1].kwargs["get_current_value"]() == "Default legends"
     assert editor._layout_slots_body is frame_factory.created[-1]
     assert editor._layout_slots_body.columnconfigure_calls == [(0, 1)]
     assert refresh_calls == [editor]
@@ -290,26 +266,6 @@ def test_on_layout_select_updates_layout_var_and_notifies_editor() -> None:
     assert set_calls == ["auto"]
 
 
-def test_set_layout_label_updates_combo_and_notifies_editor() -> None:
-    set_calls: list[str] = []
-    changed_calls: list[str] = []
-    combo = _FakeCombobox()
-    fake_self = SimpleNamespace(
-        editor=SimpleNamespace(
-            _layout_combo=combo,
-            _layout_var=SimpleNamespace(set=lambda value: set_calls.append(value)),
-            _on_layout_changed=lambda: changed_calls.append("changed"),
-        )
-    )
-    fake_self._on_layout_select = layout_setup.LayoutSetupControls._on_layout_select.__get__(fake_self, SimpleNamespace)
-
-    layout_setup.LayoutSetupControls._set_layout_label(fake_self, "ANSI (101/104-key)")
-
-    assert combo.value == "ANSI (101/104-key)"
-    assert set_calls == ["ansi"]
-    assert changed_calls == ["changed"]
-
-
 def test_refresh_legend_pack_choices_updates_combo_from_editor_state() -> None:
     combo = _FakeCombobox()
     editor = SimpleNamespace(_physical_layout="iso", _layout_legend_pack="iso-de-qwertz", _legend_pack_combo=combo)
@@ -335,28 +291,5 @@ def test_on_legend_pack_select_updates_var_and_notifies_editor() -> None:
     )
 
     layout_setup.LayoutSetupControls._on_legend_pack_select(fake_self)
-    assert set_calls == ["iso-de-qwertz"]
-    assert changed_calls == ["changed"]
-
-
-def test_set_legend_pack_label_updates_combo_and_notifies_editor() -> None:
-    set_calls: list[str] = []
-    changed_calls: list[str] = []
-    combo = _FakeCombobox()
-    fake_self = SimpleNamespace(
-        _legend_pack_label_to_id={"ISO German QWERTZ": "iso-de-qwertz"},
-        editor=SimpleNamespace(
-            _legend_pack_combo=combo,
-            _legend_pack_var=SimpleNamespace(set=lambda value: set_calls.append(value)),
-            _on_layout_legend_pack_changed=lambda: changed_calls.append("changed"),
-        ),
-    )
-    fake_self._on_legend_pack_select = layout_setup.LayoutSetupControls._on_legend_pack_select.__get__(
-        fake_self, SimpleNamespace
-    )
-
-    layout_setup.LayoutSetupControls._set_legend_pack_label(fake_self, "ISO German QWERTZ")
-
-    assert combo.value == "ISO German QWERTZ"
     assert set_calls == ["iso-de-qwertz"]
     assert changed_calls == ["changed"]

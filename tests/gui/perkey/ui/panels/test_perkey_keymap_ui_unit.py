@@ -93,4 +93,4 @@ def test_reload_keymap_ui_does_not_touch_status_when_unchanged() -> None:
     assert ed.selected_cells == ((1, 2), (1, 3))
     assert ed.selected_cell == (1, 2)
     assert ed.status_label.text == "Existing"
-    assert ed.canvas.redraw_calls == 1
+    assert ed.canvas.redraw_calls == 0

@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from keyrgb.gui.perkey.ui import layout_slots
+from keyrgb.gui.theme import metrics as theme_metrics
 
 
 @dataclass(frozen=True)
@@ -144,6 +145,7 @@ def test_refresh_layout_slots_ui_shows_empty_state_and_clears_old_children(
 
     assert old_child.destroyed is True
     assert registry["labels"][0].options["text"] == "This layout has no optional key positions."
+    assert registry["labels"][0].options["style"] == theme_metrics.BODY_LABEL_STYLE
     assert registry["labels"][0].grid_calls == [{"row": 0, "column": 0, "sticky": "w"}]
 
 
@@ -166,6 +168,7 @@ def test_refresh_layout_slots_ui_builds_rows_and_binds_commands(monkeypatch: pyt
     assert checkbutton.options["text"] == "iso_extra"
     assert checkbutton.options["variable"].get() is True
     assert default_label.options["text"] == "Default: ISO Default"
+    assert default_label.options["style"] == theme_metrics.CAPTION_LABEL_STYLE
     assert [event for event, _ in entry.bind_calls] == ["<Return>", "<FocusOut>"]
 
     checkbutton.options["variable"].set(False)

@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from keyrgb.gui.settings.panels import autostart_panel
+from keyrgb.gui.theme import metrics as theme_metrics
 
 
 class _FakeWidget:
@@ -56,9 +57,9 @@ def test_autostart_panel_init_creates_expected_labels_and_checkbuttons(monkeypat
         "Autostart",
         "Control what happens when KeyRGB launches, and whether it starts automatically when you log in.",
     ]
-    assert [label.options["font"] for label in registry["labels"]] == [
-        ("Sans", 11, "bold"),
-        ("Sans", 9),
+    assert [label.options["style"] for label in registry["labels"]] == [
+        theme_metrics.SECTION_LABEL_STYLE,
+        theme_metrics.BODY_LABEL_STYLE,
     ]
     assert registry["labels"][0].pack_calls == [{"anchor": "w", "pady": (0, 6)}]
     assert registry["labels"][1].pack_calls == [{"anchor": "w", "fill": "x", "pady": (0, 6)}]

@@ -302,6 +302,95 @@ def test_sync_button_state_disables_backend_speed_probe_without_tray() -> None:
     assert window.btn_run_speed_probe.options["state"] == "disabled"
 
 
+def test_build_window_uses_semantic_styles_and_preserves_env_focus_contract() -> None:
+    from keyrgb.gui.theme import metrics as theme_metrics
+
+    registry, fake_ttk, fake_scrolledtext = _build_support_ui_modules()
+
+    class _FakeStyle:
+        def __init__(self, *args, **kwargs) -> None:
+            self.configured: list[tuple[str, dict[str, object]]] = []
+            self.mapped: list[tuple[str, dict[str, object]]] = []
+
+        def configure(self, name: str, **kwargs) -> None:
+            self.configured.append((name, dict(kwargs)))
+
+        def map(self, name: str, **kwargs) -> None:
+            self.mapped.append((name, dict(kwargs)))
+
+    fake_ttk.LabelFrame = fake_ttk.Frame
+    style_holder: dict[str, _FakeStyle] = {}
+
+    def _make_style(*args, **kwargs) -> _FakeStyle:
+        style = _FakeStyle()
+        style_holder["style"] = style
+        return style
+
+    fake_ttk.Style = _make_style  # type: ignore[attr-defined]
+
+    window = _make_window()
+    support_window.support_window_ui.build_window(
+        window,
+        ttk=fake_ttk,
+        scrolledtext=fake_scrolledtext,
+        center_window_on_screen=lambda root: None,
+    )
+
+    assert window._main_frame.options["padding"] == theme_metrics.OUTER_PADDING
+
+    title_label = registry["labels"][0]
+    assert title_label.options["text"] == "Support Tools"
+    assert title_label.options["style"] == theme_metrics.TITLE_LABEL_STYLE
+    assert all("font" not in label.options for label in registry["labels"])
+
+    intro_label = registry["labels"][1]
+    assert intro_label.options["style"] == theme_metrics.BODY_LABEL_STYLE
+    assert window.status_label.options["style"] == theme_metrics.STATUS_LABEL_STYLE
+    assert window.issue_meta_label.options["text"].startswith("Suggested template")
+    assert window.issue_meta_label.options["style"] == theme_metrics.STATUS_LABEL_STYLE
+    caption_labels = [label for label in registry["labels"] if label.options.get("wraplength") == 300]
+    assert len(caption_labels) == 3
+    assert all(label.options["style"] == theme_metrics.CAPTION_LABEL_STYLE for label in caption_labels)
+
+    # The status-palette run-check styles are retained, not replaced by generic actions.
+    assert window.btn_run_debug.options["style"] == "SupportChecks.Diagnostics.TButton"
+    assert window.btn_run_speed_probe.options["style"] == "SupportChecks.Probe.TButton"
+    assert window.btn_run_discovery.options["style"] == "SupportChecks.Discovery.TButton"
+    configured_names = [name for name, _kwargs in style_holder["style"].configured]
+    assert configured_names == [
+        "SupportChecks.Diagnostics.TButton",
+        "SupportChecks.Probe.TButton",
+        "SupportChecks.Discovery.TButton",
+    ]
+    assert "style" not in window.btn_copy_debug.options
+    assert "style" not in window.btn_save_bundle.options
+
+    # Env-driven focus uses the shared non-forcing scheduler.
+    assert [delay for delay, _callback in window.root.after_calls] == [0, 50]
+    _delay, focus_callback = window.root.after_calls[1]
+    assert callable(focus_callback)
+    focus_callback()
+    assert window.btn_run_debug.options["focused"] is True
+    assert "focused" not in window.txt_debug.options
+
+
+def test_support_initial_focus_targets_discovery_action_without_stealing_existing_focus() -> None:
+    window = _make_window()
+    support_window.support_window_ui.apply_initial_focus(
+        window,
+        focus_env="discovery",
+    )
+
+    delay, focus_callback = window.root.after_calls[-1]
+    assert delay == 50
+    assert callable(focus_callback)
+    window.root.focused = object()
+    focus_callback()
+
+    assert "focused" not in window.btn_run_discovery.options
+    assert "focused" not in window.txt_discovery.options
+
+
 def test_set_status_clears_message_after_delay() -> None:
     window = _make_window()
 

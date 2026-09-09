@@ -3,6 +3,8 @@ from __future__ import annotations
 # @quality-exception file-size-analysis: Protocol-heavy Tk typing surface for one reactive color window; size is type discipline not mixed logic
 from typing import Protocol, cast
 
+from keyrgb.gui.theme import metrics as theme_metrics
+
 _UNSUPPORTED_BACKEND_TEXT = (
     "RGB color control is not available with the currently selected backend.\n\n"
     "Reactive typing can still run, but manual highlight color won’t be applied to the keyboard on "
@@ -241,7 +243,7 @@ def build_reactive_window_ui(
         variable=gui_state._use_manual_var,
         command=gui_state._on_toggle_manual,
     )
-    gui_state._manual_check.pack(anchor="w", pady=(0, 10))
+    gui_state._manual_check.pack(anchor="w", pady=(0, theme_metrics.CONTROL_GAP_Y))
 
     gui_state._reactive_vivid_visuals_var = tk_module.BooleanVar(
         value=bool(
@@ -254,7 +256,7 @@ def build_reactive_window_ui(
         variable=gui_state._reactive_vivid_visuals_var,
         command=gui_state._on_toggle_reactive_visual_mode,
     )
-    gui_state._reactive_vivid_visuals_check.pack(anchor="w", pady=(0, 12))
+    gui_state._reactive_vivid_visuals_check.pack(anchor="w", pady=(0, theme_metrics.SECTION_GAP_Y))
 
     if not gui_state._color_supported:
         try:
@@ -268,11 +270,11 @@ def build_reactive_window_ui(
         msg = ttk_module.Label(
             main,
             text=_UNSUPPORTED_BACKEND_TEXT,
-            font=("Sans", 9),
+            style=theme_metrics.BODY_LABEL_STYLE,
             justify="left",
             wraplength=520,
         )
-        msg.pack(pady=(6, 10), fill="x")
+        msg.pack(pady=(theme_metrics.CONTROL_GAP_Y, theme_metrics.SECTION_GAP_Y), fill="x")
         gui_state._wrap_labels.append(msg)
 
     if gui_state._color_supported:
@@ -290,7 +292,7 @@ def build_reactive_window_ui(
     else:
         gui_state.color_wheel = None
 
-    ttk_module.Separator(main, orient="horizontal").pack(fill="x", pady=(18, 12))
+    ttk_module.Separator(main, orient="horizontal").pack(fill="x", pady=(18, theme_metrics.SECTION_GAP_Y))
 
     gui_state._reactive_brightness_var = tk_module.DoubleVar(value=100.0)
     brightness_frame = ttk_module.Frame(main)
@@ -329,7 +331,7 @@ def build_reactive_window_ui(
     gui_state._sync_reactive_brightness_widgets()
     gui_state._sync_color_wheel_brightness()
 
-    ttk_module.Separator(main, orient="horizontal").pack(fill="x", pady=(18, 12))
+    ttk_module.Separator(main, orient="horizontal").pack(fill="x", pady=(18, theme_metrics.SECTION_GAP_Y))
 
     gui_state._reactive_trail_var = tk_module.DoubleVar(value=40.0)
     trail_frame = ttk_module.Frame(main)
@@ -362,5 +364,5 @@ def build_reactive_window_ui(
 
     gui_state._sync_reactive_trail_widgets()
 
-    gui_state.status_label = ttk_module.Label(main, text="", font=("Sans", 9))
-    gui_state.status_label.pack(pady=(10, 0))
+    gui_state.status_label = ttk_module.Label(main, text="", style=theme_metrics.STATUS_LABEL_STYLE)
+    gui_state.status_label.pack(pady=(theme_metrics.SECTION_GAP_Y, 0))

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from keyrgb.gui.theme import focus as theme_focus, metrics as theme_metrics
 from keyrgb.gui.windows import reactive_color
 
 
@@ -43,6 +44,7 @@ class _FakeWidget:
         self.bind_calls: list[tuple[str, object]] = []
         self.configure_calls: list[dict[str, object]] = []
         self.columnconfigure_calls: list[tuple[int, int]] = []
+        self.focus_calls = 0
 
     def pack(self, **kwargs) -> None:
         self.pack_calls.append(dict(kwargs))
@@ -63,6 +65,9 @@ class _FakeWidget:
     def columnconfigure(self, index: int, weight: int = 0, **_kwargs) -> None:
         self.columnconfigure_calls.append((index, weight))
 
+    def focus_set(self) -> None:
+        self.focus_calls += 1
+
     def winfo_width(self) -> int:
         return int(self.kwargs.get("width_px", 640))
 
@@ -74,7 +79,8 @@ class _FakeWidget:
 
 
 class _FakeRoot:
-    def __init__(self) -> None:
+    def __init__(self, *, focused: object = None) -> None:
+        self._focused = focused
         self.title_calls: list[str] = []
         self.geometry_calls: list[str] = []
         self.minsize_calls: list[tuple[int, int]] = []
@@ -103,6 +109,9 @@ class _FakeRoot:
 
     def after(self, delay: int, callback) -> None:
         self.after_calls.append((delay, callback))
+
+    def focus_get(self) -> object:
+        return self._focused
 
     def bind(self, sequence: str, callback) -> None:
         self.bind_calls.append((sequence, callback))
@@ -316,3 +325,188 @@ def test_on_reactive_trail_release_reports_failure_when_commit_returns_none() ->
     gui._on_reactive_trail_release()
 
     assert status_calls[0]["ok"] is False
+
+
+def test_description_section_uses_body_style_and_section_gap() -> None:
+    root = _FakeRoot()
+    main = _FakeWidget(width_px=640)
+    created: list[_FakeWidget] = []
+
+    def _label(parent=None, **kwargs):
+        widget = _FakeWidget(parent, **kwargs)
+        created.append(widget)
+        return widget
+
+    gui = SimpleNamespace(root=root, _wrap_labels=[])
+
+    reactive_color.reactive_color_bootstrap.build_description_section(
+        gui,
+        main,
+        ttk_module=SimpleNamespace(Label=_label),
+        wrap_sync_errors=reactive_color._WRAP_SYNC_ERRORS,
+    )
+
+    assert created[0].kwargs.get("style") == theme_metrics.BODY_LABEL_STYLE
+    assert "font" not in created[0].kwargs
+    assert created[0].pack_calls[0] == {"pady": (0, theme_metrics.SECTION_GAP_Y), "fill": "x"}
+
+
+def test_reactive_window_ui_uses_theme_styles_and_gap_constants() -> None:
+    from keyrgb.gui.windows import _reactive_color_ui as reactive_color_ui
+
+    main = _FakeWidget(width_px=640)
+    labels: list[_FakeWidget] = []
+    checks: list[_FakeWidget] = []
+    separators: list[_FakeWidget] = []
+    committed: list[tuple[int, int, int]] = []
+
+    def _label(parent=None, **kwargs):
+        widget = _FakeWidget(parent, **kwargs)
+        labels.append(widget)
+        return widget
+
+    def _checkbutton(parent=None, **kwargs):
+        widget = _FakeWidget(parent, **kwargs)
+        checks.append(widget)
+        return widget
+
+    def _separator(parent=None, **kwargs):
+        widget = _FakeWidget(parent, **kwargs)
+        separators.append(widget)
+        return widget
+
+    def _frame(parent=None, **kwargs):
+        return _FakeWidget(parent, **kwargs)
+
+    def _scale(parent=None, **kwargs):
+        return _FakeWidget(parent, **kwargs)
+
+    class _Wheel:
+        def __init__(self, parent, **kwargs) -> None:
+            self.parent = parent
+            self.kwargs = kwargs
+            self.pack_calls: list[dict[str, object]] = []
+
+        def pack(self, **kwargs) -> None:
+            self.pack_calls.append(dict(kwargs))
+
+        def set_brightness_percent(self, _pct: int) -> None:
+            return None
+
+    gui = SimpleNamespace(
+        config=SimpleNamespace(
+            reactive_use_manual_color=False, reactive_visual_mode="subtle", reactive_color=(1, 2, 3)
+        ),
+        _color_supported=True,
+        _wrap_labels=[],
+        _on_toggle_manual=lambda: None,
+        _on_toggle_reactive_visual_mode=lambda: None,
+        _on_color_change=lambda *args, **kwargs: None,
+        _on_color_release=lambda *args, **kwargs: None,
+        _on_reactive_brightness_change=lambda value: None,
+        _on_reactive_brightness_release=lambda _event=None: None,
+        _on_reactive_trail_change=lambda value: None,
+        _on_reactive_trail_release=lambda _event=None: None,
+        _sync_reactive_brightness_widgets=lambda: committed.append((0, 0, 0)),
+        _sync_color_wheel_brightness=lambda: None,
+        _sync_reactive_trail_widgets=lambda: None,
+    )
+
+    reactive_color_ui.build_reactive_window_ui(
+        gui,
+        main,
+        tk_module=SimpleNamespace(BooleanVar=_FakeVar, DoubleVar=_FakeVar),
+        ttk_module=SimpleNamespace(
+            Checkbutton=_checkbutton, Label=_label, Separator=_separator, Frame=_frame, Scale=_scale
+        ),
+        color_wheel_cls=_Wheel,
+        wrap_sync_errors=(RuntimeError,),
+        tk_error=RuntimeError,
+    )
+
+    assert checks[0].pack_calls[0] == {"anchor": "w", "pady": (0, theme_metrics.CONTROL_GAP_Y)}
+    assert checks[1].pack_calls[0] == {"anchor": "w", "pady": (0, theme_metrics.SECTION_GAP_Y)}
+    assert separators[0].pack_calls[0] == {"fill": "x", "pady": (18, theme_metrics.SECTION_GAP_Y)}
+    assert gui.status_label.kwargs.get("style") == theme_metrics.STATUS_LABEL_STYLE
+    assert "font" not in gui.status_label.kwargs
+    for widget in (*labels, *checks):
+        font = widget.kwargs.get("font")
+        assert not (isinstance(font, tuple) and font and font[0] == "Sans"), widget.kwargs
+    # The vivid-visuals check is the always-enabled meaningful focus target.
+    assert gui._reactive_vivid_visuals_check is checks[1]
+
+
+def test_reactive_window_ui_styles_unsupported_body_message() -> None:
+    from keyrgb.gui.windows import _reactive_color_ui as reactive_color_ui
+
+    main = _FakeWidget(width_px=640)
+    labels: list[_FakeWidget] = []
+
+    def _label(parent=None, **kwargs):
+        widget = _FakeWidget(parent, **kwargs)
+        labels.append(widget)
+        return widget
+
+    gui = SimpleNamespace(
+        config=SimpleNamespace(reactive_use_manual_color=True, reactive_visual_mode="subtle", reactive_color=(1, 2, 3)),
+        _color_supported=False,
+        _wrap_labels=[],
+        _on_toggle_manual=lambda: None,
+        _on_toggle_reactive_visual_mode=lambda: None,
+        _on_color_change=lambda *args, **kwargs: None,
+        _on_color_release=lambda *args, **kwargs: None,
+        _on_reactive_brightness_change=lambda value: None,
+        _on_reactive_brightness_release=lambda _event=None: None,
+        _on_reactive_trail_change=lambda value: None,
+        _on_reactive_trail_release=lambda _event=None: None,
+        _sync_reactive_brightness_widgets=lambda: None,
+        _sync_color_wheel_brightness=lambda: None,
+        _sync_reactive_trail_widgets=lambda: None,
+    )
+
+    reactive_color_ui.build_reactive_window_ui(
+        gui,
+        main,
+        tk_module=SimpleNamespace(BooleanVar=_FakeVar, DoubleVar=_FakeVar),
+        ttk_module=SimpleNamespace(
+            Checkbutton=lambda parent=None, **kwargs: _FakeWidget(parent, **kwargs),
+            Label=_label,
+            Separator=lambda parent=None, **kwargs: _FakeWidget(parent, **kwargs),
+            Frame=lambda parent=None, **kwargs: _FakeWidget(parent, **kwargs),
+            Scale=lambda parent=None, **kwargs: _FakeWidget(parent, **kwargs),
+        ),
+        color_wheel_cls=lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("no wheel when unsupported")),
+        wrap_sync_errors=(RuntimeError,),
+        tk_error=RuntimeError,
+    )
+
+    assert gui.color_wheel is None
+    unsupported = next(
+        label for label in labels if "Reactive typing can still run" in str(label.kwargs.get("text", ""))
+    )
+    assert unsupported.kwargs.get("style") == theme_metrics.BODY_LABEL_STYLE
+    assert "font" not in unsupported.kwargs
+
+
+def test_schedule_initial_focus_targets_always_enabled_vivid_check(monkeypatch) -> None:
+    gui = reactive_color.ReactiveColorGUI.__new__(reactive_color.ReactiveColorGUI)
+    gui.root = _FakeRoot()
+    vivid = _FakeWidget()
+    gui._reactive_vivid_visuals_check = vivid
+    calls: list[tuple[object, object]] = []
+    monkeypatch.setattr(reactive_color, "schedule_initial_focus", lambda root, target: calls.append((root, target)))
+
+    gui._schedule_initial_focus()
+
+    assert calls == [(gui.root, vivid)]
+
+
+def test_reactive_initial_focus_is_scheduled_non_forcing() -> None:
+    root = _FakeRoot()
+    vivid = _FakeWidget()
+    reactive_color.schedule_initial_focus(root, vivid)
+
+    focus_entries = [(delay, cb) for delay, cb in root.after_calls if delay == theme_focus.INITIAL_FOCUS_DELAY_MS]
+    assert len(focus_entries) == 1
+    focus_entries[0][1]()
+    assert vivid.focus_calls == 1

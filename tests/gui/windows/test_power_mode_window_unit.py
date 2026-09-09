@@ -120,6 +120,10 @@ def test_constructor_sets_up_window_and_explanations(monkeypatch) -> None:
     monkeypatch.setattr(power_mode, "Config", lambda: config)
     monkeypatch.setattr(power_mode, "apply_clam_theme", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(power_mode, "apply_keyrgb_window_icon", lambda *_args, **_kwargs: None)
+    focus_calls: list[tuple[object, object]] = []
+    monkeypatch.setattr(
+        power_mode, "schedule_initial_focus", lambda root_arg, target: focus_calls.append((root_arg, target))
+    )
     monkeypatch.setattr(power_mode, "get_current_freq_stats_khz", lambda: (1_025_000, 1_300_000))
     monkeypatch.setattr(
         power_mode,
@@ -158,11 +162,30 @@ def test_constructor_sets_up_window_and_explanations(monkeypatch) -> None:
     footer_label = next(
         widget for widget in registry["labels"] if widget.kwargs.get("textvariable") is gui._save_status_var
     )
-    assert footer_label.grid_calls == [{"row": 0, "column": 0, "columnspan": 4, "sticky": "ew", "pady": (0, 10)}]
+    assert footer_label.grid_calls == [{"row": 0, "column": 0, "columnspan": 4, "sticky": "ew", "pady": (0, 6)}]
     live_freq_label = next(
         widget for widget in registry["labels"] if widget.kwargs.get("textvariable") is gui._live_freq_var
     )
     assert live_freq_label.grid_calls == [{"row": 2, "column": 0, "columnspan": 4, "sticky": "w", "pady": (12, 0)}]
+
+    from keyrgb.gui.theme import metrics as theme_metrics
+
+    main_frame = registry["frames"][0]
+    assert main_frame.kwargs.get("padding") == theme_metrics.OUTER_PADDING
+    title_label = next(widget for widget in registry["labels"] if widget.kwargs.get("text") == "Power Mode Settings")
+    assert title_label.kwargs.get("style") == theme_metrics.TITLE_LABEL_STYLE
+    assert "font" not in title_label.kwargs
+    assert all("font" not in widget.kwargs for widget in registry["labels"])
+    cap_value_label = next(
+        widget for widget in registry["labels"] if widget.kwargs.get("textvariable") is gui._cap_value_var
+    )
+    assert cap_value_label.kwargs.get("style") == theme_metrics.VALUE_LABEL_STYLE
+    assert footer_label.kwargs.get("style") == theme_metrics.STATUS_LABEL_STYLE
+    assert live_freq_label.kwargs.get("style") == theme_metrics.STATUS_LABEL_STYLE
+    save_button = next(widget for widget in registry["buttons"] if widget.kwargs.get("text") == "Save")
+    assert save_button.kwargs.get("style") == theme_metrics.PRIMARY_BUTTON_STYLE
+    assert gui.btn_save is save_button
+    assert focus_calls == [(root, save_button)]
 
 
 def test_save_persists_clamped_extreme_cap_and_refreshes_status(monkeypatch) -> None:

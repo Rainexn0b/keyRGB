@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from typing import cast
 
+from keyrgb.gui.theme import metrics as theme_metrics
+from keyrgb.gui.theme.focus import schedule_initial_focus
+
 from . import (
     _support_window_ui_sections as support_window_ui_sections,
     _support_window_ui_shared as support_window_ui_shared,
@@ -49,34 +52,36 @@ def build_window(
     scrolledtext_mod = cast(_ScrolledTextModuleProtocol, scrolledtext)
     _configure_run_check_styles(window, ttk=ttk_mod)
 
-    main = ttk_mod.Frame(window.root, padding=18)
+    main = ttk_mod.Frame(window.root, padding=theme_metrics.OUTER_PADDING)
     main.pack(fill="both", expand=True)
     window._main_frame = main
     _reset_wrap_targets(window)
 
-    ttk_mod.Label(main, text="Support Tools", font=("Sans", 14, "bold")).pack(anchor="w", pady=(0, 6))
+    ttk_mod.Label(main, text="Support Tools", style=theme_metrics.TITLE_LABEL_STYLE).pack(
+        anchor="w", pady=(0, theme_metrics.CONTROL_GAP_Y)
+    )
     intro_label = ttk_mod.Label(
         main,
         text=(
             "Run read-only support scans directly from the tray workflow.\n"
             "The Debug section explains the current setup; Detect New Backends highlights RGB-related devices that keyRGB sees but may not yet support."
         ),
-        font=("Sans", 9),
+        style=theme_metrics.BODY_LABEL_STYLE,
         justify="left",
         wraplength=1120,
     )
-    intro_label.pack(anchor="w", pady=(0, 12))
+    intro_label.pack(anchor="w", pady=(0, theme_metrics.SECTION_GAP_Y))
     _register_wrap_target(window, label=intro_label, owner=main, padding=36, minimum=360)
 
-    window.status_label = ttk_mod.Label(main, text="", font=("Sans", 9))
-    window.status_label.pack(anchor="w", pady=(0, 10))
+    window.status_label = ttk_mod.Label(main, text="", style=theme_metrics.STATUS_LABEL_STYLE)
+    window.status_label.pack(anchor="w", pady=(0, theme_metrics.CONTROL_GAP_Y))
 
     window.checks_frame = ttk_mod.LabelFrame(main, text="Run Checks", padding=12)
-    window.checks_frame.pack(fill="x", pady=(0, 12))
+    window.checks_frame.pack(fill="x", pady=(0, theme_metrics.SECTION_GAP_Y))
     build_checks_section(window, window.checks_frame, ttk=ttk_mod)
 
     results_row = ttk_mod.Frame(main)
-    results_row.pack(fill="both", expand=True, pady=(0, 12))
+    results_row.pack(fill="both", expand=True, pady=(0, theme_metrics.SECTION_GAP_Y))
     results_row.columnconfigure(0, weight=1, uniform="pane")
     results_row.columnconfigure(1, weight=1, uniform="pane")
     results_row.rowconfigure(0, weight=1)
@@ -95,7 +100,7 @@ def build_window(
     )
 
     window.issue_frame = ttk_mod.LabelFrame(main, text="Prepare Support Issue", padding=12)
-    window.issue_frame.pack(fill="both", expand=True, pady=(0, 12))
+    window.issue_frame.pack(fill="both", expand=True, pady=(0, theme_metrics.SECTION_GAP_Y))
     build_issue_section(window, window.issue_frame, ttk=ttk_mod, scrolledtext=scrolledtext_mod)
 
     window.bundle_frame = ttk_mod.LabelFrame(main, text="Support Bundle", padding=12)
@@ -114,7 +119,7 @@ def build_window(
     )
 
     center_window_on_screen(window.root)
-    window.root.after(150, window._apply_initial_focus)
+    window._apply_initial_focus()
 
 
 def build_checks_section(window: _SupportWindowProtocol, parent: _WidgetProtocol, *, ttk: _TtkModuleProtocol) -> None:
@@ -187,14 +192,6 @@ def apply_initial_focus(
     window: _SupportWindowProtocol,
     *,
     focus_env: str,
-    tk_runtime_errors: tuple[type[BaseException], ...],
 ) -> None:
-    try:
-        if focus_env == "discovery":
-            window.discovery_frame.focus_set()
-            window.txt_discovery.focus_set()
-        else:
-            window.debug_frame.focus_set()
-            window.txt_debug.focus_set()
-    except tk_runtime_errors:
-        return
+    target = window.btn_run_discovery if focus_env == "discovery" else window.btn_run_debug
+    schedule_initial_focus(window.root, target)

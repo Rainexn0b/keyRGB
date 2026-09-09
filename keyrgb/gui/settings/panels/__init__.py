@@ -4,6 +4,7 @@ from .autostart_panel import AutostartPanel
 from .bottom_bar_panel import BottomBarPanel
 from .dim_sync_panel import DimSyncPanel
 from .experimental_backends_panel import ExperimentalBackendsPanel
+from .idle_transition_advanced_panel import IdleTransitionAdvancedPanel
 from .power_management_panel import PowerManagementPanel
 from .power_source_panel import PowerSourcePanel
 from .time_scheduler_panel import TimeSchedulerPanel
@@ -14,6 +15,7 @@ __all__ = [
     "BottomBarPanel",
     "DimSyncPanel",
     "ExperimentalBackendsPanel",
+    "IdleTransitionAdvancedPanel",
     "PowerManagementPanel",
     "PowerSourcePanel",
     "TimeSchedulerPanel",

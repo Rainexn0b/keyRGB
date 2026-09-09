@@ -70,10 +70,6 @@ def test_init_builds_controls_and_slider_binding(monkeypatch) -> None:
         var_dim_sync_enabled=_FakeVar(True),
         var_dim_sync_mode=_FakeVar("temp"),
         var_dim_temp_brightness=_FakeVar(17.2),
-        var_debounce_enter=_FakeVar(6),
-        var_debounce_exit=_FakeVar(10),
-        var_idle_fade_duration=_FakeVar(0.6),
-        var_controller_sleep_respect=_FakeVar(False),
         on_toggle=lambda: toggle_calls.append("toggle"),
     )
 
@@ -81,21 +77,10 @@ def test_init_builds_controls_and_slider_binding(monkeypatch) -> None:
     assert labels[1].kwargs["text"].startswith("React to screen blanking or session idle")
     assert labels[2].kwargs["text"] == "Idle source: Unknown"
     assert checks[0].kwargs["text"] == "Sync keyboard lighting with screen idle/blanking"
-    # The controller-sleep label is split into a short checkbox plus a wrapping
-    # detail label so the left settings column does not end up wider than the
-    # other (uniform) columns.
-    assert checks[1].kwargs["text"] == "Let the controller's own sleep timeout turn the keyboard off"
-    assert "wraplength" not in checks[1].kwargs
-    assert labels[3].kwargs["text"].startswith("Recommended for supported ITE controllers")
-    assert labels[3].kwargs["wraplength"] == 400
-    # Delays are shown in seconds (0.5s steps), not internal poll counts.
-    assert labels[5].kwargs["text"] == "Delay before reacting to screen idle/blanking, in seconds."
-    assert spinboxes[0].kwargs["from_"] == 0.5
-    assert spinboxes[0].kwargs["to"] == 30.0
-    assert spinboxes[0].kwargs["increment"] == 0.5
-    assert spinboxes[0].kwargs["format"] == "%.1f"
-    assert spinboxes[1].kwargs["from_"] == 0.5
-    assert spinboxes[1].kwargs["to"] == 30.0
+    # Advanced controls (controller sleep, delays, fade) now live on the
+    # Advanced page; Automation keeps only the sync outcome controls.
+    assert len(checks) == 1
+    assert spinboxes == []
     assert radios[0].kwargs["value"] == "off"
     assert radios[1].kwargs["value"] == "temp"
     assert panel.lbl_dim_temp_val.kwargs["text"] == "17"
@@ -105,21 +90,15 @@ def test_init_builds_controls_and_slider_binding(monkeypatch) -> None:
     assert panel.scale_dim_temp.kwargs["from_"] == 1
     assert panel.scale_dim_temp.kwargs["to"] == 50
     assert panel.scale_dim_temp.bind_calls[0][0] == "<ButtonRelease-1>"
-    assert panel.lbl_fade_duration_val.kwargs["text"] == "0.6 s"
-    assert panel.scale_fade_duration.kwargs["from_"] == 0.1
-    assert panel.scale_fade_duration.kwargs["to"] == 3.0
-    assert panel.scale_fade_duration.bind_calls[0][0] == "<ButtonRelease-1>"
 
     checks[0].kwargs["command"]()
     radios[0].kwargs["command"]()
     radios[1].kwargs["command"]()
     panel.scale_dim_temp.bind_calls[0][1](None)
     panel.scale_dim_temp.kwargs["command"]("9.8")
-    panel.scale_fade_duration.kwargs["command"]("1.2")
 
     assert toggle_calls == ["toggle", "toggle", "toggle", "toggle"]
     assert panel.lbl_dim_temp_val.options["text"] == "9"
-    assert panel.lbl_fade_duration_val.options["text"] == "1.2 s"
 
 
 class _BadFloat:
@@ -135,9 +114,6 @@ def _make_panel(*, dim_sync_enabled: bool, dim_sync_mode: str) -> dim_sync_panel
     panel.rb_dim_off = _FakeWidget()
     panel.rb_dim_temp = _FakeWidget()
     panel.scale_dim_temp = _FakeWidget()
-    panel.spn_enter = _FakeWidget()
-    panel.spn_exit = _FakeWidget()
-    panel.scale_fade_duration = _FakeWidget()
     panel.lbl_idle_source = _FakeWidget()
     return panel
 
@@ -151,8 +127,6 @@ def test_apply_enabled_state_disables_all_controls_when_power_management_disable
     assert panel.rb_dim_off.options["state"] == "disabled"
     assert panel.rb_dim_temp.options["state"] == "disabled"
     assert panel.scale_dim_temp.options["state"] == "disabled"
-    assert panel.spn_enter.options["state"] == "disabled"
-    assert panel.spn_exit.options["state"] == "disabled"
     assert panel.lbl_idle_source.options["state"] == "disabled"
 
 
@@ -165,8 +139,6 @@ def test_apply_enabled_state_disables_temp_scale_when_dim_sync_is_disabled() -> 
     assert panel.rb_dim_off.options["state"] == "normal"
     assert panel.rb_dim_temp.options["state"] == "normal"
     assert panel.scale_dim_temp.options["state"] == "disabled"
-    assert panel.spn_enter.options["state"] == "normal"
-    assert panel.spn_exit.options["state"] == "normal"
     assert panel.lbl_idle_source.options["state"] == "normal"
 
 
@@ -179,8 +151,6 @@ def test_apply_enabled_state_enables_temp_scale_for_temp_mode() -> None:
     assert panel.rb_dim_off.options["state"] == "normal"
     assert panel.rb_dim_temp.options["state"] == "normal"
     assert panel.scale_dim_temp.options["state"] == "normal"
-    assert panel.spn_enter.options["state"] == "normal"
-    assert panel.spn_exit.options["state"] == "normal"
 
 
 def test_apply_enabled_state_disables_temp_scale_for_off_mode() -> None:
@@ -192,8 +162,6 @@ def test_apply_enabled_state_disables_temp_scale_for_off_mode() -> None:
     assert panel.rb_dim_off.options["state"] == "normal"
     assert panel.rb_dim_temp.options["state"] == "normal"
     assert panel.scale_dim_temp.options["state"] == "disabled"
-    assert panel.spn_enter.options["state"] == "normal"
-    assert panel.spn_exit.options["state"] == "normal"
     assert panel.lbl_idle_source.options["state"] == "normal"
 
 
@@ -217,10 +185,6 @@ def test_init_uses_idle_source_label_when_provided(monkeypatch) -> None:
         var_dim_sync_enabled=_FakeVar(True),
         var_dim_sync_mode=_FakeVar("off"),
         var_dim_temp_brightness=_FakeVar(10.0),
-        var_debounce_enter=_FakeVar(1),
-        var_debounce_exit=_FakeVar(1),
-        var_idle_fade_duration=_FakeVar(0.6),
-        var_controller_sleep_respect=_FakeVar(False),
         on_toggle=lambda: None,
         idle_source_label="Wayland compositor idle",
     )

@@ -149,8 +149,14 @@ def test_delete_profile_ui_updates_combo(monkeypatch) -> None:
     def fake_delete_profile(_name: str) -> DeleteProfileResult:
         return DeleteProfileResult(deleted=True, active_profile="default", message="Deleted lighting profile: p2")
 
+    list_calls = {"n": 0}
+
+    def fake_list_profiles():
+        list_calls["n"] += 1
+        return ["default", "p3"]
+
     monkeypatch.setattr(actions, "delete_profile", fake_delete_profile)
-    monkeypatch.setattr(actions.profiles, "list_profiles", lambda: ["default", "p3"])  # type: ignore[attr-defined]
+    monkeypatch.setattr(actions.profiles, "list_profiles", fake_list_profiles)  # type: ignore[attr-defined]
 
     ed = DummyEditor(
         _profile_name_var=DummyVar("p2"),
@@ -180,7 +186,19 @@ def test_delete_profile_ui_updates_combo(monkeypatch) -> None:
 
     assert ed.profile_name == "default"
     assert ed._profile_name_var.get() == "default"
+    # Regression: one shared scan refreshes all three combo value lists.
+    assert list_calls["n"] == 1
     assert ed._profiles_combo.values == ["default", "p3"]
+    assert ed._ac_power_source_profile_combo.values == [
+        "Keep current profile",
+        "default",
+        "p3",
+    ]
+    assert ed._battery_power_source_profile_combo.values == [
+        "Keep current profile",
+        "default",
+        "p3",
+    ]
     assert ed.status_label.text == "Deleted lighting profile: p2"
 
 
@@ -259,13 +277,33 @@ def test_save_profile_ui_and_new_profile_paths(monkeypatch) -> None:
     monkeypatch.setattr(actions, "_mark_saved_snapshot_if_supported", lambda _e: marks.append("mark"))
     monkeypatch.setattr(actions, "set_status", lambda _e, msg: statuses.append(msg))
     monkeypatch.setattr(actions, "saved_profile", lambda name: f"saved:{name}")
-    monkeypatch.setattr(actions_ui.profiles, "list_profiles", lambda: ["Default", "Night"])
+    save_list_calls = {"n": 0}
+
+    def fake_save_list_profiles():
+        save_list_calls["n"] += 1
+        return ["Default", "Night"]
+
+    monkeypatch.setattr(actions_ui.profiles, "list_profiles", fake_save_list_profiles)
 
     actions_ui.save_profile_ui(ed)
     assert ed.profile_name == "Night"
     assert commits == [True]
     assert marks == ["mark"]
     assert statuses[-1] == "saved:Night"
+    # Regression: save performs one shared scan for all three combo lists.
+    assert save_list_calls["n"] == 1
+    assert ed._profile_names_snapshot == ("Default", "Night")
+    assert ed._profiles_combo.values == ["Default", "Night"]
+    assert ed._ac_power_source_profile_combo.values == [
+        "Keep current profile",
+        "Default",
+        "Night",
+    ]
+    assert ed._battery_power_source_profile_combo.values == [
+        "Keep current profile",
+        "Default",
+        "Night",
+    ]
 
     # new profile cancelled / empty / exists / success
     monkeypatch.setattr(actions, "_guard_destructive_profile_action", lambda *_a, **_k: False)
@@ -288,14 +326,35 @@ def test_save_profile_ui_and_new_profile_paths(monkeypatch) -> None:
     assert any("already exists" in s for s in statuses)
 
     monkeypatch.setattr(sd, "askstring", lambda *_a, **_k: "Fresh")
-    # list_profiles is called twice (existence check + combo refresh); return
-    # pre-create list first, then include the new name.
-    profile_lists = iter([["Default", "Night"], ["Default", "Night", "Fresh"], ["Default", "Night", "Fresh"]])
-    monkeypatch.setattr(actions_ui.profiles, "list_profiles", lambda: next(profile_lists))
+    # Existence check + one shared refresh scan; return pre-create list first,
+    # then include the new name for the shared refresh.
+    profile_lists = iter([["Default", "Night"], ["Default", "Night", "Fresh"]])
+    new_list_calls = {"n": 0}
+
+    def fake_new_list_profiles():
+        new_list_calls["n"] += 1
+        return next(profile_lists)
+
+    monkeypatch.setattr(actions_ui.profiles, "list_profiles", fake_new_list_profiles)
     statuses.clear()
     actions_ui.new_profile_ui(ed)
     assert ed.profile_name == "Fresh"
     assert any("Created lighting profile" in s for s in statuses)
+    # Regression: post-create refresh shares a single scan across all combos.
+    assert new_list_calls["n"] == 2
+    assert ed._profiles_combo.values == ["Default", "Night", "Fresh"]
+    assert ed._ac_power_source_profile_combo.values == [
+        "Keep current profile",
+        "Default",
+        "Night",
+        "Fresh",
+    ]
+    assert ed._battery_power_source_profile_combo.values == [
+        "Keep current profile",
+        "Default",
+        "Night",
+        "Fresh",
+    ]
 
 
 def test_delete_and_set_default_guard_paths(monkeypatch) -> None:

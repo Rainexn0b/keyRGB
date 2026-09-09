@@ -86,7 +86,7 @@ class SupportToolsGUI(support_session_bridge.SupportWindowSessionBridgeMixin):
         self.root.minsize(960, 720)
         self.root.resizable(True, True)
 
-        bg_color, fg_color = apply_clam_theme(self.root, include_checkbuttons=True, map_checkbutton_state=True)
+        bg_color, fg_color = apply_clam_theme(self.root)
         self._bg_color = bg_color
         self._fg_color = fg_color
         self._support_session = support_window_state.SupportSessionState()
@@ -117,7 +117,6 @@ class SupportToolsGUI(support_session_bridge.SupportWindowSessionBridgeMixin):
         support_window_ui.apply_initial_focus(
             self,
             focus_env=str(os.environ.get("KEYRGB_SUPPORT_FOCUS") or "debug").strip().lower(),
-            tk_runtime_errors=_TK_RUNTIME_ERRORS,
         )
 
     def _sync_button_state(self) -> None:

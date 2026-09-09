@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from collections.abc import Callable, Sequence
+from contextlib import AbstractContextManager
 from functools import lru_cache
 from logging import Logger
 from tkinter import TclError
@@ -82,6 +83,8 @@ class _ProfileConfigProtocol(Protocol):
     ac_perkey_profile_name: str | None
     battery_perkey_profile_name: str | None
 
+    def batch_update(self) -> AbstractContextManager[object]: ...
+
 
 class _PerKeyProfileEditorProtocol(Protocol):
     root: tk.Misc
@@ -93,6 +96,7 @@ class _PerKeyProfileEditorProtocol(Protocol):
     per_key_layout_tweaks: PerKeyLayoutTweaks
     layout_slot_overrides: LayoutSlotOverrides
     profile_name: str
+    _profile_names_snapshot: tuple[str, ...]
     selected_key_id: str | None
     selected_slot_id: str | None
     selected_cells: KeyCells

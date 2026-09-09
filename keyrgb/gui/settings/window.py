@@ -21,9 +21,18 @@ from typing import TypeAlias
 
 from keyrgb.core import config as core_config
 from keyrgb.gui import theme as gui_theme
+from keyrgb.gui.theme import metrics as theme_metrics
 from keyrgb.gui.utils import tk_async, window_geometry, window_icon
 
-from . import _settings_window_constants as _swc, hardware_hint, os_autostart, panels, scrollable_area, settings_state
+from . import (
+    _settings_window_constants as _swc,
+    hardware_hint,
+    navigation as settings_navigation,
+    os_autostart,
+    panels,
+    scrollable_area,
+    settings_state,
+)
 
 # Keep module-level dependency names explicit so tests can monkeypatch window.py
 # directly while the implementation still resolves through this module.
@@ -34,6 +43,7 @@ BottomBarPanel = panels.BottomBarPanel
 ScrollableArea = scrollable_area.ScrollableArea
 PowerManagementPanel = panels.PowerManagementPanel
 DimSyncPanel = panels.DimSyncPanel
+IdleTransitionAdvancedPanel = panels.IdleTransitionAdvancedPanel
 PowerSourcePanel = panels.PowerSourcePanel
 TimeSchedulerPanel = panels.TimeSchedulerPanel
 VersionPanel = panels.VersionPanel
@@ -47,6 +57,10 @@ apply_keyrgb_window_icon = window_icon.apply_keyrgb_window_icon
 load_settings_values = settings_state.load_settings_values
 SettingsValues: TypeAlias = settings_state.SettingsValues
 compute_centered_window_geometry = window_geometry.compute_centered_window_geometry
+schedule_initial_focus = gui_theme.schedule_initial_focus
+build_settings_navigation = settings_navigation.build_navigation
+DEFAULT_SETTINGS_CATEGORY_ID = settings_navigation.DEFAULT_CATEGORY_ID
+SETTINGS_CATEGORIES = settings_navigation.CATEGORIES
 
 _detect_idle_power_source = _swc.detect_idle_power_source
 _KEEP_CURRENT_POWER_MODE_LABEL = _swc.KEEP_CURRENT_POWER_MODE_LABEL
@@ -57,7 +71,6 @@ _SETTINGS_MIN_WIDTH = _swc.SETTINGS_MIN_WIDTH
 _SETTINGS_MIN_HEIGHT = _swc.SETTINGS_MIN_HEIGHT
 _SETTINGS_DEFAULT_WIDTH = _swc.SETTINGS_DEFAULT_WIDTH
 _SETTINGS_DEFAULT_HEIGHT = _swc.SETTINGS_DEFAULT_HEIGHT
-_SETTINGS_COLUMN_GAP = _swc.SETTINGS_COLUMN_GAP
 
 _FOOTER_HARDWARE_PROBE_ERRORS = (AttributeError, ImportError, OSError, RuntimeError, TypeError, ValueError)
 _FOOTER_HARDWARE_HINT_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
@@ -75,11 +88,7 @@ class PowerSettingsGUI:
         self.root.minsize(_SETTINGS_MIN_WIDTH, _SETTINGS_MIN_HEIGHT)
         self.root.resizable(True, True)
 
-        bg_color, _fg_color = apply_clam_theme(
-            self.root,
-            include_checkbuttons=True,
-            map_checkbutton_state=True,
-        )
+        bg_color, _fg_color = apply_clam_theme(self.root)
 
         self.config = Config()
 
@@ -130,32 +139,30 @@ class PowerSettingsGUI:
         content_area = ttk.Frame(outer)
         content_area.pack(side="top", fill="both", expand=True)
 
-        self.scroll = ScrollableArea(content_area, bg_color=bg_color, padding=10)
-        main = self.scroll.frame
+        title = ttk.Label(content_area, text="Settings", style=theme_metrics.TITLE_LABEL_STYLE)
+        title.pack(anchor="w", padx=theme_metrics.OUTER_PAD_X, pady=(8, 2))
 
-        title = ttk.Label(main, text="Settings", font=("Sans", 14, "bold"))
-        title.pack(anchor="w", pady=(4, 6))
-
-        cols = ttk.Frame(main)
-        cols.pack(fill="both", expand=True)
-        # Grid with a uniform column group keeps all three column cells exactly
-        # the same width; pack(expand=True) would preserve each column's
-        # natural (content-driven) width and only split the surplus equally.
-        for column_index in range(3):
-            cols.columnconfigure(column_index, weight=1, uniform="settings_columns")
-
-        # Split the gap evenly on both sides of every column so the column
-        # frames themselves (cell minus padding) stay equal widths.
-        half_gap = _SETTINGS_COLUMN_GAP // 2
-
-        self._left = ttk.Frame(cols)
-        self._left.grid(row=0, column=0, sticky="nsew", padx=(half_gap, half_gap))
-
-        self._middle = ttk.Frame(cols)
-        self._middle.grid(row=0, column=1, sticky="nsew", padx=(half_gap, half_gap))
-
-        self._right = ttk.Frame(cols)
-        self._right.grid(row=0, column=2, sticky="nsew", padx=(half_gap, half_gap))
+        # One independently scrolling page per category (UX-01). All pages and
+        # panels are constructed exactly once here; tab switches only reselect
+        # and never recreate panels or repeat probes.
+        navigation = build_settings_navigation(
+            content_area,
+            notebook_cls=ttk.Notebook,
+            frame_cls=ttk.Frame,
+            scroll_area_cls=ScrollableArea,
+            bg_color=bg_color,
+            padding=theme_metrics.OUTER_PAD_X,
+        )
+        self.notebook = navigation.notebook
+        self.page_frames = dict(navigation.page_frames)
+        self.scroll_areas = dict(navigation.scroll_areas)
+        self.panel_parents = dict(navigation.panel_parents)
+        self.notebook.pack(
+            fill="both", expand=True, padx=theme_metrics.CONTROL_GAP_Y, pady=(2, theme_metrics.CONTROL_GAP_Y)
+        )
+        # Intentional non-forcing initial focus (UX-05): the notebook is the
+        # keyboard entry point; the helper never grabs or steals focus.
+        schedule_initial_focus(self.root, self.notebook)
 
     def _init_vars(self, values: SettingsValues) -> None:
         self.var_enabled = tk.BooleanVar(value=bool(values.power_management_enabled))
@@ -193,12 +200,16 @@ class PowerSettingsGUI:
         self.var_night_reactive = tk.DoubleVar(value=float(values.night_reactive_brightness))
 
     def _init_panels(self) -> None:
-        left = self._left
-        middle = self._middle
-        right = self._right
+        parents = self.panel_parents
+        lighting = parents["management"]
+        automation = parents["dim_sync"]
+        app_page = parents["autostart"]
+        idle_advanced = parents["idle_transition_advanced"]
+        advanced = parents["experimental"]
+        about = parents["version"]
 
         self.management_panel = PowerManagementPanel(
-            left,
+            lighting,
             var_enabled=self.var_enabled,
             var_off_suspend=self.var_off_suspend,
             var_restore_resume=self.var_restore_resume,
@@ -207,23 +218,19 @@ class PowerSettingsGUI:
             on_toggle=self._on_toggle,
         )
 
-        ttk.Separator(left).pack(fill="x", pady=(8, 6))
+        ttk.Separator(lighting).pack(fill="x", pady=(8, theme_metrics.CONTROL_GAP_Y))
 
         self.dim_sync_panel = DimSyncPanel(
-            left,
+            automation,
             var_dim_sync_enabled=self.var_dim_sync_enabled,
             var_dim_sync_mode=self.var_dim_sync_mode,
             var_dim_temp_brightness=self.var_dim_temp_brightness,
-            var_debounce_enter=self.var_debounce_enter,
-            var_debounce_exit=self.var_debounce_exit,
-            var_idle_fade_duration=self.var_idle_fade_duration,
-            var_controller_sleep_respect=self.var_controller_sleep_respect,
             on_toggle=self._on_toggle,
             idle_source_label=_detect_idle_power_source(),
         )
 
         self.power_source_panel = PowerSourcePanel(
-            middle,
+            lighting,
             var_ac_enabled=self.var_ac_enabled,
             var_battery_enabled=self.var_battery_enabled,
             var_ac_brightness=self.var_ac_brightness,
@@ -234,10 +241,10 @@ class PowerSettingsGUI:
             on_toggle=self._on_toggle,
         )
 
-        ttk.Separator(middle).pack(fill="x", pady=(8, 6))
+        ttk.Separator(automation).pack(fill="x", pady=(8, theme_metrics.CONTROL_GAP_Y))
 
         self.time_scheduler_panel = TimeSchedulerPanel(
-            middle,
+            automation,
             var_enabled=self.var_scheduler_enabled,
             var_day_start=self.var_day_start,
             var_night_start=self.var_night_start,
@@ -248,27 +255,32 @@ class PowerSettingsGUI:
             on_toggle=self._on_toggle,
         )
 
-        ttk.Separator(right).pack(fill="x", pady=(0, 6))
-
         self.version_panel = VersionPanel(
-            right,
+            about,
             root=self.root,
             get_status_label=lambda: self.status,
         )
 
-        ttk.Separator(right).pack(fill="x", pady=(8, 6))
-
         self.autostart_panel = AutostartPanel(
-            right,
+            app_page,
             var_autostart=self.var_autostart,
             var_os_autostart=self.var_os_autostart,
             on_toggle=self._on_toggle,
         )
 
-        ttk.Separator(right).pack(fill="x", pady=(8, 6))
+        self.idle_transition_advanced_panel = IdleTransitionAdvancedPanel(
+            idle_advanced,
+            var_controller_sleep_respect=self.var_controller_sleep_respect,
+            var_debounce_enter=self.var_debounce_enter,
+            var_debounce_exit=self.var_debounce_exit,
+            var_idle_fade_duration=self.var_idle_fade_duration,
+            on_toggle=self._on_toggle,
+        )
+
+        ttk.Separator(advanced).pack(fill="x", pady=(8, theme_metrics.CONTROL_GAP_Y))
 
         self.experimental_backends_panel = ExperimentalBackendsPanel(
-            right,
+            advanced,
             var_experimental_backends=self.var_experimental_backends,
             on_toggle=self._on_toggle,
         )
@@ -276,11 +288,13 @@ class PowerSettingsGUI:
     def _finalize_layout(self) -> None:
         self._apply_enabled_state()
 
-        # Bind wheel globally within this Tk app, but filter to this toplevel + pointer location.
-        self.scroll.bind_mousewheel(self.root)
+        # Bind wheel for every page; each ScrollableArea routes only events
+        # whose pointer target is inside its own container (additive bind).
+        for scroll in self.scroll_areas.values():
+            scroll.bind_mousewheel(self.root)
 
-        # Map at the default size immediately: if the first paint runs with
-        # compressed columns, the dynamic wrap sync temporarily wraps the
+        # Map at the default size immediately: if the first paint runs with a
+        # narrow page, the dynamic wrap sync temporarily wraps the
         # description labels into many extra lines, which inflates the
         # measured content height (and thus the computed window height).
         try:
@@ -292,26 +306,32 @@ class PowerSettingsGUI:
         # to ensure it overrides any window manager restoration/defaults.
 
         self.root.update_idletasks()
-        try:
-            self.scroll.canvas.configure(scrollregion=self.scroll.canvas.bbox("all"))
-        except _SCROLLREGION_CONFIGURE_ERRORS:
-            pass
+        for scroll in self.scroll_areas.values():
+            try:
+                scroll.canvas.configure(scrollregion=scroll.canvas.bbox("all"))
+            except _SCROLLREGION_CONFIGURE_ERRORS:
+                continue
 
-        self.scroll.finalize_initial_scrollbar_state()
+        for scroll in self.scroll_areas.values():
+            scroll.finalize_initial_scrollbar_state()
 
         # Defer geometry application to ensure it overrides any WM defaults.
         self.root.after(50, self._apply_geometry)
         # Second pass after async content (wrap syncs, version check, footer
         # hardware hint) settles, trimming any transient height over-estimate
-        # so the window hugs the actual column content.
+        # so the window hugs the actual page content.
         self.root.after(350, self._apply_geometry)
 
     def _apply_geometry(self) -> None:
         self.root.update_idletasks()
+        # Every page scrolls independently, so size from the default
+        # Lighting & Power page; taller hidden pages scroll instead of
+        # inflating (or staling) the window.
+        default_page = self.scroll_areas[DEFAULT_SETTINGS_CATEGORY_ID]
         geometry = compute_centered_window_geometry(
             self.root,
-            content_height_px=int(self.scroll.frame.winfo_reqheight()),
-            content_width_px=int(self.scroll.frame.winfo_reqwidth()),
+            content_height_px=int(default_page.frame.winfo_reqheight()),
+            content_width_px=int(default_page.frame.winfo_reqwidth()),
             footer_height_px=int(self.bottom_bar.winfo_reqheight()),
             chrome_padding_px=40,
             default_w=_SETTINGS_DEFAULT_WIDTH,
@@ -325,6 +345,7 @@ class PowerSettingsGUI:
 
         self.management_panel.apply_enabled_state()
         self.dim_sync_panel.apply_enabled_state(power_management_enabled=enabled)
+        self.idle_transition_advanced_panel.apply_enabled_state(power_management_enabled=enabled)
         self.power_source_panel.apply_enabled_state(power_management_enabled=enabled)
         self.time_scheduler_panel.apply_enabled_state()
 

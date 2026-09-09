@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Protocol, cast
 
+from keyrgb.gui.theme import metrics as theme_metrics
+
 Color = tuple[int, int, int]
 
 _UNSUPPORTED_BACKEND_TEXT = (
@@ -116,6 +118,8 @@ class _UniformColorWindowState(Protocol):
     _wrap_labels: list[_WrapLabelWidget]
     color_wheel: _ColorWheelWidget | None
     status_label: _LabelWidget
+    _apply_button: _ButtonWidget
+    _close_button: _ButtonWidget
 
     def _initial_color(self) -> Color: ...
 
@@ -138,7 +142,7 @@ def build_uniform_window_ui(
 ) -> None:
     gui_state = cast(_UniformColorWindowState, gui)
 
-    main_frame = ttk_module.Frame(gui_state.root, padding=20)
+    main_frame = ttk_module.Frame(gui_state.root, padding=theme_metrics.OUTER_PADDING)
     main_frame.pack(fill="both", expand=True)
     gui_state._main_frame = main_frame
     gui_state._wrap_labels = []
@@ -146,8 +150,8 @@ def build_uniform_window_ui(
     ttk_module.Label(
         main_frame,
         text=f"Select Uniform {gui_state._target_label} Color",
-        font=("Sans", 14, "bold"),
-    ).pack(pady=(0, 10))
+        style=theme_metrics.TITLE_LABEL_STYLE,
+    ).pack(pady=(0, theme_metrics.SECTION_GAP_Y))
 
     def _sync_wrap(_event: object | None = None) -> None:
         try:
@@ -167,11 +171,11 @@ def build_uniform_window_ui(
         msg = ttk_module.Label(
             main_frame,
             text=_UNSUPPORTED_BACKEND_TEXT,
-            font=("Sans", 9),
+            style=theme_metrics.BODY_LABEL_STYLE,
             justify="left",
             wraplength=420,
         )
-        msg.pack(pady=(10, 16), fill="x")
+        msg.pack(pady=(theme_metrics.CONTROL_GAP_Y, theme_metrics.SECTION_GAP_Y), fill="x")
         gui_state._wrap_labels.append(msg)
         gui_state.color_wheel = None
     else:
@@ -185,23 +189,30 @@ def build_uniform_window_ui(
         gui_state.color_wheel.pack()
 
     button_frame = ttk_module.Frame(main_frame)
-    button_frame.pack(pady=20, fill="x")
+    button_frame.pack(pady=(theme_metrics.SECTION_GAP_Y, theme_metrics.CONTROL_GAP_Y), fill="x")
     try:
         button_frame.columnconfigure(0, weight=1)
         button_frame.columnconfigure(1, weight=1)
     except wrap_sync_errors:
         pass
 
-    apply_btn = ttk_module.Button(button_frame, text="Apply", command=gui_state._on_apply)
+    apply_btn = ttk_module.Button(
+        button_frame,
+        text="Apply",
+        command=gui_state._on_apply,
+        style=theme_metrics.PRIMARY_BUTTON_STYLE,
+    )
     if not gui_state._color_supported:
         try:
             apply_btn.configure(state="disabled")
         except tk_widget_state_errors:
             pass
     apply_btn.grid(row=0, column=0, sticky="ew", padx=(0, 8))
+    gui_state._apply_button = apply_btn
 
     close_btn = ttk_module.Button(button_frame, text="Close", command=gui_state._on_close)
     close_btn.grid(row=0, column=1, sticky="ew", padx=(8, 0))
+    gui_state._close_button = close_btn
 
-    gui_state.status_label = ttk_module.Label(main_frame, text="", font=("Sans", 9))
-    gui_state.status_label.pack()
+    gui_state.status_label = ttk_module.Label(main_frame, text="", style=theme_metrics.STATUS_LABEL_STYLE)
+    gui_state.status_label.pack(pady=(theme_metrics.CONTROL_GAP_Y, 0))

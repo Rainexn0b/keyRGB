@@ -7,6 +7,7 @@ from types import ModuleType, SimpleNamespace
 import pytest
 
 import keyrgb.gui.settings.window as settings_window
+from keyrgb.gui.theme import metrics as theme_metrics
 from tests.gui.settings.window._settings_window_fakes import (
     _FakeBottomBarPanel,
     _FakePanel,
@@ -55,11 +56,11 @@ def test_init_sets_up_root_and_calls_init_steps(monkeypatch: pytest.MonkeyPatch)
     assert gui.root is root
     assert gui.config == "config-obj"
     assert root.title_calls == ["KeyRGB - Settings"]
-    assert root.minsize_calls == [(1000, 620)]
+    assert root.minsize_calls == [(680, 560)]
     assert root.resizable_calls == [(True, True)]
     assert calls == [
         ("icon", (root,), {}),
-        ("theme", (root,), {"include_checkbuttons": True, "map_checkbutton_state": True}),
+        ("theme", (root,), {}),
         ("config", (), {}),
         ("detect", (), {}),
         ("load", (), {"config": "config-obj", "os_autostart_enabled": True}),
@@ -104,9 +105,71 @@ def test_start_footer_hardware_probe_swallows_worker_and_footer_errors(monkeypat
     gui._start_footer_hardware_probe()
 
 
-def test_init_layout_builds_frames_bottom_bar_and_scroll(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_init_layout_builds_title_notebook_and_per_page_scroll(monkeypatch: pytest.MonkeyPatch) -> None:
     frames: list[_FakeWidget] = []
     labels: list[_FakeWidget] = []
+    notebooks: list[_FakeWidget] = []
+
+    class _FakeNotebook(_FakeWidget):
+        def __init__(self, parent=None, **kwargs) -> None:
+            super().__init__(parent, **kwargs)
+            self.add_calls: list[dict[str, object]] = []
+            self.select_calls: list[object] = []
+            self.bind_calls: list[tuple[str, object]] = []
+
+        def add(self, child, **kwargs) -> None:
+            self.add_calls.append({"child": child, **kwargs})
+
+        def select(self, child) -> None:
+            self.select_calls.append(child)
+
+        def bind(self, sequence, callback) -> None:
+            self.bind_calls.append((sequence, callback))
+
+    def fake_notebook(parent=None, **kwargs):
+        notebook = _FakeNotebook(parent, **kwargs)
+        notebooks.append(notebook)
+        return notebook
+
+    focus_calls: list[tuple[object, object]] = []
+    monkeypatch.setattr(
+        settings_window,
+        "schedule_initial_focus",
+        lambda root, target: focus_calls.append((root, target)),
+    )
+
+    scroll_areas: dict[str, _FakeScrollArea] = {}
+    build_calls: list[dict[str, object]] = []
+
+    def fake_build_navigation(parent, **kwargs):
+        from types import SimpleNamespace as _NS
+
+        build_calls.append(dict(kwargs))
+        pages = {}
+        panel_parents = {}
+        panel_to_category = {
+            "management": "lighting_power",
+            "power_source": "lighting_power",
+            "dim_sync": "automation",
+            "time_scheduler": "automation",
+            "autostart": "app",
+            "idle_transition_advanced": "advanced",
+            "experimental": "advanced",
+            "version": "about",
+        }
+        for category_id in ("lighting_power", "automation", "app", "advanced", "about"):
+            page = _FakeWidget(parent)
+            pages[category_id] = page
+            scroll_areas[category_id] = _FakeScrollArea(page, bg_color=kwargs["bg_color"], padding=kwargs["padding"])
+        for panel_id, category_id in panel_to_category.items():
+            panel_parents[panel_id] = scroll_areas[category_id].frame
+        notebook = fake_notebook(parent)
+        return _NS(
+            notebook=notebook,
+            page_frames=pages,
+            scroll_areas=dict(scroll_areas),
+            panel_parents=panel_parents,
+        )
 
     monkeypatch.setattr(
         settings_window,
@@ -114,10 +177,11 @@ def test_init_layout_builds_frames_bottom_bar_and_scroll(monkeypatch: pytest.Mon
         SimpleNamespace(
             Frame=lambda parent=None, **kwargs: frames.append(_FakeWidget(parent, **kwargs)) or frames[-1],
             Label=lambda parent=None, **kwargs: labels.append(_FakeWidget(parent, **kwargs)) or labels[-1],
+            Notebook=fake_notebook,
         ),
     )
     monkeypatch.setattr(settings_window, "BottomBarPanel", _FakeBottomBarPanel)
-    monkeypatch.setattr(settings_window, "ScrollableArea", _FakeScrollArea)
+    monkeypatch.setattr(settings_window, "build_settings_navigation", fake_build_navigation)
     gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
     gui.root = _FakeRoot()
     gui._on_close = lambda: None
@@ -125,25 +189,41 @@ def test_init_layout_builds_frames_bottom_bar_and_scroll(monkeypatch: pytest.Mon
     assert isinstance(gui.bottom_bar_panel, _FakeBottomBarPanel)
     assert gui.bottom_bar is gui.bottom_bar_panel.frame
     assert gui.status is gui.bottom_bar_panel.status
-    assert isinstance(gui.scroll, _FakeScrollArea)
-    assert gui.scroll.bg_color == "#123456"
-    assert gui.scroll.padding == 10
+    # Global title stays outside the tabs; one scroll area per category page.
     assert labels[0].kwargs["text"] == "Settings"
-    cols_frame = frames[2]
-    assert gui._left.parent is cols_frame
-    assert gui._middle.parent is cols_frame
-    assert gui._right.parent is cols_frame
-    # Columns must stay symmetrical: one uniform grid group with equal weights.
-    assert cols_frame.columnconfigure_calls == [
-        {"index": 0, "weight": 1, "uniform": "settings_columns"},
-        {"index": 1, "weight": 1, "uniform": "settings_columns"},
-        {"index": 2, "weight": 1, "uniform": "settings_columns"},
+    assert labels[0].kwargs["style"] == theme_metrics.TITLE_LABEL_STYLE
+    assert "font" not in labels[0].kwargs
+    assert set(gui.scroll_areas) == {"lighting_power", "automation", "app", "advanced", "about"}
+    for area in gui.scroll_areas.values():
+        assert area.bg_color == "#123456"
+        assert area.padding == theme_metrics.OUTER_PAD_X
+    assert len(notebooks) == 1
+    assert notebooks[0].pack_calls == [
+        {"fill": "both", "expand": True, "padx": theme_metrics.CONTROL_GAP_Y, "pady": (2, theme_metrics.CONTROL_GAP_Y)}
     ]
-    gap = settings_window._SETTINGS_COLUMN_GAP
-    half_gap = gap // 2
-    assert gui._left.grid_calls == [{"row": 0, "column": 0, "sticky": "nsew", "padx": (half_gap, half_gap)}]
-    assert gui._middle.grid_calls == [{"row": 0, "column": 1, "sticky": "nsew", "padx": (half_gap, half_gap)}]
-    assert gui._right.grid_calls == [{"row": 0, "column": 2, "sticky": "nsew", "padx": (half_gap, half_gap)}]
+    # Intentional non-forcing initial focus lands on the notebook exactly once.
+    assert focus_calls == [(gui.root, gui.notebook)]
+    # Panel placement comes from the navigation mapping, built exactly once.
+    assert len(build_calls) == 1
+    assert gui.panel_parents == {
+        panel_id: scroll_areas[category_id].frame
+        for panel_id, category_id in {
+            "management": "lighting_power",
+            "power_source": "lighting_power",
+            "dim_sync": "automation",
+            "time_scheduler": "automation",
+            "autostart": "app",
+            "idle_transition_advanced": "advanced",
+            "experimental": "advanced",
+            "version": "about",
+        }.items()
+    }
+    # No tab-change hook: switching tabs reselects only, never rebuilds.
+    assert notebooks[0].bind_calls == []
+    notebooks[0].select(gui.page_frames["automation"])
+    notebooks[0].select(gui.page_frames["about"])
+    assert notebooks[0].select_calls[-2:] == [gui.page_frames["automation"], gui.page_frames["about"]]
+    assert len(build_calls) == 1
 
 
 def test_init_vars_creates_all_expected_tk_variables(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -225,12 +305,25 @@ def test_init_panels_builds_panel_stack_with_expected_arguments(monkeypatch: pyt
     monkeypatch.setattr(settings_window, "TimeSchedulerPanel", make_panel("time_scheduler"))
     monkeypatch.setattr(settings_window, "VersionPanel", make_panel("version"))
     monkeypatch.setattr(settings_window, "AutostartPanel", make_panel("autostart"))
+    monkeypatch.setattr(settings_window, "IdleTransitionAdvancedPanel", make_panel("idle_transition_advanced"))
     monkeypatch.setattr(settings_window, "ExperimentalBackendsPanel", make_panel("experimental"))
     gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
     gui.root = _FakeRoot()
-    gui._left = object()
-    gui._middle = object()
-    gui._right = object()
+    lighting = _FakeWidget()
+    automation = _FakeWidget()
+    app_page = _FakeWidget()
+    advanced = _FakeWidget()
+    about = _FakeWidget()
+    gui.panel_parents = {
+        "management": lighting,
+        "power_source": lighting,
+        "dim_sync": automation,
+        "time_scheduler": automation,
+        "autostart": app_page,
+        "idle_transition_advanced": advanced,
+        "experimental": advanced,
+        "version": about,
+    }
     gui.status = _FakeWidget()
     gui.var_enabled = _FakeVar(True)
     gui.var_off_suspend = _FakeVar(False)
@@ -262,8 +355,8 @@ def test_init_panels_builds_panel_stack_with_expected_arguments(monkeypatch: pyt
     gui.var_experimental_backends = _FakeVar(False)
     gui._on_toggle = lambda: None
     gui._init_panels()
-    assert created["management"].args == (gui._left,)
-    assert created["power_source"].args == (gui._middle,)
+    assert created["management"].args == (lighting,)
+    assert created["power_source"].args == (lighting,)
     assert created["power_source"].kwargs["var_ac_brightness"] is gui.var_ac_brightness
     assert created["power_source"].kwargs["var_ac_power_mode"] is gui.var_ac_power_mode
     assert created["power_source"].kwargs["var_battery_power_mode"] is gui.var_battery_power_mode
@@ -273,12 +366,31 @@ def test_init_panels_builds_panel_stack_with_expected_arguments(monkeypatch: pyt
         "Balanced",
         "Performance",
     )
-    assert created["time_scheduler"].args == (gui._middle,)
+    assert created["time_scheduler"].args == (automation,)
     assert created["time_scheduler"].kwargs["var_enabled"] is gui.var_scheduler_enabled
+    assert created["dim_sync"].args == (automation,)
     assert created["dim_sync"].kwargs["idle_source_label"] == "Wayland compositor idle"
+    assert created["dim_sync"].kwargs["var_dim_sync_enabled"] is gui.var_dim_sync_enabled
+    assert created["dim_sync"].kwargs["var_dim_sync_mode"] is gui.var_dim_sync_mode
+    assert created["dim_sync"].kwargs["var_dim_temp_brightness"] is gui.var_dim_temp_brightness
+    assert created["autostart"].args == (app_page,)
+    assert created["idle_transition_advanced"].args == (advanced,)
+    assert created["idle_transition_advanced"].kwargs["var_controller_sleep_respect"] is (
+        gui.var_controller_sleep_respect
+    )
+    assert created["idle_transition_advanced"].kwargs["var_debounce_enter"] is gui.var_debounce_enter
+    assert created["idle_transition_advanced"].kwargs["var_debounce_exit"] is gui.var_debounce_exit
+    assert created["idle_transition_advanced"].kwargs["var_idle_fade_duration"] is gui.var_idle_fade_duration
+    assert created["experimental"].args == (advanced,)
+    assert created["version"].args == (about,)
     assert created["version"].kwargs["root"] is gui.root
     assert created["version"].kwargs["get_status_label"]() is gui.status
-    assert len(separators) == 5
+    # One separator between the two panels sharing Lighting & Power, one
+    # in Automation, and one in Advanced; single-panel pages need no separator.
+    assert len(separators) == 3
+    assert separators[0].parent is lighting
+    assert separators[1].parent is automation
+    assert separators[2].parent is advanced
 
 
 def test_init_vars_uses_canonical_night_start_fallback_when_empty(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -308,18 +420,21 @@ def test_init_vars_uses_canonical_night_start_fallback_when_empty(monkeypatch: p
 def test_finalize_layout_applies_state_scroll_and_geometry(monkeypatch: pytest.MonkeyPatch) -> None:
     gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
     gui.root = _FakeRoot()
-    gui.scroll = _FakeScrollArea(None, bg_color="#000", padding=10)
+    area_lighting = _FakeScrollArea(None, bg_color="#000", padding=10)
+    area_automation = _FakeScrollArea(None, bg_color="#000", padding=10)
+    gui.scroll_areas = {"lighting_power": area_lighting, "automation": area_automation}
     gui.bottom_bar = _FakeWidget()
     calls: list[str] = []
     gui._apply_enabled_state = lambda: calls.append("enabled")
     gui._apply_geometry = lambda: calls.append("geometry")
     gui._finalize_layout()
     assert calls == ["enabled"]
-    assert gui.root.geometry_calls == ["1320x820"]
-    assert gui.scroll.bind_mousewheel_calls == [(gui.root, None)]
-    assert gui.scroll.canvas.configure_calls == [{"scrollregion": (1, 2, 3, 4)}]
-    assert gui.scroll.canvas.bbox_calls == ["all"]
-    assert gui.scroll.finalize_calls == 1
+    assert gui.root.geometry_calls == ["880x840"]
+    for area in (area_lighting, area_automation):
+        assert area.bind_mousewheel_calls == [(gui.root, None)]
+        assert area.canvas.configure_calls == [{"scrollregion": (1, 2, 3, 4)}]
+        assert area.canvas.bbox_calls == ["all"]
+        assert area.finalize_calls == 1
     assert gui.root.update_calls == 1
     assert gui.root.after_calls == [(50, gui._apply_geometry), (350, gui._apply_geometry)]
 
@@ -327,21 +442,30 @@ def test_finalize_layout_applies_state_scroll_and_geometry(monkeypatch: pytest.M
 def test_finalize_layout_swallows_scrollregion_errors() -> None:
     gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
     gui.root = _FakeRoot()
-    gui.scroll = _FakeScrollArea(None, bg_color="#000", padding=10)
-    gui.scroll.canvas.configure = lambda **kwargs: (_ for _ in ()).throw(RuntimeError("boom"))
+    failing = _FakeScrollArea(None, bg_color="#000", padding=10)
+    failing.canvas.configure = lambda **kwargs: (_ for _ in ()).throw(RuntimeError("boom"))
+    passing = _FakeScrollArea(None, bg_color="#000", padding=10)
+    gui.scroll_areas = {"lighting_power": failing, "automation": passing}
     gui.bottom_bar = _FakeWidget()
     gui._apply_enabled_state = lambda: None
     gui._apply_geometry = lambda: None
     gui._finalize_layout()
+    assert passing.canvas.configure_calls == [{"scrollregion": (1, 2, 3, 4)}]
+    assert passing.finalize_calls == 1
+    assert failing.finalize_calls == 1
     assert gui.root.after_calls == [(50, gui._apply_geometry), (350, gui._apply_geometry)]
 
 
-def test_apply_geometry_uses_centered_geometry_helper(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_apply_geometry_sizes_from_default_page_only(monkeypatch: pytest.MonkeyPatch) -> None:
     gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
     gui.root = _FakeRoot()
-    gui.scroll = SimpleNamespace(frame=_FakeWidget())
-    gui.scroll.frame.reqheight = 700
-    gui.scroll.frame.reqwidth = 900
+    default_page = SimpleNamespace(frame=_FakeWidget())
+    default_page.frame.reqheight = 400
+    default_page.frame.reqwidth = 600
+    hidden_tall_page = SimpleNamespace(frame=_FakeWidget())
+    hidden_tall_page.frame.reqheight = 1400
+    hidden_tall_page.frame.reqwidth = 1200
+    gui.scroll_areas = {"lighting_power": default_page, "automation": hidden_tall_page}
     gui.bottom_bar = _FakeWidget()
     gui.bottom_bar.reqheight = 44
     calls: list[dict[str, object]] = []
@@ -353,14 +477,16 @@ def test_apply_geometry_uses_centered_geometry_helper(monkeypatch: pytest.Monkey
     gui._apply_geometry()
     assert gui.root.update_calls == 1
     assert gui.root.geometry_calls == ["1100x850+10+20"]
+    # The taller hidden page scrolls independently and must not inflate the
+    # window; the stable default keeps the 880x840 budget.
     assert calls == [
         {
-            "content_height_px": 700,
-            "content_width_px": 900,
+            "content_height_px": 400,
+            "content_width_px": 600,
             "footer_height_px": 44,
             "chrome_padding_px": 40,
-            "default_w": 1320,
-            "default_h": 820,
+            "default_w": 880,
+            "default_h": 840,
             "screen_ratio_cap": 0.95,
         }
     ]
@@ -371,10 +497,31 @@ def test_apply_enabled_state_delegates_to_panels() -> None:
     gui.var_enabled = _FakeVar(False)
     gui.management_panel = _FakePanel()
     gui.dim_sync_panel = _FakePanel()
+    gui.idle_transition_advanced_panel = _FakePanel()
     gui.power_source_panel = _FakePanel()
     gui.time_scheduler_panel = _FakePanel()
     gui._apply_enabled_state()
     assert gui.management_panel.apply_calls == [{}]
     assert gui.dim_sync_panel.apply_calls == [{"power_management_enabled": False}]
+    assert gui.idle_transition_advanced_panel.apply_calls == [{"power_management_enabled": False}]
     assert gui.power_source_panel.apply_calls == [{"power_management_enabled": False}]
     assert gui.time_scheduler_panel.apply_calls == [{}]
+
+
+def test_tab_switch_has_no_rebuild_path_and_probes_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin one-time construction without invoking an unrelated fake select.
+
+    The real ``__init__`` call order (layout/vars/panels/finalize/probe each
+    exactly once) is pinned by ``test_init_sets_up_root_and_calls_init_steps``,
+    one-time page construction by the navigation tests, and the absence of a
+    tab-change rebuild hook by the layout test's ``bind_calls == []``
+    assertion. This test pins the remaining half: the footer probe is issued
+    exactly once per window.
+    """
+    gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
+    gui.root = _FakeRoot()
+    gui.bottom_bar_panel = _FakeBottomBarPanel(None, on_close=lambda: None)
+    probe_runs: list[int] = []
+    monkeypatch.setattr(settings_window, "run_in_thread", lambda *args, **kwargs: probe_runs.append(1) or None)
+    gui._start_footer_hardware_probe()
+    assert len(probe_runs) == 1

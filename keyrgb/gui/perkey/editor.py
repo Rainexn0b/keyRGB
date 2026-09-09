@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import tkinter as tk
-from tkinter import ttk
 from typing import TYPE_CHECKING, Protocol, cast
 
 from keyrgb.core.diagnostics.device_discovery import collect_device_discovery
@@ -100,7 +99,6 @@ class PerKeyEditor:
         editor_bootstrap.initialize_editor(
             self,
             tk=tk,
-            ttk=ttk,
             config_cls=Config,
             profiles=profiles,
             apply_keyrgb_window_icon=apply_keyrgb_window_icon,
@@ -108,12 +106,9 @@ class PerKeyEditor:
             compute_perkey_editor_min_content_size=window_geometry.compute_perkey_editor_min_content_size,
             fit_perkey_editor_geometry_to_content=window_geometry.fit_perkey_editor_geometry_to_content,
             apply_clam_theme=apply_clam_theme,
-            tk_call_errors=_TK_CALL_ERRORS,
-            log_boundary_exception=_log_boundary_exception,
             normalize_layout_legend_pack_fn=self._normalize_layout_legend_pack,
             initial_last_non_black_color=color_utils.initial_last_non_black_color,
             load_profile_colors=profile_management.load_profile_colors,
-            sanitize_keymap_cells=profile_management.sanitize_keymap_cells,
             per_key_commit_pipeline_cls=commit_pipeline.PerKeyCommitPipeline,
             get_keyboard=hardware.get_keyboard,
             build_ui_fn=self._build_ui,

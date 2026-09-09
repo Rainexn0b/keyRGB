@@ -47,12 +47,35 @@ def _configured_power_source_profile_names(editor: _PerKeyProfileEditorProtocol)
     return configured
 
 
-def power_source_profile_options(editor: _PerKeyProfileEditorProtocol) -> tuple[str, ...]:
-    names = list(profiles.list_profiles())
+def _remember_profile_snapshot(
+    editor: _PerKeyProfileEditorProtocol,
+    profile_names: list[str] | tuple[str, ...],
+) -> tuple[str, ...]:
+    """Cache an immutable profile-name snapshot on the editor and return it."""
+    snapshot = tuple(profile_names)
+    editor._profile_names_snapshot = snapshot
+    return snapshot
+
+
+def refresh_profile_snapshot(editor: _PerKeyProfileEditorProtocol) -> tuple[str, ...]:
+    """Scan once, cache the immutable snapshot on the editor, and return it."""
+    return _remember_profile_snapshot(editor, profiles.list_profiles())
+
+
+def _power_source_profile_options(
+    editor: _PerKeyProfileEditorProtocol,
+    profile_names: list[str] | tuple[str, ...],
+) -> tuple[str, ...]:
+    names = list(profile_names)
     for configured_name in _configured_power_source_profile_names(editor):
         if configured_name not in names:
             names.append(configured_name)
     return (KEEP_CURRENT_PROFILE_LABEL, *names)
+
+
+def power_source_profile_options(editor: _PerKeyProfileEditorProtocol) -> tuple[str, ...]:
+    """Return policy choices from the editor's cached profile snapshot."""
+    return _power_source_profile_options(editor, editor._profile_names_snapshot)
 
 
 def _power_source_profile_selection(value: object) -> str:
@@ -91,8 +114,14 @@ def _maybe_activate_current_power_source_profile_ui(
     return source_label, desired_profile_name
 
 
-def sync_power_source_profile_policy_controls(editor: _PerKeyProfileEditorProtocol) -> None:
-    options = power_source_profile_options(editor)
+def sync_power_source_profile_policy_controls(
+    editor: _PerKeyProfileEditorProtocol,
+    profile_names: list[str] | tuple[str, ...] | None = None,
+) -> None:
+    if profile_names is None:
+        snapshot = editor._profile_names_snapshot
+    else:
+        snapshot = _remember_profile_snapshot(editor, profile_names)
     config = getattr(editor, "config", None)
     ac_selection = _power_source_profile_selection(getattr(config, "ac_perkey_profile_name", None))
     battery_selection = _power_source_profile_selection(getattr(config, "battery_perkey_profile_name", None))
@@ -100,22 +129,36 @@ def sync_power_source_profile_policy_controls(editor: _PerKeyProfileEditorProtoc
     editor._ac_power_source_profile_var.set(ac_selection)
     editor._battery_power_source_profile_var.set(battery_selection)
 
+    options = _power_source_profile_options(editor, snapshot)
     for combo in (
         editor._ac_power_source_profile_combo,
         editor._battery_power_source_profile_combo,
     ):
-        if combo is not None:
-            combo.configure(values=options)
+        combo.configure(values=options)
+
+
+def refresh_all_profile_choices(
+    editor: _PerKeyProfileEditorProtocol,
+) -> None:
+    """Refresh all three profile combo value lists from one shared snapshot.
+
+    Owns the single list_profiles scan. The snapshot is cached on the editor
+    so later policy saves/syncs never touch the filesystem.
+    """
+    snapshot = refresh_profile_snapshot(editor)
+    editor._profiles_combo.configure(values=list(snapshot))
+    sync_power_source_profile_policy_controls(editor, snapshot)
 
 
 def save_power_source_profile_policy_ui(editor: _PerKeyProfileEditorProtocol) -> None:
     facade = _facade()
-    editor.config.ac_perkey_profile_name = _selected_power_source_profile_name(
-        editor._ac_power_source_profile_var.get()
-    )
-    editor.config.battery_perkey_profile_name = _selected_power_source_profile_name(
-        editor._battery_power_source_profile_var.get()
-    )
+    with editor.config.batch_update():
+        editor.config.ac_perkey_profile_name = _selected_power_source_profile_name(
+            editor._ac_power_source_profile_var.get()
+        )
+        editor.config.battery_perkey_profile_name = _selected_power_source_profile_name(
+            editor._battery_power_source_profile_var.get()
+        )
     activated_profile = _maybe_activate_current_power_source_profile_ui(editor)
     sync_power_source_profile_policy_controls(editor)
     if activated_profile is None:
@@ -192,7 +235,7 @@ def save_profile_ui(editor: _PerKeyProfileEditorProtocol) -> None:
     )
     editor.profile_name = name
     editor._profile_name_var.set(name)
-    sync_power_source_profile_policy_controls(editor)
+    refresh_all_profile_choices(editor)
 
     facade.ensure_full_map_ui(editor, num_rows=NUM_ROWS, num_cols=NUM_COLS)
     editor._commit(force=True)
@@ -242,8 +285,7 @@ def new_profile_ui(editor: _PerKeyProfileEditorProtocol) -> None:
     )
     editor.profile_name = name
     editor._profile_name_var.set(name)
-    editor._profiles_combo.configure(values=profiles.list_profiles())
-    sync_power_source_profile_policy_controls(editor)
+    refresh_all_profile_choices(editor)
 
     facade.ensure_full_map_ui(editor, num_rows=NUM_ROWS, num_cols=NUM_COLS)
     editor._commit(force=True)
@@ -263,8 +305,7 @@ def delete_profile_ui(editor: _PerKeyProfileEditorProtocol) -> None:
 
     editor.profile_name = result.active_profile
     editor._profile_name_var.set(result.active_profile)
-    editor._profiles_combo.configure(values=profiles.list_profiles())
-    sync_power_source_profile_policy_controls(editor)
+    refresh_all_profile_choices(editor)
     if callable(editor._activate_profile):
         editor._activate_profile()
     facade._mark_saved_snapshot_if_supported(editor)

@@ -9,7 +9,8 @@ from tkinter import ttk
 
 from keyrgb.core.config import Config
 from keyrgb.core.power import system as _power_system
-from keyrgb.gui.theme import apply_clam_theme
+from keyrgb.gui import theme as gui_theme
+from keyrgb.gui.theme import metrics as theme_metrics
 from keyrgb.gui.utils.tk_async import TkAsyncCoordinator, submit_gui_work
 from keyrgb.gui.utils.window_geometry import compute_centered_window_geometry
 from keyrgb.gui.utils.window_icon import apply_keyrgb_window_icon
@@ -24,6 +25,11 @@ normalize_extreme_saver_cap_khz = _power_system.normalize_extreme_saver_cap_khz
 set_mode = _power_system.set_mode
 
 logger = logging.getLogger(__name__)
+
+# Keep module-level dependency names explicit so tests can monkeypatch this
+# module directly while the implementation still resolves through the package.
+apply_clam_theme = gui_theme.apply_clam_theme
+schedule_initial_focus = gui_theme.schedule_initial_focus
 
 _GUI_RUNTIME_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _GEOMETRY_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
@@ -228,42 +234,54 @@ class PowerModeSettingsGUI:
         self.root.destroy()
 
     def _build_ui(self) -> None:
-        self._main_frame = ttk.Frame(self.root, padding=14)
+        self._main_frame = ttk.Frame(self.root, padding=theme_metrics.OUTER_PADDING)
         self._main_frame.pack(fill="both", expand=True)
 
-        ttk.Label(self._main_frame, text="Power Mode Settings", font=("Sans", 14, "bold")).pack(anchor="w", pady=(0, 6))
+        ttk.Label(self._main_frame, text="Power Mode Settings", style=theme_metrics.TITLE_LABEL_STYLE).pack(
+            anchor="w", pady=(0, theme_metrics.CONTROL_GAP_Y)
+        )
         ttk.Label(
             self._main_frame,
             text=_INTRO_TEXT,
+            style=theme_metrics.BODY_LABEL_STYLE,
             justify="left",
             wraplength=_CONTENT_WRAP_PX,
-        ).pack(anchor="w", fill="x", pady=(0, 10))
+        ).pack(anchor="w", fill="x", pady=(0, theme_metrics.SECTION_GAP_Y))
 
         status_frame = ttk.LabelFrame(self._main_frame, text="Current Status", padding=10)
-        status_frame.pack(fill="x", pady=(0, 10))
+        status_frame.pack(fill="x", pady=(0, theme_metrics.SECTION_GAP_Y))
         ttk.Label(
             status_frame,
             textvariable=self._status_var,
+            style=theme_metrics.STATUS_LABEL_STYLE,
             justify="left",
             wraplength=_CONTENT_WRAP_PX,
         ).pack(anchor="w", fill="x")
 
         help_frame = ttk.LabelFrame(self._main_frame, text="What The Modes Do", padding=10)
-        help_frame.pack(fill="x", pady=(0, 10))
+        help_frame.pack(fill="x", pady=(0, theme_metrics.SECTION_GAP_Y))
         for text in (_EXTREME_HELP_TEXT, _BALANCED_HELP_TEXT, _PERFORMANCE_HELP_TEXT):
-            ttk.Label(help_frame, text=text, justify="left", wraplength=_CONTENT_WRAP_PX).pack(
-                anchor="w", fill="x", pady=(0, 6)
-            )
+            ttk.Label(
+                help_frame,
+                text=text,
+                style=theme_metrics.BODY_LABEL_STYLE,
+                justify="left",
+                wraplength=_CONTENT_WRAP_PX,
+            ).pack(anchor="w", fill="x", pady=(0, theme_metrics.CONTROL_GAP_Y))
 
         cap_frame = ttk.LabelFrame(self._main_frame, text="Extreme Saver Target", padding=10)
-        cap_frame.pack(fill="x", pady=(0, 10))
+        cap_frame.pack(fill="x", pady=(0, theme_metrics.SECTION_GAP_Y))
 
         header = ttk.Frame(cap_frame)
         header.pack(fill="x")
         header.columnconfigure(0, weight=1)
 
-        ttk.Label(header, text="Configured CPU frequency target").grid(row=0, column=0, sticky="w")
-        ttk.Label(header, textvariable=self._cap_value_var, font=("Sans", 10, "bold")).grid(row=0, column=1, sticky="e")
+        ttk.Label(header, text="Configured CPU frequency target", style=theme_metrics.BODY_LABEL_STYLE).grid(
+            row=0, column=0, sticky="w"
+        )
+        ttk.Label(header, textvariable=self._cap_value_var, style=theme_metrics.VALUE_LABEL_STYLE).grid(
+            row=0, column=1, sticky="e"
+        )
 
         min_mhz, max_mhz = _cap_mhz_bounds()
         self.scale_cap = ttk.Scale(
@@ -274,25 +292,35 @@ class PowerModeSettingsGUI:
             variable=self._cap_var,
             command=self._sync_cap_label,
         )
-        self.scale_cap.pack(fill="x", pady=(8, 6))
+        self.scale_cap.pack(fill="x", pady=(theme_metrics.CONTROL_GAP_Y, theme_metrics.CONTROL_GAP_Y))
 
-        ttk.Label(cap_frame, text=_CAP_NOTE_TEXT, justify="left", wraplength=_CONTENT_WRAP_PX).pack(
-            anchor="w", fill="x"
-        )
+        ttk.Label(
+            cap_frame,
+            text=_CAP_NOTE_TEXT,
+            style=theme_metrics.BODY_LABEL_STYLE,
+            justify="left",
+            wraplength=_CONTENT_WRAP_PX,
+        ).pack(anchor="w", fill="x")
 
         footer = ttk.Frame(self._main_frame)
-        footer.pack(fill="x", pady=(6, 0))
+        footer.pack(fill="x", pady=(theme_metrics.CONTROL_GAP_Y, 0))
         footer.columnconfigure(0, weight=1)
         footer.columnconfigure(1, weight=0)
         footer.columnconfigure(2, weight=0)
         footer.columnconfigure(3, weight=0)
 
-        ttk.Label(footer, textvariable=self._save_status_var, justify="left", wraplength=420).grid(
+        ttk.Label(
+            footer,
+            textvariable=self._save_status_var,
+            style=theme_metrics.STATUS_LABEL_STYLE,
+            justify="left",
+            wraplength=420,
+        ).grid(
             row=0,
             column=0,
             columnspan=4,
             sticky="ew",
-            pady=(0, 10),
+            pady=(0, theme_metrics.CONTROL_GAP_Y),
         )
         ttk.Button(footer, text="Refresh Status", command=self._refresh_status).grid(
             row=1,
@@ -300,15 +328,32 @@ class PowerModeSettingsGUI:
             sticky="ew",
             padx=(0, 8),
         )
-        ttk.Button(footer, text="Save", command=self._save).grid(row=1, column=2, sticky="ew", padx=(0, 8))
+        self.btn_save = ttk.Button(
+            footer,
+            text="Save",
+            command=self._save,
+            style=theme_metrics.PRIMARY_BUTTON_STYLE,
+        )
+        self.btn_save.grid(row=1, column=2, sticky="ew", padx=(0, 8))
         ttk.Button(footer, text="Close", command=self._close).grid(row=1, column=3, sticky="ew")
-        ttk.Label(footer, textvariable=self._live_freq_var, justify="left", wraplength=_CONTENT_WRAP_PX).grid(
+        ttk.Label(
+            footer,
+            textvariable=self._live_freq_var,
+            style=theme_metrics.STATUS_LABEL_STYLE,
+            justify="left",
+            wraplength=_CONTENT_WRAP_PX,
+        ).grid(
             row=2,
             column=0,
             columnspan=4,
             sticky="w",
-            pady=(12, 0),
+            pady=(theme_metrics.SECTION_GAP_Y, 0),
         )
+
+        # Intentional non-forcing initial focus (UX-05): Save is the primary
+        # action and is always present; the helper schedules via `after`,
+        # never grabs, and never steals an already-focused child.
+        schedule_initial_focus(self.root, self.btn_save)
 
     def run(self) -> None:
         self.root.mainloop()

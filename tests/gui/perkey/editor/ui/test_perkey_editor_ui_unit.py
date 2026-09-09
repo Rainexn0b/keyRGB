@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from keyrgb.gui.theme import metrics as theme_metrics
 from tests.gui.perkey.editor.ui._editor_ui_fakes import _build_ui
 
 
@@ -10,12 +11,12 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
 
     main = registry["frames"][0]
     assert main.parent is root
-    assert main.options["padding"] == 16
+    assert main.options["padding"] == theme_metrics.OUTER_PADDING
     assert main.pack_calls == [{"fill": "both", "expand": True}]
 
     assert editor.status_label.options == {
         "text": "Click a key to start",
-        "font": ("Sans", 9),
+        "style": theme_metrics.STATUS_LABEL_STYLE,
         "anchor": "w",
         "justify": "left",
     }
@@ -140,13 +141,44 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
     assert "Lighting profile" in label_texts
     assert "Use on AC" in label_texts
     assert "Use on battery" in label_texts
+    label_styles = {label.options.get("text"): label.options.get("style") for label in registry["labels"]}
+    assert label_styles["Backdrop"] == theme_metrics.BODY_LABEL_STYLE
+    assert label_styles["Backdrop transparency"] == theme_metrics.BODY_LABEL_STYLE
+    assert label_styles["Config"] == theme_metrics.SECTION_LABEL_STYLE
+    assert label_styles["Setup"] == theme_metrics.SECTION_LABEL_STYLE
+
+    button_styles = {button.options["text"]: button.options.get("style") for button in registry["buttons"]}
+    assert button_styles["Save"] == theme_metrics.PRIMARY_BUTTON_STYLE
+    assert button_styles["Delete"] == theme_metrics.DESTRUCTIVE_BUTTON_STYLE
+    assert button_styles["Clear All"] == theme_metrics.DESTRUCTIVE_BUTTON_STYLE
+    assert button_styles["Fill All"] is None
+    assert button_styles["New"] is None
+    assert button_styles["Activate"] is None
+    assert button_styles["Set as Default"] is None
+    assert button_styles["Set Backdrop..."] is None
+    assert button_styles["Reset Backdrop"] is None
+    assert "font" not in editor.status_label.options
+    assert all("font" not in label.options for label in registry["labels"])
     assert len(registry["separators"]) == 2
     assert all(
         separator.grid_calls == [{"row": 0, "column": 1, "sticky": "ew", "padx": (8, 0)}]
         for separator in registry["separators"]
     )
-    assert len(registry["dropdowns"]) == 4
-    assert editor._backdrop_mode_dropdown is registry["dropdowns"][0]
+    assert "dropdowns" not in registry
+    assert len(registry["comboboxes"]) == 4
+    assert all(combobox.options["state"] == "readonly" for combobox in registry["comboboxes"])
+
+    backdrop_combo = editor._backdrop_mode_combo
+    assert backdrop_combo in registry["comboboxes"]
+    assert backdrop_combo.options["state"] == "readonly"
+    assert backdrop_combo.options["width"] == 16
+    assert backdrop_combo.options["values"] == ["No backdrop", "Built-in seed", "Custom image"]
+    assert backdrop_combo.get() == "Built-in seed"
+    assert [call[0] for call in backdrop_combo.bind_calls] == ["<<ComboboxSelected>>"]
+    backdrop_combo.set("No backdrop")
+    backdrop_combo.bind_calls[0][1](None)
+    assert editor._backdrop_mode_var.get() == "none"
+    assert editor._on_backdrop_mode_changed_calls == 1
 
     assert editor._profiles_frame.options["text"] == "Lighting profiles"
     assert editor._profiles_frame.options["padding"] == 10
@@ -154,30 +186,24 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
     assert editor._profiles_frame.columnconfigure_calls == [{"index": 1, "weight": 1}]
 
     combo = editor._profiles_combo
+    assert combo in registry["comboboxes"]
     assert combo.options["textvariable"] is editor._profile_name_var
     assert combo.options["values"] == ["default", "gaming", "movie"]
     assert combo.options["width"] == 22
     assert combo.options["state"] == "readonly"
     assert combo.grid_calls == [{"row": 0, "column": 1, "sticky": "ew", "padx": (8, 0)}]
-
-    dropdown = editor._profiles_dropdown
-    assert dropdown is registry["dropdowns"][1]
-    assert registry["profiles_list_calls"] == 2
-    assert dropdown.kwargs["root"] is root
-    assert dropdown.kwargs["anchor"] is combo
-    assert dropdown.kwargs["values_provider"]() == ["default", "gaming", "movie"]
-    assert dropdown.kwargs["get_current_value"]() == "gaming"
-    dropdown.kwargs["set_value"]("movie")
-    assert editor._profile_name_var.get() == "movie"
-    assert dropdown.kwargs["bg"] == editor.bg_color
-    assert dropdown.kwargs["fg"] == editor.fg_color
-    assert [call[0] for call in combo.bind_calls] == ["<Button-1>", "<Down>"]
-    for _event, callback, _add in combo.bind_calls:
-        assert callback.__self__ is dropdown
-        assert callback.__func__.__name__ == "open"
+    assert combo.bind_calls == []
+    # Regression: construction scans once and popup performs no I/O.
+    assert "postcommand" not in combo.options
+    assert registry["profiles_list_calls"] == 1
+    # The construction snapshot is cached immutably on the editor so later
+    # policy saves/syncs never touch the filesystem.
+    assert editor._profile_names_snapshot == ("default", "gaming", "movie")
 
     ac_combo = editor._ac_power_source_profile_combo
     battery_combo = editor._battery_power_source_profile_combo
+    assert ac_combo in registry["comboboxes"]
+    assert battery_combo in registry["comboboxes"]
     assert ac_combo.options["textvariable"] is editor._ac_power_source_profile_var
     assert battery_combo.options["textvariable"] is editor._battery_power_source_profile_var
     assert ac_combo.options["width"] == 22
@@ -200,14 +226,19 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
         "gaming",
         "movie",
     )
-    assert [call[0] for call in ac_combo.bind_calls] == ["<Button-1>", "<Down>", "<<ComboboxSelected>>"]
-    assert [call[0] for call in battery_combo.bind_calls] == ["<Button-1>", "<Down>", "<<ComboboxSelected>>"]
-    assert editor._ac_power_source_profile_dropdown is registry["dropdowns"][2]
-    assert editor._battery_power_source_profile_dropdown is registry["dropdowns"][3]
-    editor._ac_power_source_profile_dropdown.kwargs["set_value"]("gaming")
-    editor._battery_power_source_profile_dropdown.kwargs["set_value"]("default")
-    assert editor._ac_power_source_profile_var.get() == "gaming"
-    assert editor._battery_power_source_profile_var.get() == "default"
+    assert [call[0] for call in ac_combo.bind_calls] == ["<<ComboboxSelected>>"]
+    assert [call[0] for call in battery_combo.bind_calls] == ["<<ComboboxSelected>>"]
+    # Regression: power-source popups perform no I/O; values come from the
+    # single construction snapshot and preserve the configured profile.
+    assert "postcommand" not in ac_combo.options
+    assert "postcommand" not in battery_combo.options
+    assert registry["profiles_list_calls"] == 1
+    assert editor._save_power_source_profile_policy_calls == 0
+    editor._ac_power_source_profile_var.set("gaming")
+    ac_combo.bind_calls[0][1](None)
+    assert editor._save_power_source_profile_policy_calls == 1
+    editor._battery_power_source_profile_var.set("default")
+    battery_combo.bind_calls[0][1](None)
     assert editor._save_power_source_profile_policy_calls == 2
 
     layout_controls = editor._layout_setup_controls

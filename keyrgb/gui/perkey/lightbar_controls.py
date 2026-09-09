@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from keyrgb.core.profile import profiles
 from keyrgb.core.resources.defaults import get_default_lightbar_overlay
+from keyrgb.gui.theme import metrics as theme_metrics
 
 from .lightbar_layout import lightbar_rect_for_size, normalize_lightbar_overlay
 from .ui.status import reset_lightbar_overlay, saved_lightbar_overlay, set_status
@@ -37,7 +38,7 @@ class LightbarControls(ttk.LabelFrame):
         ttk.Label(
             self,
             text="Single-zone placement preview for the auxiliary lightbar",
-            font=("Sans", 9),
+            style=theme_metrics.BODY_LABEL_STYLE,
             justify="left",
             anchor="w",
         ).grid(row=0, column=0, sticky="ew")

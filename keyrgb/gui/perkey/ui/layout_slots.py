@@ -6,6 +6,7 @@ from tkinter import ttk
 from typing import Protocol, cast
 
 from keyrgb.core.resources.layout_slots import get_layout_slot_states
+from keyrgb.gui.theme import metrics as theme_metrics
 
 LayoutSlotOverrides = dict[str, dict[str, object]]
 
@@ -159,7 +160,7 @@ def refresh_layout_slots_ui(editor: object) -> None:
         ttk.Label(
             body_parent,
             text="This layout has no optional key positions.",
-            font=("Sans", 9),
+            style=theme_metrics.BODY_LABEL_STYLE,
             wraplength=_body_wraplength(body),
             justify="left",
         ).grid(row=0, column=0, sticky="w")
@@ -186,7 +187,7 @@ def refresh_layout_slots_ui(editor: object) -> None:
         entry.bind("<Return>", commit_label)
         entry.bind("<FocusOut>", commit_label)
 
-        ttk.Label(row, text=f"Default: {state.default_label}", font=("Sans", 8)).grid(
+        ttk.Label(row, text=f"Default: {state.default_label}", style=theme_metrics.CAPTION_LABEL_STYLE).grid(
             row=0,
             column=2,
             sticky="e",

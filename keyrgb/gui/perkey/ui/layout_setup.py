@@ -7,7 +7,7 @@ from typing import Protocol, cast
 
 from keyrgb.core.resources.layout_legends import get_layout_legend_pack_ids, load_layout_legend_pack
 from keyrgb.core.resources.layouts import LAYOUT_CATALOG
-from keyrgb.gui.widgets.dropdown import UpwardListboxDropdown
+from keyrgb.gui.theme import metrics as theme_metrics
 
 from .layout_slots import refresh_layout_slots_ui
 
@@ -34,10 +34,6 @@ class _GridFrameProtocol(Protocol):
     def columnconfigure(self, *args: object, **kwargs: object) -> object: ...
 
 
-class _DropdownProtocol(Protocol):
-    def open(self, _event: object = None) -> str: ...
-
-
 class _LayoutSetupEditorProtocol(Protocol):
     _physical_layout: str
     _layout_legend_pack: str | None
@@ -45,8 +41,6 @@ class _LayoutSetupEditorProtocol(Protocol):
     _legend_pack_var: _StringVarProtocol
     _layout_combo: _ComboboxProtocol
     _legend_pack_combo: _ComboboxProtocol
-    _layout_dropdown: _DropdownProtocol
-    _legend_pack_dropdown: _DropdownProtocol
     _layout_slots_body: _GridFrameProtocol
     _reset_layout_defaults: Callable[[], None]
 
@@ -77,14 +71,6 @@ def _legend_pack_choices(layout_id: str) -> list[tuple[str, str]]:
         choices.append((pack_id, label))
 
     return choices
-
-
-def _dropdown_root(editor: object, fallback: object) -> tk.Misc:
-    return cast(tk.Misc, getattr(editor, "root", None) or fallback)
-
-
-def _editor_color(editor: object, *, attr: str, default: str) -> str:
-    return str(getattr(editor, attr, default) or default)
 
 
 def _layout_legend_pack_id(editor: object) -> str:
@@ -119,18 +105,6 @@ class LayoutSetupControls(ttk.LabelFrame):
         layout_combo.set(current_label)
         layout_combo.grid(row=0, column=1, sticky="ew", padx=(8, 0))
         layout_combo.bind("<<ComboboxSelected>>", self._on_layout_select)
-        layout_dropdown = UpwardListboxDropdown(
-            root=_dropdown_root(editor, layout_combo),
-            anchor=cast(tk.Widget, layout_combo),
-            values_provider=lambda: list(_LAYOUT_LABELS),
-            get_current_value=lambda: str(layout_combo.get() or current_label),
-            set_value=self._set_layout_label,
-            bg=_editor_color(editor, attr="bg_color", default="#2b2b2b"),
-            fg=_editor_color(editor, attr="fg_color", default="#ffffff"),
-        )
-        editor._layout_dropdown = layout_dropdown
-        layout_combo.bind("<Button-1>", layout_dropdown.open)
-        layout_combo.bind("<Down>", layout_dropdown.open)
 
         ttk.Label(self, text="Legends").grid(row=1, column=0, sticky="w", pady=(8, 0))
 
@@ -142,24 +116,12 @@ class LayoutSetupControls(ttk.LabelFrame):
         editor._legend_pack_combo = cast(_ComboboxProtocol, legend_pack_combo)
         legend_pack_combo.grid(row=1, column=1, sticky="ew", padx=(8, 0), pady=(8, 0))
         legend_pack_combo.bind("<<ComboboxSelected>>", self._on_legend_pack_select)
-        legend_pack_dropdown = UpwardListboxDropdown(
-            root=_dropdown_root(editor, legend_pack_combo),
-            anchor=cast(tk.Widget, legend_pack_combo),
-            values_provider=lambda: [label for _pack_id, label in _legend_pack_choices(editor._physical_layout)],
-            get_current_value=lambda: str(legend_pack_combo.get() or _AUTO_LEGEND_PACK_LABEL),
-            set_value=self._set_legend_pack_label,
-            bg=_editor_color(editor, attr="bg_color", default="#2b2b2b"),
-            fg=_editor_color(editor, attr="fg_color", default="#ffffff"),
-        )
-        editor._legend_pack_dropdown = legend_pack_dropdown
-        legend_pack_combo.bind("<Button-1>", legend_pack_dropdown.open)
-        legend_pack_combo.bind("<Down>", legend_pack_dropdown.open)
         self.refresh_legend_pack_choices()
 
         self._description_label = ttk.Label(
             self,
             text="Choose the physical layout here when setting up the keyboard or refreshing its saved setup.",
-            font=("Sans", 9),
+            style=theme_metrics.BODY_LABEL_STYLE,
             justify="left",
             anchor="w",
         )
@@ -204,16 +166,6 @@ class LayoutSetupControls(ttk.LabelFrame):
         except _DESCRIPTION_WRAP_ERRORS:
             return
         self._description_label.configure(wraplength=max(200, width - 24))
-
-    def _set_layout_label(self, label: str) -> None:
-        editor = self.editor
-        editor._layout_combo.set(str(label))
-        self._on_layout_select()
-
-    def _set_legend_pack_label(self, label: str) -> None:
-        editor = self.editor
-        editor._legend_pack_combo.set(str(label))
-        self._on_legend_pack_select()
 
     def _on_layout_select(self, _event=None) -> None:
         editor = self.editor

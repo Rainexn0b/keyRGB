@@ -4,6 +4,8 @@ import tkinter as tk
 from collections.abc import Callable
 from tkinter import ttk
 
+from keyrgb.gui.theme import metrics as theme_metrics
+
 from ._wrap_sync import bind_wraplength_sync
 
 
@@ -21,13 +23,13 @@ class PowerManagementPanel:
     ) -> None:
         self._var_enabled = var_enabled
 
-        pm_title = ttk.Label(parent, text="Power Management", font=("Sans", 11, "bold"))
-        pm_title.pack(anchor="w", pady=(0, 6))
+        pm_title = ttk.Label(parent, text="Power Management", style=theme_metrics.SECTION_LABEL_STYLE)
+        pm_title.pack(anchor="w", pady=(0, theme_metrics.CONTROL_GAP_Y))
 
         desc = ttk.Label(
             parent,
             text="Control whether KeyRGB turns keyboard LEDs off or on for lid and suspend events.",
-            font=("Sans", 9),
+            style=theme_metrics.BODY_LABEL_STYLE,
             justify="left",
             wraplength=400,
         )

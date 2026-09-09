@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from keyrgb.gui.theme import metrics as theme_metrics
+
 from . import _support_window_ui_shared as support_window_ui_shared
 
 CheckActionSpec = support_window_ui_shared.CheckActionSpec
@@ -26,11 +28,11 @@ def build_checks_section(
             "backend from the current diagnostics payload when available, or the selected backend from device "
             "discovery when that is the only result available."
         ),
-        font=("Sans", 9),
+        style=theme_metrics.BODY_LABEL_STYLE,
         justify="left",
         wraplength=1120,
     )
-    desc_label.pack(anchor="w", pady=(0, 10))
+    desc_label.pack(anchor="w", pady=(0, theme_metrics.CONTROL_GAP_Y))
     register_wrap_target(window, label=desc_label, owner=parent, padding=28, minimum=320)
 
     grid = ttk.Frame(parent)
@@ -71,8 +73,10 @@ def build_checks_section(
         button = ttk.Button(cell, text=label, command=command, style=style_name, width=26)
         button.pack(fill="x")
         setattr(window, attr_name, button)
-        caption_label = ttk.Label(cell, text=caption, font=("Sans", 8), justify="left", wraplength=300)
-        caption_label.pack(anchor="w", pady=(6, 0))
+        caption_label = ttk.Label(
+            cell, text=caption, style=theme_metrics.CAPTION_LABEL_STYLE, justify="left", wraplength=300
+        )
+        caption_label.pack(anchor="w", pady=(theme_metrics.CONTROL_GAP_Y, 0))
         register_wrap_target(window, label=caption_label, owner=cell, padding=8, minimum=180)
 
 
@@ -90,11 +94,11 @@ def build_debug_section(
             "Collect a full read-only diagnostics report for the current setup, including backend probes, "
             "USB holders, and configuration state."
         ),
-        font=("Sans", 9),
+        style=theme_metrics.BODY_LABEL_STYLE,
         justify="left",
         wraplength=520,
     )
-    desc_label.pack(anchor="w", pady=(0, 8))
+    desc_label.pack(anchor="w", pady=(0, theme_metrics.CONTROL_GAP_Y))
     register_wrap_target(window, label=desc_label, owner=parent, padding=28, minimum=240)
 
     _build_action_row(
@@ -135,11 +139,11 @@ def build_discovery_section(
             "Scan for supported, dormant, experimental-disabled, and unrecognized ITE-class controller "
             "candidates using safe read-only probes."
         ),
-        font=("Sans", 9),
+        style=theme_metrics.BODY_LABEL_STYLE,
         justify="left",
         wraplength=520,
     )
-    desc_label.pack(anchor="w", pady=(0, 8))
+    desc_label.pack(anchor="w", pady=(0, theme_metrics.CONTROL_GAP_Y))
     register_wrap_target(window, label=desc_label, owner=parent, padding=28, minimum=240)
 
     _build_action_row(
@@ -183,20 +187,20 @@ def build_issue_section(
             "Review the recommended GitHub form before filing. The draft updates automatically from the current "
             "diagnostics and discovery results."
         ),
-        font=("Sans", 9),
+        style=theme_metrics.BODY_LABEL_STYLE,
         justify="left",
         wraplength=1120,
     )
-    desc_label.pack(anchor="w", pady=(0, 8))
+    desc_label.pack(anchor="w", pady=(0, theme_metrics.CONTROL_GAP_Y))
     register_wrap_target(window, label=desc_label, owner=parent, padding=28, minimum=320)
 
     window.issue_meta_label = ttk.Label(
         parent,
         text="Suggested template: run diagnostics or discovery first",
-        font=("Sans", 9),
+        style=theme_metrics.STATUS_LABEL_STYLE,
         justify="left",
     )
-    window.issue_meta_label.pack(anchor="w", pady=(0, 8))
+    window.issue_meta_label.pack(anchor="w", pady=(0, theme_metrics.CONTROL_GAP_Y))
 
     _build_action_row(
         window,
@@ -241,11 +245,11 @@ def build_bundle_section(
             "backend probe observations, and the generated issue draft. Missing diagnostics or discovery snapshots "
             "are filled with safe read-only collectors before saving."
         ),
-        font=("Sans", 9),
+        style=theme_metrics.BODY_LABEL_STYLE,
         justify="left",
         wraplength=1120,
     )
-    desc_label.pack(anchor="w", pady=(0, 8))
+    desc_label.pack(anchor="w", pady=(0, theme_metrics.CONTROL_GAP_Y))
     register_wrap_target(window, label=desc_label, owner=parent, padding=28, minimum=320)
 
     _build_action_row(

@@ -18,6 +18,12 @@ specs for larger changes.
 
 ### Active follow-up plans
 
+- `2026-09-09/pre-1.0-tk-ux-hardening-plan.md` — active Tkinter UX campaign;
+  categorized Settings and shared visual, spacing, contrast, and focus behavior
+  and native per-key controls are complete; duplicate-instance prevention is
+  active, followed by geometry persistence and keyboard access; the per-key
+  editor/calibration redesign
+  remains explicitly deferred pending dedicated UX discussion
 - `2026-08-11/architecture-concerns-plan.md` — confirmation and remediation
   tracker for the 2026-08-11 architecture review; one finding per pass, with
   test-first contracts and explicit confirmed/rejected status

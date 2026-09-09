@@ -7,6 +7,7 @@ from typing import Any
 from unittest.mock import MagicMock
 
 from keyrgb.gui.calibrator import _app_bootstrap as boot
+from keyrgb.gui.theme import focus as theme_focus, metrics as theme_metrics
 
 
 class _Widget:
@@ -18,6 +19,7 @@ class _Widget:
         self.configure_calls: list[dict[str, object]] = []
         self.column_calls: list[tuple[object, ...]] = []
         self.row_calls: list[tuple[object, ...]] = []
+        self.focus_calls = 0
         self._width = 300
 
     def grid(self, *args: object, **kwargs: object) -> None:
@@ -37,6 +39,9 @@ class _Widget:
 
     def winfo_width(self) -> int:
         return self._width
+
+    def focus_set(self) -> None:
+        self.focus_calls += 1
 
 
 class _Tk:
@@ -87,6 +92,7 @@ class _App:
         self.row_calls: list[tuple[Any, ...]] = []
         self.bind_calls: list[tuple[Any, ...]] = []
         self.after_calls: list[tuple[int, object]] = []
+        self._focused: object = None
         self.destroy = MagicMock()
         self._redraw = MagicMock()
         self._on_click = MagicMock()
@@ -110,6 +116,9 @@ class _App:
 
     def after(self, delay_ms: int, callback: object) -> None:
         self.after_calls.append((delay_ms, callback))
+
+    def focus_get(self) -> object:
+        return self._focused
 
 
 def test_build_widgets_creates_canvas_controls_and_keybindings() -> None:
@@ -201,3 +210,63 @@ def test_finish_init_schedules_load_and_swallows_deiconify_errors() -> None:
 
     boot.finish_init(_AppFinish(), tk_runtime_errors=(RuntimeError,))
     assert calls == ["load", "probe", "redraw"]
+
+
+def test_build_widgets_uses_theme_styles_outer_padding_and_assign_focus() -> None:
+    app = _App()
+    tk = _Tk()
+    ttk = _Ttk()
+
+    boot.build_widgets(app, tk=tk, ttk=ttk, tk_runtime_errors=(RuntimeError,), wrap_sync_errors=(RuntimeError,))
+
+    # Outer frame uses the shared spacing metric.
+    outer = ttk.widgets[0]
+    assert outer.kind == "frame"
+    assert outer.kwargs.get("padding") == theme_metrics.OUTER_PADDING
+
+    labels = [w for w in ttk.widgets if w.kind == "label"]
+    title = next(w for w in labels if w.kwargs.get("text") == "Keymap Calibrator")
+    assert title.kwargs.get("style") == theme_metrics.TITLE_LABEL_STYLE
+    assert "font" not in title.kwargs
+
+    assert app.lbl_cell.kwargs.get("style") == theme_metrics.BODY_LABEL_STYLE
+    assert "font" not in app.lbl_cell.kwargs
+
+    assert app.lbl_status.kwargs.get("style") == theme_metrics.STATUS_LABEL_STYLE
+    assert "font" not in app.lbl_status.kwargs
+
+    # No calibrator-chrome widget keeps a local Sans tuple; canvas labels
+    # (TkDefaultFont in canvas_render) are out of scope here.
+    for w in ttk.widgets:
+        font = w.kwargs.get("font")
+        assert not (isinstance(font, tuple) and font and font[0] == "Sans"), w.kwargs
+
+    assign_btn = next(w for w in ttk.widgets if w.kind == "button" and w.kwargs.get("text") == "Assign selected key")
+    assert assign_btn.kwargs.get("style") == theme_metrics.PRIMARY_BUTTON_STYLE
+
+    # Save actions stay on the default button style (only Assign is primary).
+    for text in ("Save", "Save && Close"):
+        btn = next(w for w in ttk.widgets if w.kind == "button" and w.kwargs.get("text") == text)
+        assert "style" not in btn.kwargs
+
+    # Initial focus is scheduled non-forcing on Assign via `after`.
+    focus_entries = [(d, cb) for d, cb in app.after_calls if d == theme_focus.INITIAL_FOCUS_DELAY_MS]
+    assert len(focus_entries) == 1
+    focus_cb = focus_entries[0][1]
+    assert callable(focus_cb)
+    assert app._focused is None
+    focus_cb()
+    assert assign_btn.focus_calls == 1
+
+    # Existing bindings and control order are unchanged.
+    assert any(seq == "<Return>" for seq, _cb, _add in app.bind_calls)
+    assert any(seq == "<KP_Enter>" for seq, _cb, _add in app.bind_calls)
+    assert [w.kwargs.get("text") for w in ttk.widgets if w.kind == "button"] == [
+        "Prev",
+        "Next",
+        "Assign selected key",
+        "Skip (nothing lit)",
+        "Reset Keymap Defaults",
+        "Save",
+        "Save && Close",
+    ]

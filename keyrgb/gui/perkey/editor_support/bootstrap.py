@@ -44,18 +44,6 @@ class _TkModuleProtocol(Protocol):
     def DoubleVar(self, value: object = ...) -> _TkVarProtocol: ...
 
 
-class _TtkStyleProtocol(Protocol):
-    def configure(self, style_name: str, **kwargs: object) -> object: ...
-
-    def lookup(self, style_name: str, option_name: str) -> str: ...
-
-    def map(self, style_name: str, **kwargs: object) -> object: ...
-
-
-class _TtkModuleProtocol(Protocol):
-    def Style(self) -> _TtkStyleProtocol: ...
-
-
 class _ProfilesProtocol(Protocol):
     def get_active_profile(self) -> str: ...
 
@@ -136,8 +124,6 @@ class _PerKeyEditorBootstrapApp(Protocol):
 
     def _get_visible_layout_keys(self) -> Sequence[_VisibleLayoutKeyProtocol]: ...
 
-    def _reload_keymap(self) -> None: ...
-
     def select_slot_id(self, slot_id: str) -> None: ...
 
 
@@ -145,7 +131,6 @@ def initialize_editor(
     app: object,
     *,
     tk: object,
-    ttk: object,
     config_cls: type[Config],
     profiles: object,
     apply_keyrgb_window_icon: Callable[[_TkRootProtocol], object],
@@ -153,12 +138,9 @@ def initialize_editor(
     compute_perkey_editor_min_content_size: Callable[..., tuple[int, int]],
     fit_perkey_editor_geometry_to_content: Callable[..., object],
     apply_clam_theme: Callable[..., tuple[str, str]],
-    tk_call_errors: tuple[type[Exception], ...],
-    log_boundary_exception: Callable[[str, str, BaseException], object],
     normalize_layout_legend_pack_fn: Callable[[str, str | None], str],
     initial_last_non_black_color: Callable[[object], tuple[int, int, int]],
     load_profile_colors: Callable[..., PerKeyColors],
-    sanitize_keymap_cells: Callable[..., Keymap],
     per_key_commit_pipeline_cls: type[PerKeyCommitPipeline],
     get_keyboard: Callable[[], KeyboardDevice | None],
     build_ui_fn: Callable[[], object],
@@ -167,11 +149,8 @@ def initialize_editor(
     num_rows: int,
     num_cols: int,
 ) -> None:
-    del sanitize_keymap_cells
-
     editor = cast(_PerKeyEditorBootstrapApp, app)
     tk_module = cast(_TkModuleProtocol, tk)
-    ttk_module = cast(_TtkModuleProtocol, ttk)
     profiles_api = cast(_ProfilesProtocol, profiles)
 
     editor._key_size = 28
@@ -207,35 +186,10 @@ def initialize_editor(
         wheel_size=editor._wheel_size,
     )
 
-    style = ttk_module.Style()
-    # The per-key editor uses ttk.Checkbutton widgets ("Apply to all keys",
-    # "Sample tool"). Enable checkbutton styling + state mapping so the dark
-    # theme keeps the hover ("active") background dark instead of falling back
-    # to clam's default light hover color, which obscured the light label text.
-    editor.bg_color, editor.fg_color = apply_clam_theme(
-        editor.root,
-        include_checkbuttons=True,
-        map_checkbutton_state=True,
-    )
-    style.configure("TLabelframe", background=editor.bg_color, foreground=editor.fg_color)
-    style.configure("TLabelframe.Label", background=editor.bg_color, foreground=editor.fg_color)
-    style.configure("TRadiobutton", background=editor.bg_color, foreground=editor.fg_color)
-
-    field_bg = style.lookup("TEntry", "fieldbackground") or "#3a3a3a"
-    style.configure("TEntry", fieldbackground=field_bg, foreground=editor.fg_color)
-    style.configure("TCombobox", fieldbackground=field_bg, foreground=editor.fg_color)
-    try:
-        style.map(
-            "TCombobox",
-            fieldbackground=[("readonly", field_bg), ("disabled", field_bg)],
-            foreground=[("readonly", editor.fg_color), ("disabled", editor.fg_color)],
-        )
-    except tk_call_errors as exc:
-        log_boundary_exception(
-            "perkey.editor.style_map",
-            "Failed to apply perkey combobox style map",
-            exc,
-        )
+    # Widget styling (frames, labelframes, radios, entries, comboboxes,
+    # checkbuttons, and focus/disabled maps) is owned centrally by
+    # keyrgb.gui.theme.ttk via apply_clam_theme; no per-window overrides here.
+    editor.bg_color, editor.fg_color = apply_clam_theme(editor.root)
 
     editor.config = config_cls()
     editor.profile_name = profiles_api.get_active_profile()
@@ -321,8 +275,6 @@ def initialize_editor(
 
     if not editor.keymap:
         set_status(editor, no_keymap_found_initial())
-
-    editor.root.bind("<FocusIn>", lambda _event: editor._reload_keymap())
 
     for key_def in editor._get_visible_layout_keys():
         if key_def.key_id in editor.keymap:

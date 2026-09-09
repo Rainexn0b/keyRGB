@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from keyrgb.gui.theme.focus import INITIAL_FOCUS_DELAY_MS
 from tests.gui.perkey.editor.ui._editor_ui_fakes import _build_ui
 
 
@@ -25,6 +26,30 @@ def test_build_editor_ui_adds_lightbar_controls_when_lightbar_is_detected(
     assert editor.lightbar_controls.parent is editor._overlay_setup_panel
     assert editor.lightbar_controls.grid_calls == [{"row": 1, "column": 0, "sticky": "ew", "pady": (10, 0)}]
     assert editor.lightbar_controls.sync_calls == 1
+
+
+def test_build_editor_ui_schedules_initial_focus_on_backdrop_combo(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    editor, root, _registry = _build_ui(monkeypatch)
+
+    focus_calls = [call for call in root.after_calls if call[0] == INITIAL_FOCUS_DELAY_MS]
+    assert len(focus_calls) == 1
+
+    focus_calls[0][1]()
+    assert editor._backdrop_mode_combo.focus_set_calls == 1
+
+
+def test_build_editor_ui_initial_focus_does_not_steal_existing_focus(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    editor, root, _registry = _build_ui(monkeypatch)
+    root.focused = object()  # Focus already landed on another child.
+
+    focus_callback = next(call[1] for call in root.after_calls if call[0] == INITIAL_FOCUS_DELAY_MS)
+    focus_callback()
+
+    assert editor._backdrop_mode_combo.focus_set_calls == 0
 
 
 def test_build_editor_ui_schedules_status_wrap_sync_on_bind_and_after(monkeypatch: pytest.MonkeyPatch) -> None:

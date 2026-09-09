@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from keyrgb.gui.settings.panels import experimental_backends_panel
+from keyrgb.gui.theme import metrics as theme_metrics
 
 
 class _FakeWidget:
@@ -70,7 +71,7 @@ def test_experimental_backends_panel_init_creates_title_and_description_labels(
     assert registry["labels"][0].parent is parent
     assert registry["labels"][0].options == {
         "text": "Backend policy",
-        "font": ("Sans", 11, "bold"),
+        "style": theme_metrics.SECTION_LABEL_STYLE,
     }
     assert registry["labels"][0].pack_calls == [{"anchor": "w", "pady": (0, 6)}]
     assert registry["labels"][1].parent is parent
@@ -79,7 +80,7 @@ def test_experimental_backends_panel_init_creates_title_and_description_labels(
             "Experimental backends are opt-in. Some are speculative; others have protocol notes or "
             "reverse-engineering references but still need broader user validation."
         ),
-        "font": ("Sans", 9),
+        "style": theme_metrics.BODY_LABEL_STYLE,
         "justify": "left",
         "wraplength": 420,
     }

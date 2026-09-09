@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from keyrgb.gui.theme import ttk as ttk_theme
+from keyrgb.gui.theme import metrics, ttk as ttk_theme
 
 
 class _FakeStyle:
@@ -52,7 +52,17 @@ class _FakeRoot:
 
 
 def _patch_style(monkeypatch: pytest.MonkeyPatch, style: _FakeStyle) -> None:
-    monkeypatch.setattr(ttk_theme.ttk, "Style", lambda: style)
+    monkeypatch.setattr(ttk_theme.ttk, "Style", lambda _root=None: style)
+
+
+@pytest.fixture(autouse=True)
+def _headless_fonts(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep apply-path tests independent of any ambient Tk interpreter."""
+
+    def _no_tk(name: str, root: object = None) -> object:
+        raise ttk_theme.tk.TclError("no display")
+
+    monkeypatch.setattr(ttk_theme.tkfont, "nametofont", _no_tk)
 
 
 def _configured_calls(style: _FakeStyle) -> dict[str, dict[str, object]]:
@@ -60,10 +70,13 @@ def _configured_calls(style: _FakeStyle) -> dict[str, dict[str, object]]:
 
 
 def _mapped_calls(style: _FakeStyle) -> dict[str, dict[str, object]]:
-    return {style_name: kwargs for style_name, kwargs in style.map_calls}
+    merged: dict[str, dict[str, object]] = {}
+    for style_name, kwargs in style.map_calls:
+        merged.setdefault(style_name, {}).update(kwargs)
+    return merged
 
 
-def test_apply_clam_light_theme_uses_ttk_lookups_and_optional_checkbutton_mapping(
+def test_apply_clam_light_theme_uses_ttk_lookups_and_centralized_checkbutton_mapping(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     style = _FakeStyle(
@@ -79,11 +92,7 @@ def test_apply_clam_light_theme_uses_ttk_lookups_and_optional_checkbutton_mappin
     _patch_style(monkeypatch, style)
     monkeypatch.setenv("KEYRGB_TK_SCALING", "1.5")
 
-    bg_color, fg_color = ttk_theme.apply_clam_light_theme(
-        root,
-        include_checkbuttons=True,
-        map_checkbutton_state=True,
-    )
+    bg_color, fg_color = ttk_theme.apply_clam_light_theme(root)
 
     assert (bg_color, fg_color) == ("#fafafa", "#111111")
     assert style.theme_calls == ["clam"]
@@ -101,21 +110,32 @@ def test_apply_clam_light_theme_uses_ttk_lookups_and_optional_checkbutton_mappin
     assert configured["TSpinbox"] == {"fieldbackground": "#ffffff", "foreground": "#111111"}
     assert configured["TScale"] == {"background": "#fafafa", "troughcolor": "#d7d7d7"}
     assert configured["TScrollbar"] == {"background": "#fafafa", "troughcolor": "#d7d7d7"}
+    # Checkbutton styling is centralized.
     assert configured["TCheckbutton"] == {"background": "#fafafa", "foreground": "#111111"}
 
     mapped = _mapped_calls(style)
-    assert mapped["TCombobox"] == {
-        "fieldbackground": [("readonly", "#ffffff"), ("disabled", "#ffffff")],
-        "foreground": [("readonly", "#111111"), ("disabled", "#777777"), ("!disabled", "#111111")],
-    }
-    assert mapped["TCheckbutton"] == {
-        "background": [("disabled", "#fafafa"), ("active", "#fafafa")],
-        "foreground": [("disabled", "#777777"), ("!disabled", "#111111")],
-    }
-    assert mapped["TRadiobutton"] == {
-        "background": [("disabled", "#fafafa"), ("active", "#fafafa")],
-        "foreground": [("disabled", "#777777"), ("!disabled", "#111111")],
-    }
+    assert mapped["TCombobox"]["fieldbackground"] == [
+        ("disabled", "#ffffff"),
+        ("readonly", "#ffffff"),
+        ("focus", "#ffffff"),
+    ]
+    assert mapped["TCombobox"]["foreground"] == [
+        ("disabled", ttk_theme.LIGHT_DISABLED_FG),
+        ("readonly", "#111111"),
+        ("!disabled", "#111111"),
+    ]
+    assert mapped["TCheckbutton"]["foreground"] == [
+        ("disabled", ttk_theme.LIGHT_DISABLED_FG),
+        ("!disabled", "#111111"),
+    ]
+    assert mapped["TRadiobutton"]["foreground"] == [
+        ("disabled", ttk_theme.LIGHT_DISABLED_FG),
+        ("!disabled", "#111111"),
+    ]
+    assert mapped["TButton"]["foreground"] == [
+        ("disabled", ttk_theme.LIGHT_DISABLED_FG),
+        ("!disabled", "#111111"),
+    ]
 
 
 def test_apply_clam_light_theme_falls_back_to_default_colors_and_tolerates_root_configure_errors(
@@ -127,11 +147,7 @@ def test_apply_clam_light_theme_falls_back_to_default_colors_and_tolerates_root_
     _patch_style(monkeypatch, style)
     monkeypatch.delenv("KEYRGB_TK_SCALING", raising=False)
 
-    bg_color, fg_color = ttk_theme.apply_clam_light_theme(
-        root,
-        include_checkbuttons=True,
-        map_checkbutton_state=False,
-    )
+    bg_color, fg_color = ttk_theme.apply_clam_light_theme(root)
 
     assert (bg_color, fg_color) == ("#f0f0f0", "#000000")
     assert root.configure_calls == [{"bg": "#f0f0f0"}]
@@ -143,21 +159,23 @@ def test_apply_clam_light_theme_falls_back_to_default_colors_and_tolerates_root_
     assert configured["TSpinbox"] == {"fieldbackground": "#ffffff", "foreground": "#000000"}
     assert configured["TScale"] == {"background": "#f0f0f0", "troughcolor": "#ffffff"}
     assert configured["TScrollbar"] == {"background": "#f0f0f0", "troughcolor": "#ffffff"}
+    # Checkbutton styling is centralized.
     assert configured["TCheckbutton"] == {"background": "#f0f0f0", "foreground": "#000000"}
 
     mapped = _mapped_calls(style)
-    assert mapped["TCombobox"] == {
-        "fieldbackground": [("readonly", "#ffffff"), ("disabled", "#ffffff")],
-        "foreground": [("readonly", "#000000"), ("disabled", "#777777"), ("!disabled", "#000000")],
-    }
-    assert "TCheckbutton" not in mapped
-    assert mapped["TRadiobutton"] == {
-        "background": [("disabled", "#f0f0f0"), ("active", "#f0f0f0")],
-        "foreground": [("disabled", "#777777"), ("!disabled", "#000000")],
-    }
+    assert mapped["TCombobox"]["foreground"] == [
+        ("disabled", ttk_theme.LIGHT_DISABLED_FG),
+        ("readonly", "#000000"),
+        ("!disabled", "#000000"),
+    ]
+    assert "TCheckbutton" in mapped
+    assert mapped["TRadiobutton"]["foreground"] == [
+        ("disabled", ttk_theme.LIGHT_DISABLED_FG),
+        ("!disabled", "#000000"),
+    ]
 
 
-def test_apply_clam_dark_theme_configures_dark_palette_and_optional_checkbutton_mapping(
+def test_apply_clam_dark_theme_configures_dark_palette_and_centralized_checkbutton_mapping(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     style = _FakeStyle()
@@ -166,11 +184,7 @@ def test_apply_clam_dark_theme_configures_dark_palette_and_optional_checkbutton_
     _patch_style(monkeypatch, style)
     monkeypatch.delenv("KEYRGB_TK_SCALING", raising=False)
 
-    bg_color, fg_color = ttk_theme.apply_clam_dark_theme(
-        root,
-        include_checkbuttons=True,
-        map_checkbutton_state=True,
-    )
+    bg_color, fg_color = ttk_theme.apply_clam_dark_theme(root)
 
     assert (bg_color, fg_color) == ("#2b2b2b", "#e0e0e0")
     assert style.theme_calls == ["clam"]
@@ -191,19 +205,29 @@ def test_apply_clam_dark_theme_configures_dark_palette_and_optional_checkbutton_
     assert configured["TCheckbutton"] == {"background": "#2b2b2b", "foreground": "#e0e0e0"}
 
     mapped = _mapped_calls(style)
-    assert mapped["TButton"] == {"background": [("active", "#505050")]}
-    assert mapped["TCombobox"] == {
-        "fieldbackground": [("readonly", "#3a3a3a"), ("disabled", "#3a3a3a")],
-        "foreground": [("readonly", "#e0e0e0"), ("disabled", "#777777"), ("!disabled", "#e0e0e0")],
-    }
-    assert mapped["TCheckbutton"] == {
-        "background": [("disabled", "#2b2b2b"), ("active", "#2b2b2b")],
-        "foreground": [("disabled", "#777777"), ("!disabled", "#e0e0e0")],
-    }
-    assert mapped["TRadiobutton"] == {
-        "background": [("disabled", "#2b2b2b"), ("active", "#2b2b2b")],
-        "foreground": [("disabled", "#777777"), ("!disabled", "#e0e0e0")],
-    }
+    assert mapped["TButton"]["background"] == [
+        ("disabled", "#2b2b2b"),
+        ("active", "#505050"),
+        ("focus", "#505050"),
+    ]
+    assert mapped["TCombobox"]["fieldbackground"] == [
+        ("disabled", "#3a3a3a"),
+        ("readonly", "#3a3a3a"),
+        ("focus", "#3a3a3a"),
+    ]
+    assert mapped["TCombobox"]["foreground"] == [
+        ("disabled", ttk_theme.DARK_DISABLED_FG),
+        ("readonly", "#e0e0e0"),
+        ("!disabled", "#e0e0e0"),
+    ]
+    assert mapped["TCheckbutton"]["foreground"] == [
+        ("disabled", ttk_theme.DARK_DISABLED_FG),
+        ("!disabled", "#e0e0e0"),
+    ]
+    assert mapped["TRadiobutton"]["foreground"] == [
+        ("disabled", ttk_theme.DARK_DISABLED_FG),
+        ("!disabled", "#e0e0e0"),
+    ]
 
 
 def test_apply_clam_dark_theme_tolerates_scaling_and_root_configure_failures(
@@ -223,7 +247,9 @@ def test_apply_clam_dark_theme_tolerates_scaling_and_root_configure_failures(
     assert (bg_color, fg_color) == ("#2b2b2b", "#e0e0e0")
     assert root.configure_calls == [{"bg": "#2b2b2b"}]
     assert root.tk_calls == [("tk", "scaling", 1.25)]
-    assert "TCheckbutton" not in _configured_calls(style)
+    # Checkbutton styling is centralized.
+    assert "TCheckbutton" in _configured_calls(style)
+    assert "TCheckbutton" in _mapped_calls(style)
 
 
 def test_apply_scaling_if_configured_calls_tk_scaling_for_positive_values(
@@ -261,3 +287,48 @@ def test_apply_scaling_if_configured_swallows_tk_call_errors(monkeypatch: pytest
     ttk_theme._apply_scaling_if_configured(root)
 
     assert root.tk_calls == [("tk", "scaling", 1.1)]
+
+
+def test_semantic_styles_use_named_fonts_not_local_tuples(monkeypatch: pytest.MonkeyPatch) -> None:
+    style = _FakeStyle()
+    root = _FakeRoot()
+    _patch_style(monkeypatch, style)
+    monkeypatch.setattr(ttk_theme, "ensure_theme_fonts", lambda _root: dict(metrics.FONT_NAME_BY_STYLE))
+    monkeypatch.delenv("KEYRGB_TK_SCALING", raising=False)
+
+    ttk_theme.apply_clam_dark_theme(root)
+
+    configured = _configured_calls(style)
+    for semantic in metrics.ALL_SEMANTIC_STYLES:
+        assert semantic in configured
+        font_value = configured[semantic].get("font")
+        assert isinstance(font_value, str)
+        assert font_value in metrics.FONT_SPECS
+
+
+def test_theme_style_uses_the_supplied_root(monkeypatch: pytest.MonkeyPatch) -> None:
+    style = _FakeStyle()
+    roots: list[object] = []
+    root = _FakeRoot()
+    monkeypatch.setattr(ttk_theme.ttk, "Style", lambda supplied_root=None: roots.append(supplied_root) or style)
+    monkeypatch.delenv("KEYRGB_TK_SCALING", raising=False)
+
+    ttk_theme.apply_clam_dark_theme(root)
+
+    assert roots == [root]
+
+
+def test_semantic_styles_inherit_safely_when_named_fonts_are_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    style = _FakeStyle()
+    root = _FakeRoot()
+    _patch_style(monkeypatch, style)
+    monkeypatch.delenv("KEYRGB_TK_SCALING", raising=False)
+
+    ttk_theme.apply_clam_dark_theme(root)
+
+    configured = _configured_calls(style)
+    for semantic in metrics.ALL_SEMANTIC_STYLES:
+        assert semantic in configured
+        assert "font" not in configured[semantic]

@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 import keyrgb.gui.perkey.editor_support.ui as editor_ui
+import keyrgb.gui.perkey.ui._profile_actions_ui as profile_actions_ui
 
 
 class _FakeVar:
@@ -32,6 +33,7 @@ class _FakeWidget:
         self.rowconfigure_calls = []
         self.grid_remove_calls = 0
         self.pack_propagate_calls = []
+        self.focus_set_calls = 0
         self.width = int(kwargs.get("width", 360))
         self.reqwidth = int(kwargs.get("reqwidth", kwargs.get("width", 0)))
         self.children = []
@@ -65,6 +67,9 @@ class _FakeWidget:
     def pack_propagate(self, flag) -> None:
         self.pack_propagate_calls.append(flag)
 
+    def focus_set(self) -> None:
+        self.focus_set_calls += 1
+
     def winfo_width(self) -> int:
         return int(self.width)
 
@@ -81,6 +86,7 @@ class _FakeRoot:
         self.bind_calls = []
         self.bound_callbacks = {}
         self.after_calls = []
+        self.focused = None
 
     def bind(self, event, callback, add=None) -> None:
         if self.bind_error:
@@ -90,6 +96,9 @@ class _FakeRoot:
 
     def after(self, delay_ms, callback) -> None:
         self.after_calls.append((delay_ms, callback))
+
+    def focus_get(self):
+        return self.focused
 
 
 class _FakeKeyboardCanvas:
@@ -116,16 +125,6 @@ class _FakeColorWheel:
 
     def winfo_reqwidth(self) -> int:
         return int(self.reqwidth)
-
-
-class _FakeDropdown:
-    def __init__(self, **kwargs):
-        self.kwargs = dict(kwargs)
-        self.open_calls = []
-
-    def open(self, event=None):
-        self.open_calls.append(event)
-        return "break"
 
 
 class _FakeLayoutSetupControls:
@@ -177,6 +176,10 @@ class _FakeEditor:
         self._ac_power_source_profile_var = _FakeVar("movie")
         self._battery_power_source_profile_var = _FakeVar("Keep current profile")
         self._save_power_source_profile_policy_calls = 0
+        self._on_backdrop_mode_changed_calls = 0
+
+    def _on_backdrop_mode_changed(self, _event=None) -> None:
+        self._on_backdrop_mode_changed_calls += 1
 
     def _set_backdrop(self) -> None:
         return None
@@ -254,7 +257,6 @@ def _install_fake_ui(
         "labelframes": [],
         "canvases": [],
         "wheels": [],
-        "dropdowns": [],
         "layout_controls": [],
         "overlay_controls": [],
         "lightbar_controls": [],
@@ -360,11 +362,6 @@ def _install_fake_ui(
         registry["wheels"].append(wheel)
         return wheel
 
-    def fake_dropdown(**kwargs):
-        dropdown = _FakeDropdown(**kwargs)
-        registry["dropdowns"].append(dropdown)
-        return dropdown
-
     def fake_layout_controls(parent=None, *, editor):
         controls = _FakeLayoutSetupControls(parent, editor=editor)
         registry["layout_controls"].append(controls)
@@ -386,11 +383,10 @@ def _install_fake_ui(
 
     monkeypatch.setattr(editor_ui, "KeyboardCanvas", fake_keyboard_canvas)
     monkeypatch.setattr(editor_ui, "ColorWheel", fake_color_wheel)
-    monkeypatch.setattr(editor_ui, "UpwardListboxDropdown", fake_dropdown)
     monkeypatch.setattr(editor_ui, "LayoutSetupControls", fake_layout_controls)
     monkeypatch.setattr(editor_ui, "OverlayControls", fake_overlay_controls)
     monkeypatch.setattr(editor_ui, "LightbarControls", fake_lightbar_controls)
-    monkeypatch.setattr(editor_ui.profiles, "list_profiles", fake_list_profiles)
+    monkeypatch.setattr(profile_actions_ui.profiles, "list_profiles", fake_list_profiles)
     return registry
 
 

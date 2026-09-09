@@ -46,24 +46,6 @@ class _Root:
         return "after1"
 
 
-class _Style:
-    def __init__(self) -> None:
-        self.configured: list[tuple[str, dict[str, object]]] = []
-        self.mapped: list[tuple[str, dict[str, object]]] = []
-        self.fail_map = False
-
-    def configure(self, style_name: str, **kwargs: object) -> None:
-        self.configured.append((style_name, kwargs))
-
-    def lookup(self, style_name: str, option_name: str) -> str:
-        return "#222222"
-
-    def map(self, style_name: str, **kwargs: object) -> None:
-        if self.fail_map:
-            raise RuntimeError("map failed")
-        self.mapped.append((style_name, kwargs))
-
-
 class _Tk:
     def __init__(self) -> None:
         self.root = _Root()
@@ -81,14 +63,6 @@ class _Tk:
         return _Var(value)
 
 
-class _Ttk:
-    def __init__(self) -> None:
-        self.style = _Style()
-
-    def Style(self) -> _Style:
-        return self.style
-
-
 class _Config:
     def __init__(self) -> None:
         self.physical_layout = "ansi"
@@ -103,7 +77,6 @@ def test_initialize_editor_wires_state_ui_and_initial_selection(monkeypatch: pyt
     monkeypatch.setattr(bootstrap.dirty_state, "mark_saved", lambda editor: marked.append(editor))
 
     tk = _Tk()
-    ttk = _Ttk()
     app = SimpleNamespace(
         _detect_lightbar_device=lambda: True,
         _load_keymap=lambda: {"esc": ((0, 0),)},
@@ -114,7 +87,6 @@ def test_initialize_editor_wires_state_ui_and_initial_selection(monkeypatch: pyt
             SimpleNamespace(key_id="missing", slot_id="m"),
             SimpleNamespace(key_id="esc", slot_id="slot_esc"),
         ],
-        _reload_keymap=MagicMock(),
         select_slot_id=MagicMock(),
         _on_close=MagicMock(),
         canvas=SimpleNamespace(redraw=MagicMock()),
@@ -138,7 +110,6 @@ def test_initialize_editor_wires_state_ui_and_initial_selection(monkeypatch: pyt
     bootstrap.initialize_editor(
         app,
         tk=tk,
-        ttk=ttk,
         config_cls=_Config,
         profiles=profiles,
         apply_keyrgb_window_icon=lambda root: icon_calls.append(root),
@@ -146,12 +117,9 @@ def test_initialize_editor_wires_state_ui_and_initial_selection(monkeypatch: pyt
         compute_perkey_editor_min_content_size=lambda **kwargs: (800, 600),
         fit_perkey_editor_geometry_to_content=lambda root, **kwargs: geometry_fit_calls.append(kwargs),
         apply_clam_theme=lambda root, **kwargs: theme_calls.append(kwargs) or ("#111", "#eee"),
-        tk_call_errors=(RuntimeError,),
-        log_boundary_exception=MagicMock(),
         normalize_layout_legend_pack_fn=lambda layout, pack: f"{layout}:{pack or 'auto'}",
         initial_last_non_black_color=lambda color: (int(color[0]), int(color[1]), int(color[2])),
         load_profile_colors=lambda **kwargs: {(0, 0): (1, 2, 3)},
-        sanitize_keymap_cells=lambda *a, **k: {},
         per_key_commit_pipeline_cls=lambda **kwargs: SimpleNamespace(interval=kwargs.get("commit_interval_s")),
         get_keyboard=get_kb,
         build_ui_fn=build_ui,
@@ -164,7 +132,7 @@ def test_initialize_editor_wires_state_ui_and_initial_selection(monkeypatch: pyt
     assert app.root is tk.root
     assert app.root.title_text.startswith("KeyRGB")
     assert icon_calls == [app.root]
-    assert theme_calls and theme_calls[0]["include_checkbuttons"] is True
+    assert theme_calls == [{}]
     assert app.bg_color == "#111"
     assert app.fg_color == "#eee"
     assert app.profile_name == "Default"
@@ -186,23 +154,14 @@ def test_initialize_editor_wires_state_ui_and_initial_selection(monkeypatch: pyt
     app.canvas.redraw.assert_called()
     assert status_msgs == []  # keymap present
     app.select_slot_id.assert_called_once_with("slot_esc")
-    assert any(seq == "<FocusIn>" for seq, _ in app.root.binds)
-
-    # FocusIn binding reloads keymap
-    focus_cb = next(cb for seq, cb in app.root.binds if seq == "<FocusIn>")
-    focus_cb(None)
-    app._reload_keymap.assert_called_once()
+    assert all(seq != "<FocusIn>" for seq, _ in app.root.binds)
 
 
-def test_initialize_editor_handles_style_map_failure_and_empty_keymap(
+def test_initialize_editor_handles_missing_secondary_lighting_and_empty_keymap(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(bootstrap.dirty_state, "mark_saved", lambda _e: None)
-    logs: list[str] = []
     tk = _Tk()
-    ttk = _Ttk()
-    ttk.style.fail_map = True
-
     app = SimpleNamespace(
         _detect_lightbar_device=lambda: False,
         _load_keymap=dict,
@@ -210,7 +169,6 @@ def test_initialize_editor_handles_style_map_failure_and_empty_keymap(
         _load_per_key_layout_tweaks=dict,
         _load_layout_slot_overrides=dict,
         _get_visible_layout_keys=list,
-        _reload_keymap=MagicMock(),
         select_slot_id=MagicMock(),
         _on_close=MagicMock(),
         canvas=SimpleNamespace(redraw=MagicMock()),
@@ -247,7 +205,6 @@ def test_initialize_editor_handles_style_map_failure_and_empty_keymap(
     bootstrap.initialize_editor(
         app,
         tk=tk,
-        ttk=ttk,
         config_cls=_Config,
         profiles=profiles,
         apply_keyrgb_window_icon=lambda _r: None,
@@ -255,12 +212,9 @@ def test_initialize_editor_handles_style_map_failure_and_empty_keymap(
         compute_perkey_editor_min_content_size=lambda **_k: (1, 1),
         fit_perkey_editor_geometry_to_content=lambda _r, **_k: None,
         apply_clam_theme=lambda _r, **_k: ("#000", "#fff"),
-        tk_call_errors=(RuntimeError,),
-        log_boundary_exception=lambda key, msg, exc: logs.append(key),
         normalize_layout_legend_pack_fn=lambda *_a: "auto",
         initial_last_non_black_color=lambda c: (1, 1, 1),
         load_profile_colors=lambda **_k: {},
-        sanitize_keymap_cells=lambda *a, **k: {},
         per_key_commit_pipeline_cls=lambda **_k: object(),
         get_keyboard=lambda: None,
         build_ui_fn=lambda: None,
@@ -270,7 +224,6 @@ def test_initialize_editor_handles_style_map_failure_and_empty_keymap(
         num_cols=1,
     )
 
-    assert "perkey.editor.style_map" in logs
     assert app.secondary_lighting is None
     assert app.kb is None
     assert statuses == ["no-map"]

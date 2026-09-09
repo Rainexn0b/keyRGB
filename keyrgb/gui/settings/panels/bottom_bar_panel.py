@@ -4,6 +4,8 @@ import tkinter as tk
 from collections.abc import Callable
 from tkinter import ttk
 
+from keyrgb.gui.theme import metrics as theme_metrics
+
 _WRAPLENGTH_SYNC_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
 _TK_CALLBACK_SETUP_ERRORS = (RuntimeError, tk.TclError)
 
@@ -24,18 +26,20 @@ class BottomBarPanel:
         self.hardware_hint = ttk.Label(
             self.frame,
             text="",
-            font=("Sans", 9),
+            style=theme_metrics.STATUS_LABEL_STYLE,
             wraplength=820,
             justify="left",
             anchor="w",
         )
         self._hardware_hint_packed = False
 
-        self.status = ttk.Label(self.frame, text="", font=("Sans", 9))
+        self.status = ttk.Label(self.frame, text="", style=theme_metrics.STATUS_LABEL_STYLE)
         self.status.grid(row=0, column=1, sticky="w")
 
+        # Close stays on the default button style: Settings autosaves, so
+        # there is no primary save action and nothing destructive here.
         self.close_btn = ttk.Button(self.frame, text="Close", command=on_close)
-        self.close_btn.grid(row=0, column=2, sticky="e", padx=(12, 0))
+        self.close_btn.grid(row=0, column=2, sticky="e", padx=(theme_metrics.OUTER_PAD_X, 0))
 
         def _sync_wraplength(_e=None) -> None:
             try:
@@ -61,7 +65,7 @@ class BottomBarPanel:
         if text.strip():
             self.hardware_hint.configure(text=text)
             if not self._hardware_hint_packed:
-                self.hardware_hint.grid(row=0, column=0, sticky="ew", padx=(0, 12))
+                self.hardware_hint.grid(row=0, column=0, sticky="ew", padx=(0, theme_metrics.OUTER_PAD_X))
                 self._hardware_hint_packed = True
             return
 

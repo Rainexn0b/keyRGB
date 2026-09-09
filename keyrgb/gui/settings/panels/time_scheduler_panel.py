@@ -5,6 +5,8 @@ import tkinter as tk
 from collections.abc import Callable
 from tkinter import ttk
 
+from keyrgb.gui.theme import metrics as theme_metrics
+
 from ._wrap_sync import bind_wraplength_sync
 
 _LABEL_VALUE_ERRORS = (TypeError, ValueError, OverflowError)
@@ -49,8 +51,8 @@ class TimeSchedulerPanel:
         self._on_toggle = on_toggle
         self._scales: list[ttk.Scale] = []
 
-        title = ttk.Label(parent, text="Time-of-day brightness scheduler", font=("Sans", 11, "bold"))
-        title.pack(anchor="w", pady=(0, 6))
+        title = ttk.Label(parent, text="Time-of-day brightness scheduler", style=theme_metrics.SECTION_LABEL_STYLE)
+        title.pack(anchor="w", pady=(0, theme_metrics.CONTROL_GAP_Y))
 
         desc = ttk.Label(
             parent,
@@ -61,7 +63,7 @@ class TimeSchedulerPanel:
                 "During the day, plugged-in/battery brightness wins when configured; otherwise the scheduled "
                 "base brightness is used."
             ),
-            font=("Sans", 9),
+            style=theme_metrics.BODY_LABEL_STYLE,
             justify="left",
             wraplength=400,
         )
@@ -74,7 +76,7 @@ class TimeSchedulerPanel:
             variable=self.var_enabled,
             command=self._on_toggle,
         )
-        self.chk_enabled.pack(anchor="w", pady=(0, 6))
+        self.chk_enabled.pack(anchor="w", pady=(0, theme_metrics.CONTROL_GAP_Y))
 
         # Schedule row
         schedule_frame = ttk.Frame(parent)
@@ -82,7 +84,9 @@ class TimeSchedulerPanel:
         schedule_frame.columnconfigure(0, weight=1)
         schedule_frame.columnconfigure(2, weight=1)
 
-        ttk.Label(schedule_frame, text="Day starts at", font=("Sans", 9)).grid(row=0, column=0, sticky="w")
+        ttk.Label(schedule_frame, text="Day starts at", style=theme_metrics.BODY_LABEL_STYLE).grid(
+            row=0, column=0, sticky="w"
+        )
         self.ent_day_start = ttk.Entry(
             schedule_frame,
             textvariable=self.var_day_start,
@@ -93,7 +97,7 @@ class TimeSchedulerPanel:
         self.ent_day_start.bind("<Return>", day_commit)
         self.ent_day_start.bind("<FocusOut>", day_commit)
 
-        ttk.Label(schedule_frame, text="Night starts at", font=("Sans", 9)).grid(
+        ttk.Label(schedule_frame, text="Night starts at", style=theme_metrics.BODY_LABEL_STYLE).grid(
             row=0, column=2, sticky="e", padx=(12, 6)
         )
         self.ent_night_start = ttk.Entry(
@@ -187,9 +191,9 @@ class TimeSchedulerPanel:
         row_frame.pack(fill="x", pady=(3, 0))
         row_frame.columnconfigure(0, weight=1)
 
-        ttk.Label(row_frame, text=label, font=("Sans", 9)).grid(row=0, column=0, sticky="w")
+        ttk.Label(row_frame, text=label, style=theme_metrics.BODY_LABEL_STYLE).grid(row=0, column=0, sticky="w")
 
-        lbl_val = ttk.Label(row_frame, text=str(int(var.get())), font=("Sans", 9), width=3)
+        lbl_val = ttk.Label(row_frame, text=str(int(var.get())), style=theme_metrics.VALUE_LABEL_STYLE, width=3)
         lbl_val.grid(row=0, column=1, sticky="e", padx=(12, 0))
 
         _label_ref = lbl_val

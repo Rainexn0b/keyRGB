@@ -23,15 +23,18 @@ def test_launch_keymap_calibrator_uses_structural_repo_root_for_packaged_layout(
     (runtime_root / "keyrgb").mkdir(exist_ok=True)
 
     launch_calls: list[dict[str, object]] = []
+    process = object()
 
     def _fake_launch_module_subprocess(module_name: str, **kwargs):
         launch_calls.append({"module_name": module_name, **kwargs})
+        return process
 
     monkeypatch.setattr(calibrator_launch, "__file__", str(anchor))
     monkeypatch.setattr(calibrator_launch, "launch_module_subprocess", _fake_launch_module_subprocess)
 
-    calibrator_launch.launch_keymap_calibrator()
+    result = calibrator_launch.launch_keymap_calibrator()
 
+    assert result is process
     assert launch_calls == [
         {
             "module_name": "keyrgb.gui.calibrator",
