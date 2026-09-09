@@ -240,29 +240,88 @@ def on_layout_legend_pack_changed(app: _LayoutEditorAppProtocol) -> None:
     app.canvas.redraw()
 
 
-def hide_setup_panel(app: _LayoutEditorAppProtocol) -> None:
-    app._overlay_setup_panel.grid_remove()
-    app._layout_setup_controls.grid_remove()
+def _hide_setup_panel_legacy(app: _LayoutEditorAppProtocol) -> None:
+    try:
+        app._overlay_setup_panel.grid_remove()
+    except AttributeError:
+        pass
+    try:
+        app._layout_setup_controls.grid_remove()
+    except AttributeError:
+        pass
     lighting_areas_panel = vars(app).get("_lighting_areas_panel")
     if lighting_areas_panel is not None and bool(getattr(lighting_areas_panel, "should_show", True)):
-        lighting_areas_panel.grid()
+        try:
+            lighting_areas_panel.grid()
+        except (AttributeError, RuntimeError, TypeError, ValueError):
+            pass
+
+
+def hide_setup_panel(app: _LayoutEditorAppProtocol) -> None:
+    # UX-03: panels live permanently inside notebook tabs; hiding means
+    # selecting Profiles. The lighting-areas panel stays conditionally
+    # visible inside Advanced without hiding its tab.
     app._setup_panel_mode = None
+    if _layout_state.select_setup_panel_tab(app, _layout_state.tab_index_for_setup_mode(None)):
+        return
+    _hide_setup_panel_legacy(app)
 
 
 def show_setup_panel(app: _LayoutEditorAppProtocol, mode: str) -> None:
+    # UX-03 notebook path: select Setup/Advanced and keep overlay/lightbar
+    # sync semantics; the tab itself is never hidden.
+    previous_mode = app._setup_panel_mode
+    app._setup_panel_mode = mode
+    if _layout_state.select_setup_panel_tab(app, _layout_state.tab_index_for_setup_mode(mode)):
+        if mode == "overlay":
+            try:
+                app.overlay_controls.sync_vars_from_scope()
+            except AttributeError:
+                pass
+            lightbar_controls = _lightbar_controls_or_none(app)
+            if lightbar_controls is not None:
+                try:
+                    lightbar_controls.sync_vars_from_editor()
+                except AttributeError:
+                    pass
+        elif mode == "layout":
+            try:
+                app._refresh_layout_slot_controls()
+            except AttributeError:
+                pass
+        return
+    app._setup_panel_mode = previous_mode
     app._hide_setup_panel()
     lighting_areas_panel = vars(app).get("_lighting_areas_panel")
     if lighting_areas_panel is not None:
-        lighting_areas_panel.grid_remove()
+        try:
+            lighting_areas_panel.grid_remove()
+        except (AttributeError, RuntimeError, TypeError, ValueError):
+            pass
     if mode == "overlay":
-        app._overlay_setup_panel.grid()
-        app.overlay_controls.sync_vars_from_scope()
+        try:
+            app._overlay_setup_panel.grid()
+        except AttributeError:
+            pass
+        try:
+            app.overlay_controls.sync_vars_from_scope()
+        except AttributeError:
+            pass
         lightbar_controls = _lightbar_controls_or_none(app)
         if lightbar_controls is not None:
-            lightbar_controls.sync_vars_from_editor()
+            try:
+                lightbar_controls.sync_vars_from_editor()
+            except AttributeError:
+                pass
     elif mode == "layout":
-        app._layout_setup_controls.grid()
-        app._refresh_layout_slot_controls()
+        try:
+            app._layout_setup_controls.grid()
+        except AttributeError:
+            pass
+        try:
+            app._refresh_layout_slot_controls()
+        except AttributeError:
+            pass
     app._setup_panel_mode = mode
 
 

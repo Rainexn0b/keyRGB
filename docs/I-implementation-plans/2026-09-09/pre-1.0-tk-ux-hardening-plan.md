@@ -119,7 +119,7 @@ outcome.
 | UX-00 | Record the automated/manual UX baseline | P1 | S | done | none |
 | UX-01 | Reorganize Settings into clear categories/tabs | P0 | M | done | UX-00 |
 | UX-02 | Separate basic and advanced settings | P0 | M | done | UX-01 |
-| UX-03 | Simplify the per-key editor's default view | P2 | L | deferred | UX-01, UX-02, UX-05–UX-09, and dedicated UX discussion |
+| UX-03 | Simplify the per-key editor's default view | P2 | L | monitoring | UX-01, UX-02, UX-05–UX-09, and dedicated UX discussion |
 | UX-04 | Turn keyboard setup and calibration into a guided workflow | P2 | L | deferred | UX-03 direction and dedicated UX discussion |
 | UX-05 | Establish consistent spacing, typography, focus, and disabled contrast | P1 | M | done | UX-07 |
 | UX-06 | Persist and safely restore main-window geometry | P1 | M | done | UX-09 |
@@ -1195,3 +1195,53 @@ coverage.
 - The campaign is now at the UX-03 dedicated design-discussion gate. Production
   implementation remains deferred until an updated per-key editor screenshot
   and a low-fidelity default/setup/advanced layout direction are approved.
+
+### 2026-09-09 — UX-03 layout direction approved
+
+- The owner supplied an updated screenshot of the current Lighting Profile
+  Editor and approved the proposed default layout.
+- The canvas and compact paint rail remain always visible. The lower editor area
+  becomes a full-width native Notebook with Profiles, Setup, and Advanced tabs.
+- Profiles owns profile actions, default selection, and AC/battery policy. Setup
+  owns layout, legends, optional keys, and calibrator launch. Advanced owns
+  overlay alignment, lightbar/lighting areas, and backdrop image/transparency;
+  backdrop mode remains in the paint rail.
+- A visible unsaved indicator is approved. Save remains in Profiles with Ctrl+S
+  available globally. Existing profile formats, secondary-device routing,
+  selection state, and standalone calibration behavior remain unchanged.
+- The owner also reported size-only restores opening top-left. Commit `8cd8e0b0`
+  now centers validated/clamped size-only state while retaining explicit saved
+  coordinates where supported.
+- UX-03 became `active`; UX-04 remained deferred until the editor shell settled.
+
+### 2026-09-09 — UX-03 approved editor shell implemented
+
+- Replaced the competing bottom profile/setup regions and numbered right-rail
+  launchers with a full-width native Profiles, Setup, and Advanced notebook.
+  The keyboard canvas and compact paint rail remain visible while switching
+  tasks.
+- Profiles retains profile actions, default selection, and AC/battery policy.
+  Setup contains physical layout, legends, optional keys, and the existing
+  calibrator launch route. Advanced contains backdrop image/transparency,
+  overlay alignment, optional lightbar controls, and lighting areas.
+- Native tab clicks refresh layout, overlay, and lightbar state. Conditional
+  lighting areas retain their grid placement across profile activation, and the
+  Advanced tab expands to full width when no secondary areas are available.
+- Added a `Saved` / `● Unsaved` indicator driven by the existing in-memory dirty
+  snapshot. No profile fields or formats changed; immediately persisted backdrop
+  and AC/battery policy state remain outside that snapshot.
+- Geometry keeps the existing 0.92 screen cap and now includes notebook space in
+  its resize floor. Advanced content uses two columns to reduce vertical demand
+  at the approved screenshot resolution.
+- Validation:
+  - `.venv/bin/python -m pytest tests/gui -q -o addopts=`: `1108 passed`;
+  - Ruff and Ruff Format across the edited per-key sources/tests: passed (`112`
+    files formatted);
+  - `.venv/bin/python -m buildpython --run-steps=1,4,13,16,17,19,20`:
+    `7 passed`; architecture checked `24` rules across `619` files with zero
+    findings;
+  - `git diff --check`: passed;
+  - independent final review found no blocker-, high-, or medium-severity issue
+    after notebook synchronization and conditional-layout corrections.
+- UX-03 is `monitoring` pending an owner-visible restart and tab/resizing check.
+  UX-04 remains deferred until this shell is accepted.

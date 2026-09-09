@@ -133,12 +133,40 @@ class _FakeLayoutSetupControls:
         self.editor = editor
         self.grid_calls = []
         self.grid_remove_calls = 0
+        self.pack_calls = []
 
     def grid(self, **kwargs) -> None:
         self.grid_calls.append(dict(kwargs))
 
     def grid_remove(self) -> None:
         self.grid_remove_calls += 1
+
+    def pack(self, **kwargs) -> None:
+        self.pack_calls.append(dict(kwargs))
+
+
+class _FakeLightingAreasPanel(_FakeLayoutSetupControls):
+    def __init__(self, parent=None, *, editor, tk_module=None, ttk_module=None, **kwargs):
+        super().__init__(parent, editor=editor)
+        import os as _os
+
+        forced = getattr(editor, "_force_lighting_areas_visible", None)
+        if forced is not None:
+            self._should_show = bool(forced)
+        else:
+            self._should_show = _os.environ.get("KEYRGB_SIMULATE_SECONDARY_DEVICES") == "1"
+        # Mirror production LightingAreasPanel._grid_options: grid() with no
+        # args re-applies the canonical options instead of row 0 / col 0.
+        self._grid_options: dict[str, object] = {}
+
+    @property
+    def should_show(self) -> bool:
+        return bool(self._should_show)
+
+    def grid(self, **kwargs) -> None:
+        if kwargs:
+            self._grid_options = dict(kwargs)
+        self.grid_calls.append(dict(self._grid_options))
 
 
 class _FakeOverlayControls(_FakeLayoutSetupControls):
@@ -177,6 +205,8 @@ class _FakeEditor:
         self._battery_power_source_profile_var = _FakeVar("Keep current profile")
         self._save_power_source_profile_policy_calls = 0
         self._on_backdrop_mode_changed_calls = 0
+        self._setup_panel_mode: str | None = None
+        self._show_setup_panel_calls: list[str] = []
 
     def _on_backdrop_mode_changed(self, _event=None) -> None:
         self._on_backdrop_mode_changed_calls += 1
@@ -213,6 +243,10 @@ class _FakeEditor:
 
     def _hide_setup_panel(self) -> None:
         return None
+
+    def _show_setup_panel(self, mode: str) -> None:
+        self._setup_panel_mode = str(mode)
+        self._show_setup_panel_calls.append(str(mode))
 
     def _run_calibrator(self) -> None:
         return None
@@ -260,6 +294,8 @@ def _install_fake_ui(
         "layout_controls": [],
         "overlay_controls": [],
         "lightbar_controls": [],
+        "lighting_areas_panels": [],
+        "notebooks": [],
         "profiles_list_calls": 0,
     }
 
@@ -326,6 +362,54 @@ def _install_fake_ui(
             super().__init__(parent, **kwargs)
             registry["separators"].append(self)
 
+    class FakeNotebook(_FakeWidget):
+        def __init__(self, parent=None, **kwargs):
+            super().__init__(parent, **kwargs)
+            self.tabs: list[tuple[object, str | None]] = []
+            self.select_calls: list[object] = []
+            self.selected: object = None
+            self.selected_index: int = 0
+            registry["notebooks"].append(self)
+
+        def add(self, child, **kwargs) -> None:
+            self.tabs.append((child, kwargs.get("text")))
+            if self.selected is None:
+                self.selected = child
+                self.selected_index = 0
+
+        def _widget_to_index(self, widget: object) -> int:
+            for pos, (child, _text) in enumerate(self.tabs):
+                if child is widget or child == widget:
+                    return pos
+            try:
+                pos = int(widget)  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                raise ValueError(f"unknown notebook tab: {widget!r}")
+            if 0 <= pos < len(self.tabs):
+                return pos
+            raise ValueError(f"unknown notebook tab: {widget!r}")
+
+        def select(self, tab_id=None):
+            if tab_id is None:
+                return self.selected
+            if isinstance(tab_id, int) and not isinstance(tab_id, bool):
+                pos = int(tab_id)
+                if not 0 <= pos < len(self.tabs):
+                    raise ValueError(f"unknown notebook tab: {tab_id!r}")
+            else:
+                pos = self._widget_to_index(tab_id)
+            self.select_calls.append(pos)
+            self.selected_index = pos
+            self.selected = self.tabs[pos][0]
+            return self.selected
+
+        def index(self, tab_id=None) -> int:
+            if tab_id is None or (isinstance(tab_id, str) and tab_id == "current"):
+                return int(self.selected_index)
+            if isinstance(tab_id, int) and not isinstance(tab_id, bool):
+                return int(tab_id)
+            return int(self._widget_to_index(tab_id))
+
     monkeypatch.setattr(
         editor_ui,
         "ttk",
@@ -339,6 +423,7 @@ def _install_fake_ui(
             Radiobutton=FakeRadiobutton,
             Combobox=FakeCombobox,
             Separator=FakeSeparator,
+            Notebook=FakeNotebook,
         ),
     )
     monkeypatch.setattr(
@@ -377,6 +462,11 @@ def _install_fake_ui(
         registry["lightbar_controls"].append(controls)
         return controls
 
+    def fake_lighting_areas_panel(parent=None, *, editor, tk_module=None, ttk_module=None, **kwargs):
+        panel = _FakeLightingAreasPanel(parent, editor=editor, tk_module=tk_module, ttk_module=ttk_module, **kwargs)
+        registry["lighting_areas_panels"].append(panel)
+        return panel
+
     def fake_list_profiles() -> list[str]:
         registry["profiles_list_calls"] += 1
         return ["default", "gaming", "movie"]
@@ -386,6 +476,7 @@ def _install_fake_ui(
     monkeypatch.setattr(editor_ui, "LayoutSetupControls", fake_layout_controls)
     monkeypatch.setattr(editor_ui, "OverlayControls", fake_overlay_controls)
     monkeypatch.setattr(editor_ui, "LightbarControls", fake_lightbar_controls)
+    monkeypatch.setattr(editor_ui, "LightingAreasPanel", fake_lighting_areas_panel)
     monkeypatch.setattr(profile_actions_ui.profiles, "list_profiles", fake_list_profiles)
     return registry
 
@@ -397,6 +488,7 @@ def _build_ui(
     frame_width: int = 360,
     color_wheel_reqwidth: int = 0,
     has_lightbar_device: bool = False,
+    lighting_areas_visible: bool | None = None,
 ):
     registry = _install_fake_ui(
         monkeypatch,
@@ -407,5 +499,7 @@ def _build_ui(
     editor = _FakeEditor(root)
     editor.has_lightbar_device = has_lightbar_device
     editor.lightbar_overlay = {"visible": True, "length": 0.72}
+    if lighting_areas_visible is not None:
+        editor._force_lighting_areas_visible = bool(lighting_areas_visible)
     editor_ui.build_editor_ui(editor)
     return editor, root, registry

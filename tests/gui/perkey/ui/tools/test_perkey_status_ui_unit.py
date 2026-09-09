@@ -38,15 +38,79 @@ class DummyLabel:
         self.text = text
 
 
+class DummyUnsavedLabel(DummyLabel):
+    pass
+
+
 class DummyEditor:
     def __init__(self):
         self.status_label = DummyLabel()
+
+
+def _dirty_capable_editor() -> DummyEditor:
+    from types import SimpleNamespace
+
+    editor = SimpleNamespace(
+        status_label=DummyLabel(),
+        _unsaved_label=DummyUnsavedLabel(),
+        colors={(0, 0): (1, 2, 3)},
+        keymap={},
+        layout_tweaks={},
+        per_key_layout_tweaks={},
+        layout_slot_overrides={},
+        lightbar_overlay={},
+        secondary_lighting=None,
+        _physical_layout="us",
+        _layout_legend_pack="default",
+    )
+    return editor  # type: ignore[return-value]
 
 
 def test_set_status_sets_label_text() -> None:
     ed = DummyEditor()
     set_status(ed, "hello")
     assert ed.status_label.text == "hello"
+
+
+def test_set_status_refreshes_unsaved_indicator_saved() -> None:
+    from keyrgb.gui.perkey.editor_support import dirty_state
+
+    ed = _dirty_capable_editor()
+    dirty_state.mark_saved(ed)
+    assert ed._unsaved_label.text == "Saved"
+    set_status(ed, "hello")
+    assert ed.status_label.text == "hello"
+    assert ed._unsaved_label.text == "Saved"
+
+
+def test_set_status_refreshes_unsaved_indicator_dirty() -> None:
+    from keyrgb.gui.perkey.editor_support import dirty_state
+
+    ed = _dirty_capable_editor()
+    dirty_state.mark_saved(ed)
+    ed.colors[(0, 0)] = (9, 9, 9)
+    set_status(ed, "Filled all keys = RGB(9,9,9)")
+    assert ed.status_label.text == "Filled all keys = RGB(9,9,9)"
+    assert ed._unsaved_label.text == "\u25cf Unsaved"
+
+
+def test_set_status_tolerates_missing_unsaved_label() -> None:
+    ed = DummyEditor()
+    set_status(ed, "hello")
+    assert ed.status_label.text == "hello"
+    set_status(object(), "hello")
+
+
+def test_set_status_tolerates_missing_status_label_but_refreshes_unsaved() -> None:
+    from types import SimpleNamespace
+
+    from keyrgb.gui.perkey.editor_support import dirty_state
+
+    label = DummyUnsavedLabel()
+    ed = SimpleNamespace(_unsaved_label=label)
+    dirty_state.mark_saved(ed)
+    set_status(ed, "hello")
+    assert label.text == "Saved"
 
 
 def test_messages_match_existing_strings() -> None:

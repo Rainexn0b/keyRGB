@@ -2,7 +2,22 @@
 
 from __future__ import annotations
 
+import tkinter as tk
 from collections.abc import Callable, Mapping
+from typing import Protocol, cast
+
+SAVED_TEXT = "Saved"
+UNSAVED_TEXT = "\u25cf Unsaved"
+
+_UNSAVED_LABEL_ERRORS = (AttributeError, RuntimeError, TypeError, ValueError, tk.TclError)
+
+
+class _UnsavedLabelProtocol(Protocol):
+    def config(self, *, text: str) -> None: ...
+
+
+class _UnsavedLabelOwner(Protocol):
+    _unsaved_label: _UnsavedLabelProtocol
 
 
 def _freeze(value: object) -> object:
@@ -32,6 +47,7 @@ def saved_snapshot(editor: object) -> tuple[object, ...]:
 
 def mark_saved(editor: object) -> None:
     vars(editor)["_saved_snapshot"] = saved_snapshot(editor)
+    refresh_unsaved_indicator(editor)
 
 
 def is_dirty(editor: object) -> bool:
@@ -40,6 +56,31 @@ def is_dirty(editor: object) -> bool:
     if saved is missing:
         return False
     return saved_snapshot(editor) != saved
+
+
+def _unsaved_label_or_none(editor: object) -> _UnsavedLabelProtocol | None:
+    try:
+        label = cast(_UnsavedLabelOwner, editor)._unsaved_label
+    except (AttributeError, RuntimeError, TypeError, ValueError):
+        return None
+    if label is None:
+        return None
+    return label
+
+
+def refresh_unsaved_indicator(editor: object) -> None:
+    """Show ``Saved`` when the snapshot matches, ``● Unsaved`` when dirty."""
+    label = _unsaved_label_or_none(editor)
+    if label is None:
+        return
+    try:
+        text = UNSAVED_TEXT if is_dirty(editor) else SAVED_TEXT
+    except (AttributeError, RuntimeError, TypeError, ValueError):
+        return
+    try:
+        label.config(text=text)
+    except _UNSAVED_LABEL_ERRORS:
+        return
 
 
 def confirm_destructive_action(
@@ -77,4 +118,12 @@ def confirm_destructive_action(
     return True
 
 
-__all__ = ["confirm_destructive_action", "is_dirty", "mark_saved", "saved_snapshot"]
+__all__ = [
+    "SAVED_TEXT",
+    "UNSAVED_TEXT",
+    "confirm_destructive_action",
+    "is_dirty",
+    "mark_saved",
+    "refresh_unsaved_indicator",
+    "saved_snapshot",
+]

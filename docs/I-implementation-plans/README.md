@@ -22,8 +22,9 @@ specs for larger changes.
   categorized Settings and shared visual, spacing, contrast, and focus behavior
   and native per-key controls are complete; duplicate-instance prevention is
   complete, including geometry persistence and keyboard access accepted in an
-  owner desktop walkthrough; the per-key editor/calibration redesign remains
-  explicitly deferred pending dedicated UX discussion
+  owner desktop walkthrough; the approved per-key editor notebook redesign is
+  monitoring, while the guided calibration workflow remains deferred until that
+  shell is accepted
 - `2026-08-11/architecture-concerns-plan.md` — confirmation and remediation
   tracker for the 2026-08-11 architecture review; one finding per pass, with
   test-first contracts and explicit confirmed/rejected status

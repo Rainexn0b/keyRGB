@@ -20,6 +20,29 @@ _LIGHTBAR_DISCOVERY_ERRORS = (
     ValueError,
 )
 
+# UX-03 editor shell: notebook tab order is Profiles, Setup, Advanced.
+# _setup_panel_mode maps to the selected tab: None -> Profiles (0),
+# "layout" -> Setup (1), "overlay" -> Advanced (2).
+SETUP_PANEL_TAB_INDEX_FOR_MODE: dict[str | None, int] = {
+    None: 0,
+    "layout": 1,
+    "overlay": 2,
+}
+
+_TAB_SELECT_ERRORS: tuple[type[Exception], ...]
+try:  # pragma: no cover - tkinter is always available in the editor runtime
+    import tkinter as _tk_for_tab_errors
+
+    _TAB_SELECT_ERRORS = (
+        AttributeError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+        _tk_for_tab_errors.TclError,
+    )
+except ImportError:  # pragma: no cover - headless fallback without TclError
+    _TAB_SELECT_ERRORS = (AttributeError, RuntimeError, TypeError, ValueError)
+
 LayoutSlotOverrides = dict[str, dict[str, object]]
 LayoutTweaks = dict[str, float]
 PerKeyLayoutTweaks = dict[str, dict[str, float]]
@@ -86,6 +109,12 @@ class _CollectDeviceDiscoveryFn(Protocol):
     def __call__(self, *, include_usb: bool) -> Mapping[str, object]: ...
 
 
+class _NotebookProtocol(Protocol):
+    def select(self, tab_id: object = ...) -> None: ...
+
+    def add(self, child: object, **kwargs: object) -> None: ...
+
+
 class _LayoutEditorAppProtocol(Protocol):
     profile_name: str
     _physical_layout: str
@@ -103,6 +132,7 @@ class _LayoutEditorAppProtocol(Protocol):
     _overlay_setup_panel: _GridPanelProtocol
     _layout_setup_controls: _GridPanelProtocol
     _lighting_areas_panel: _GridPanelProtocol
+    _editor_notebook: _NotebookProtocol
     overlay_controls: _OverlayControlsProtocol
     canvas: _CanvasProtocol
 
@@ -297,6 +327,26 @@ def load_per_key_layout_tweaks(
     profiles_module: _LoadPerKeyLayoutTweaksProfilesProtocol = profiles,
 ) -> PerKeyLayoutTweaks:
     return profiles_module.load_layout_per_key(app.profile_name, physical_layout=app._physical_layout)
+
+
+def tab_index_for_setup_mode(mode: str | None) -> int:
+    """Map a setup-panel mode to its UX-03 notebook tab index."""
+
+    return SETUP_PANEL_TAB_INDEX_FOR_MODE.get(mode, 0)
+
+
+def select_setup_panel_tab(app: object, index: int) -> bool:
+    """Select a notebook tab by index; False when no notebook is present."""
+
+    notebook = vars(app).get("_editor_notebook")
+    select = getattr(notebook, "select", None)
+    if notebook is None or not callable(select):
+        return False
+    try:
+        select(index)
+    except _TAB_SELECT_ERRORS:
+        return False
+    return True
 
 
 def detect_lightbar_device(

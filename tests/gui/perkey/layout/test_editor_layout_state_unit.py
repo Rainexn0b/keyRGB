@@ -304,6 +304,49 @@ def test_setup_panel_toggle_and_show_hide() -> None:
     assert app._setup_panel_mode is None
 
 
+def test_setup_panel_tab_index_mapping() -> None:
+    assert layout_state_mod.tab_index_for_setup_mode(None) == 0
+    assert layout_state_mod.tab_index_for_setup_mode("layout") == 1
+    assert layout_state_mod.tab_index_for_setup_mode("overlay") == 2
+    assert layout_state_mod.tab_index_for_setup_mode("unknown") == 0
+
+
+def test_setup_panel_notebook_selection_keeps_sync_semantics() -> None:
+    app = _make_app()
+
+    class _Notebook:
+        def __init__(self) -> None:
+            self.select_calls: list[object] = []
+
+        def select(self, tab_id=None):
+            if tab_id is None:
+                return None
+            self.select_calls.append(tab_id)
+            return tab_id
+
+    app._editor_notebook = _Notebook()  # type: ignore[attr-defined]
+    overlay_grid = app._overlay_setup_panel.grid_calls
+    layout_grid = app._layout_setup_controls.grid_calls
+
+    layout_mod.show_setup_panel(app, "overlay")
+    assert app._setup_panel_mode == "overlay"
+    assert app._editor_notebook.select_calls == [2]
+    app.overlay_controls.sync_vars_from_scope.assert_called()
+    app.lightbar_controls.sync_vars_from_editor.assert_called()
+    # Notebook path never hides panels via grid_remove.
+    assert app._overlay_setup_panel.grid_calls == overlay_grid
+    assert app._layout_setup_controls.grid_calls == layout_grid
+
+    layout_mod.show_setup_panel(app, "layout")
+    assert app._setup_panel_mode == "layout"
+    assert app._editor_notebook.select_calls == [2, 1]
+    app._refresh_layout_slot_controls.assert_called()
+
+    layout_mod.hide_setup_panel(app)
+    assert app._setup_panel_mode is None
+    assert app._editor_notebook.select_calls == [2, 1, 0]
+
+
 def test_sync_layout_legend_pack_ui_and_helpers() -> None:
     app = _make_app()
     logs: list[str] = []

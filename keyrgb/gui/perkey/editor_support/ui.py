@@ -49,7 +49,17 @@ def build_editor_ui(editor) -> None:
         anchor="w",
         justify="left",
     )
-    editor.status_label.pack(fill="x")
+    editor.status_label.pack(side="left", fill="x", expand=True)
+
+    # UX-03 visible unsaved indicator: compact pill beside the status text.
+    editor._unsaved_label = ttk.Label(
+        status_row,
+        text="Saved",
+        style=theme_metrics.STATUS_LABEL_STYLE,
+        anchor="e",
+        justify="right",
+    )
+    editor._unsaved_label.pack(side="right", padx=(8, 0))
 
     def _sync_status_wrap(_e=None) -> None:
         try:
@@ -107,33 +117,6 @@ def build_editor_ui(editor) -> None:
         "<<ComboboxSelected>>",
         lambda _e: _set_backdrop_mode_from_label(editor, editor._backdrop_mode_combo.get()),
     )
-
-    backdrop_buttons = ttk.Frame(right)
-    backdrop_buttons.pack(fill="x", pady=(0, 10))
-    backdrop_buttons.columnconfigure(0, weight=1)
-    backdrop_buttons.columnconfigure(1, weight=1)
-    ttk.Button(backdrop_buttons, text="Set Backdrop...", command=editor._set_backdrop).grid(
-        row=0,
-        column=0,
-        sticky="ew",
-        padx=(0, 6),
-    )
-    ttk.Button(backdrop_buttons, text="Reset Backdrop", command=editor._reset_backdrop).grid(
-        row=0,
-        column=1,
-        sticky="ew",
-        padx=(6, 0),
-    )
-
-    ttk.Label(right, text="Backdrop transparency", style=theme_metrics.BODY_LABEL_STYLE).pack(anchor="w", pady=(0, 4))
-    ttk.Scale(
-        right,
-        from_=0,
-        to=100,
-        orient="horizontal",
-        variable=editor.backdrop_transparency,
-        command=editor._on_backdrop_transparency_changed,
-    ).pack(fill="x", pady=(0, 10))
 
     initial = editor._last_non_black_color
     editor.color_wheel = ColorWheel(
@@ -202,32 +185,47 @@ def build_editor_ui(editor) -> None:
         style=theme_metrics.DESTRUCTIVE_BUTTON_STYLE,
     ).pack(fill="x", pady=(0, theme_metrics.CONTROL_GAP_Y))
 
-    _divider(btns, "Setup")
-    ttk.Button(btns, text="1. Keyboard Setup", command=editor._toggle_layout_setup).pack(
-        fill="x", pady=(0, theme_metrics.CONTROL_GAP_Y)
-    )
-    ttk.Button(btns, text="2. Keymap Calibrator", command=editor._run_calibrator).pack(
-        fill="x", pady=(0, theme_metrics.CONTROL_GAP_Y)
-    )
-    ttk.Button(btns, text="3. Overlay Alignment", command=editor._toggle_overlay).pack(
-        fill="x", pady=(0, theme_metrics.CONTROL_GAP_Y)
-    )
+    # UX-03 editor shell: notebook below the top content spans canvas+rail
+    # full width. Tabs are Profiles, Setup, Advanced in that order.
+    editor._editor_notebook = ttk.Notebook(main)
+    editor._editor_notebook.pack(fill="x", pady=(12, 0))
 
-    extras = ttk.Frame(left)
-    extras.grid(row=1, column=0, sticky="ew", pady=(12, 0))
-    extras.rowconfigure(0, weight=1)
-    extras.columnconfigure(0, weight=1, uniform="perkey_bottom")
-    extras.columnconfigure(1, weight=1, uniform="perkey_bottom")
+    editor._profiles_tab = ttk.Frame(editor._editor_notebook)
+    editor._setup_tab = ttk.Frame(editor._editor_notebook)
+    editor._advanced_tab = ttk.Frame(editor._editor_notebook)
+    editor._editor_notebook.add(editor._profiles_tab, text="Profiles")
+    editor._editor_notebook.add(editor._setup_tab, text="Setup")
+    editor._editor_notebook.add(editor._advanced_tab, text="Advanced")
+    editor._profiles_tab.columnconfigure(0, weight=1)
+    editor._setup_tab.columnconfigure(0, weight=1)
+    editor._advanced_tab.columnconfigure(0, weight=1)
+    editor._advanced_tab.columnconfigure(1, weight=1)
 
-    extras_profiles = ttk.Frame(extras)
-    extras_profiles.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
-    extras_setup = ttk.Frame(extras)
-    extras_setup.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
+    def _on_editor_tab_changed(_event: object) -> None:
+        try:
+            selected_index = int(editor._editor_notebook.index(editor._editor_notebook.select()))
+        except _STATUS_WRAP_SYNC_ERRORS:
+            return
+        # Guard against re-entrant select() events: programmatic
+        # _show_setup_panel() re-selects the same tab, which may emit
+        # <<NotebookTabChanged>> again. Skip the redundant sync.
+        if selected_index == 1:
+            if vars(editor).get("_setup_panel_mode") == "layout":
+                return
+            editor._show_setup_panel("layout")
+        elif selected_index == 2:
+            if vars(editor).get("_setup_panel_mode") == "overlay":
+                return
+            editor._show_setup_panel("overlay")
+        else:
+            editor._setup_panel_mode = None
 
-    extras_profiles.columnconfigure(0, weight=1)
-    extras_setup.columnconfigure(0, weight=1)
+    try:
+        editor._editor_notebook.bind("<<NotebookTabChanged>>", _on_editor_tab_changed, add="+")
+    except _TK_CALLBACK_SETUP_ERRORS:
+        pass
 
-    editor._profiles_frame = ttk.LabelFrame(extras_profiles, text="Lighting profiles", padding=10)
+    editor._profiles_frame = ttk.LabelFrame(editor._profiles_tab, text="Lighting profiles", padding=10)
     editor._profiles_frame.grid(row=0, column=0, sticky="nsew")
     editor._profiles_frame.columnconfigure(1, weight=1)
 
@@ -304,14 +302,43 @@ def build_editor_ui(editor) -> None:
     )
     profile_action_ui.sync_power_source_profile_policy_controls(editor, profile_names_snapshot)
 
-    editor._layout_setup_controls = LayoutSetupControls(extras_setup, editor=editor)
+    editor._layout_setup_controls = LayoutSetupControls(editor._setup_tab, editor=editor)
     editor._layout_setup_controls.grid(row=0, column=0, sticky="nsew")
-    editor._layout_setup_controls.grid_remove()
+    ttk.Button(
+        editor._setup_tab,
+        text="Run Keymap Calibrator",
+        command=editor._run_calibrator,
+    ).grid(row=1, column=0, sticky="ew", pady=(10, 0))
 
-    editor._overlay_setup_panel = ttk.Frame(extras_setup)
-    editor._overlay_setup_panel.grid(row=0, column=0, sticky="nsew")
+    editor._advanced_backdrop_frame = ttk.LabelFrame(editor._advanced_tab, text="Backdrop", padding=10)
+    editor._advanced_backdrop_frame.columnconfigure(0, weight=1)
+    editor._advanced_backdrop_frame.columnconfigure(1, weight=1)
+    ttk.Button(
+        editor._advanced_backdrop_frame,
+        text="Set Backdrop...",
+        command=editor._set_backdrop,
+    ).grid(row=0, column=0, sticky="ew", padx=(0, 6))
+    ttk.Button(
+        editor._advanced_backdrop_frame,
+        text="Reset Backdrop",
+        command=editor._reset_backdrop,
+    ).grid(row=0, column=1, sticky="ew", padx=(6, 0))
+    ttk.Label(
+        editor._advanced_backdrop_frame,
+        text="Backdrop transparency",
+        style=theme_metrics.BODY_LABEL_STYLE,
+    ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(10, 0))
+    ttk.Scale(
+        editor._advanced_backdrop_frame,
+        from_=0,
+        to=100,
+        orient="horizontal",
+        variable=editor.backdrop_transparency,
+        command=editor._on_backdrop_transparency_changed,
+    ).grid(row=2, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+
+    editor._overlay_setup_panel = ttk.Frame(editor._advanced_tab)
     editor._overlay_setup_panel.columnconfigure(0, weight=1)
-    editor._overlay_setup_panel.grid_remove()
 
     editor.overlay_controls = OverlayControls(editor._overlay_setup_panel, editor=editor)
     editor.overlay_controls.grid(row=0, column=0, sticky="nsew")
@@ -321,12 +348,19 @@ def build_editor_ui(editor) -> None:
         editor.lightbar_controls = LightbarControls(editor._overlay_setup_panel, editor=editor)
         editor.lightbar_controls.grid(row=1, column=0, sticky="ew", pady=(10, 0))
 
-    editor._lighting_areas_panel = LightingAreasPanel(extras_setup, editor=editor, tk_module=tk, ttk_module=ttk)
-    if editor._lighting_areas_panel.should_show:
-        editor._lighting_areas_panel.grid(row=0, column=0, sticky="nsew")
-        ttk.Button(btns, text="4. Lighting Areas", command=editor._hide_setup_panel).pack(
-            fill="x", pady=(0, theme_metrics.CONTROL_GAP_Y)
-        )
+    editor._lighting_areas_panel = LightingAreasPanel(editor._advanced_tab, editor=editor, tk_module=tk, ttk_module=ttk)
+    # H1: always record the canonical two-column grid options so a later
+    # sync_from_editor() re-show (grid() with no args) restores column 1
+    # instead of overlapping the backdrop at row 0 / column 0.
+    editor._lighting_areas_panel.grid(row=0, column=1, rowspan=2, sticky="nsew", padx=(6, 0))
+    if not editor._lighting_areas_panel.should_show:
+        editor._lighting_areas_panel.grid_remove()
+        editor._advanced_tab.columnconfigure(1, weight=0)
+        editor._advanced_backdrop_frame.grid(row=0, column=0, columnspan=2, sticky="nsew")
+        editor._overlay_setup_panel.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(10, 0))
+    else:
+        editor._advanced_backdrop_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+        editor._overlay_setup_panel.grid(row=1, column=0, sticky="nsew", pady=(10, 0), padx=(0, 6))
 
     editor.overlay_controls.sync_vars_from_scope()
     if editor.lightbar_controls is not None:

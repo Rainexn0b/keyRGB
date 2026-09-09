@@ -6,15 +6,69 @@ from keyrgb.gui.theme.focus import INITIAL_FOCUS_DELAY_MS
 from tests.gui.perkey.editor.ui._editor_ui_fakes import _build_ui
 
 
-def test_build_editor_ui_shows_lighting_areas_button_only_with_secondaries(
+def test_build_editor_ui_shows_lighting_areas_panel_only_with_secondaries(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("KEYRGB_SIMULATE_SECONDARY_DEVICES", "1")
 
-    _editor, _root, registry = _build_ui(monkeypatch)
+    editor, _root, registry = _build_ui(monkeypatch)
 
     button_texts = [button.options["text"] for button in registry["buttons"]]
-    assert "4. Lighting Areas" in button_texts
+    assert "4. Lighting Areas" not in button_texts
+    assert not any(text.startswith(("1.", "2.", "3.", "4.")) for text in button_texts)
+
+    panel = editor._lighting_areas_panel
+    assert panel is registry["lighting_areas_panels"][0]
+    assert panel.parent is editor._advanced_tab
+    assert panel.should_show is True
+    # M2: two-column Advanced layout keeps lighting areas on the right.
+    assert panel.grid_calls == [{"row": 0, "column": 1, "rowspan": 2, "sticky": "nsew", "padx": (6, 0)}]
+    assert panel.grid_remove_calls == 0
+    assert editor._advanced_tab.columnconfigure_calls == [
+        {"index": 0, "weight": 1},
+        {"index": 1, "weight": 1},
+    ]
+    assert editor._advanced_backdrop_frame.grid_calls == [{"row": 0, "column": 0, "sticky": "nsew", "padx": (0, 6)}]
+    assert editor._overlay_setup_panel.grid_calls == [
+        {"row": 1, "column": 0, "sticky": "nsew", "pady": (10, 0), "padx": (0, 6)}
+    ]
+    # The Advanced tab itself is never hidden when the panel is conditional.
+    assert len(registry["notebooks"]) == 1
+    assert [text for _child, text in registry["notebooks"][0].tabs] == [
+        "Profiles",
+        "Setup",
+        "Advanced",
+    ]
+
+
+def test_build_editor_ui_hides_lighting_areas_panel_without_secondaries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("KEYRGB_SIMULATE_SECONDARY_DEVICES", raising=False)
+
+    editor, _root, registry = _build_ui(monkeypatch)
+
+    panel = editor._lighting_areas_panel
+    assert panel.should_show is False
+    # H1: canonical options are recorded even when hidden so a later
+    # sync_from_editor() re-show cannot overlap row 0 / column 0.
+    assert panel.grid_calls == [{"row": 0, "column": 1, "rowspan": 2, "sticky": "nsew", "padx": (6, 0)}]
+    assert panel.grid_remove_calls == 1
+    assert panel._grid_options == {"row": 0, "column": 1, "rowspan": 2, "sticky": "nsew", "padx": (6, 0)}
+    # Re-show with no args must retain the canonical right-column placement.
+    panel.grid()
+    assert panel.grid_calls[-1] == {"row": 0, "column": 1, "rowspan": 2, "sticky": "nsew", "padx": (6, 0)}
+    # Hidden branch: the left column spans both columns and column 1 is unweighted.
+    assert editor._advanced_tab.columnconfigure_calls == [
+        {"index": 0, "weight": 1},
+        {"index": 1, "weight": 1},
+        {"index": 1, "weight": 0},
+    ]
+    assert editor._advanced_backdrop_frame.grid_calls == [{"row": 0, "column": 0, "columnspan": 2, "sticky": "nsew"}]
+    assert editor._overlay_setup_panel.grid_calls == [
+        {"row": 1, "column": 0, "columnspan": 2, "sticky": "nsew", "pady": (10, 0)}
+    ]
+    assert len(registry["notebooks"]) == 1
 
 
 def test_build_editor_ui_adds_lightbar_controls_when_lightbar_is_detected(

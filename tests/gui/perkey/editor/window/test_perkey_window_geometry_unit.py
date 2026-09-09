@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from keyrgb.gui.perkey.window_geometry import (
+    NOTEBOOK_EXTRA_HEIGHT_PX,
     apply_perkey_editor_geometry,
     compute_perkey_editor_min_content_size,
     fit_perkey_editor_geometry_to_content,
@@ -86,10 +87,11 @@ def test_apply_perkey_editor_geometry_uses_keyboard_math_chrome_padding_and_scal
 
     w0, h0, w, h = _expected_sizes(screen_w=2000, screen_h=1600, **params)
 
-    assert (w0, h0) == (924, 564)
-    assert (w, h) == (1386, 846)
-    assert root.geometry_calls == ["1386x846+307+377"]
-    assert root.minsize_calls == [(924, 564)]
+    assert NOTEBOOK_EXTRA_HEIGHT_PX == 260
+    assert (w0, h0) == (924, 564 + NOTEBOOK_EXTRA_HEIGHT_PX)
+    assert (w, h) == (1386, 1236)
+    assert root.geometry_calls == ["1386x1236+307+182"]
+    assert root.minsize_calls == [(924, 824)]
 
 
 def test_apply_perkey_editor_geometry_includes_right_panel_width_in_window_width() -> None:
@@ -111,8 +113,8 @@ def test_apply_perkey_editor_geometry_includes_right_panel_width_in_window_width
     no_panel_width = int(no_panel_root.geometry_calls[0].split("x", 1)[0])
     with_panel_width = int(with_panel_root.geometry_calls[0].split("x", 1)[0])
 
-    assert no_panel_root.minsize_calls == [(644, 564)]
-    assert with_panel_root.minsize_calls == [(924, 564)]
+    assert no_panel_root.minsize_calls == [(644, 564 + NOTEBOOK_EXTRA_HEIGHT_PX)]
+    assert with_panel_root.minsize_calls == [(924, 564 + NOTEBOOK_EXTRA_HEIGHT_PX)]
     assert with_panel_width - no_panel_width == 420
 
 
@@ -133,10 +135,10 @@ def test_apply_perkey_editor_geometry_uses_wheel_height_minimum_when_taller() ->
 
     w0, h0, w, h = _expected_sizes(screen_w=2000, screen_h=1500, **params)
 
-    assert (w0, h0) == (403, 720)
-    assert (w, h) == (604, 1080)
-    assert root.geometry_calls == ["604x1080+698+210"]
-    assert root.minsize_calls == [(403, 720)]
+    assert (w0, h0) == (403, 720 + NOTEBOOK_EXTRA_HEIGHT_PX)
+    assert (w, h) == (604, 1380)
+    assert root.geometry_calls == ["604x1380+698+60"]
+    assert root.minsize_calls == [(403, 980)]
 
 
 def test_apply_perkey_editor_geometry_clamps_to_ninety_two_percent_of_screen() -> None:
@@ -157,7 +159,7 @@ def test_apply_perkey_editor_geometry_clamps_to_ninety_two_percent_of_screen() -
     w0, h0, w, h = _expected_sizes(screen_w=1000, screen_h=900, **params)
 
     assert w0 == 1933
-    assert h0 == 1047
+    assert h0 == 1047 + NOTEBOOK_EXTRA_HEIGHT_PX
     assert (w, h) == (920, 828)
     assert root.geometry_calls == ["920x828+40+36"]
     assert root.minsize_calls == [(920, 828)]

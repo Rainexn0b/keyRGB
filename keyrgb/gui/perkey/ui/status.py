@@ -35,11 +35,28 @@ def _status_label_or_none(editor: object) -> _StatusLabelProtocol | None:
 
 def set_status(editor: object, text: str) -> None:
     label = _status_label_or_none(editor)
-    if label is None:
+    if label is not None:
+        try:
+            label.config(text=str(text))
+        except (AttributeError, tk.TclError):
+            pass
+    _refresh_unsaved_indicator(editor)
+
+
+def _refresh_unsaved_indicator(editor: object) -> None:
+    """Refresh the compact saved/unsaved pill after a status update.
+
+    Local import keeps ``status`` free of a module-level cycle with
+    ``editor_support.dirty_state``; missing labels and partially
+    constructed test doubles stay silent via narrow exceptions.
+    """
+    try:
+        from keyrgb.gui.perkey.editor_support.dirty_state import refresh_unsaved_indicator
+    except (ImportError, AttributeError, RuntimeError, TypeError, ValueError):
         return
     try:
-        label.config(text=str(text))
-    except (AttributeError, tk.TclError):
+        refresh_unsaved_indicator(editor)
+    except (AttributeError, RuntimeError, TypeError, ValueError, tk.TclError):
         return
 
 

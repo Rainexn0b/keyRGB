@@ -7,6 +7,12 @@ from keyrgb.gui.utils.window_geometry import compute_centered_window_geometry
 _GEOMETRY_SYNC_ERRORS = (RuntimeError, tk.TclError, TypeError, ValueError)
 
 
+# UX-03 editor shell: the ttk.Notebook below the top content (Profiles /
+# Setup / Advanced) needs a resize floor so its tab strip plus tab content
+# is not clipped on common DPI/font combos.
+NOTEBOOK_EXTRA_HEIGHT_PX = 260
+
+
 def compute_perkey_editor_min_content_size(
     *,
     num_rows: int,
@@ -26,7 +32,7 @@ def compute_perkey_editor_min_content_size(
     width_px = keyboard_w + right_panel_width + chrome_w
     # Right panel height includes the wheel + controls/buttons beneath it.
     # Keep a bit of slack so bottom buttons don't get clipped on common DPI/font combos.
-    height_px = max(keyboard_h + chrome_h, wheel_size + 480)
+    height_px = max(keyboard_h + chrome_h, wheel_size + 480) + NOTEBOOK_EXTRA_HEIGHT_PX
     return int(width_px), int(height_px)
 
 

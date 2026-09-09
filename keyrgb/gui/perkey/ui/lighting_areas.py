@@ -37,6 +37,7 @@ class LightingAreasPanel:
         self._frame = ttk_module.LabelFrame(parent, text="Lighting areas", padding=10, **kwargs)
         self.editor = editor
         self._rows: dict[str, dict[str, object]] = {}
+        self._grid_options: dict[str, object] = {}
         self._selection = tk_module.StringVar(value=_KEYBOARD_TARGET)
         self._should_show = False
         self._hint_label = ttk_module.Label(self._frame, text="Select an area to edit it with the colour wheel.")
@@ -48,7 +49,9 @@ class LightingAreasPanel:
         self.sync_from_editor()
 
     def grid(self, **kwargs: object) -> None:
-        self._frame.grid(**kwargs)
+        if kwargs:
+            self._grid_options = dict(kwargs)
+        self._frame.grid(**self._grid_options)
 
     def grid_remove(self) -> None:
         self._frame.grid_remove()

@@ -20,7 +20,17 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
         "anchor": "w",
         "justify": "left",
     }
-    assert editor.status_label.pack_calls == [{"fill": "x"}]
+    assert editor.status_label.pack_calls == [{"side": "left", "fill": "x", "expand": True}]
+
+    # UX-03 visible unsaved indicator sits beside the status text.
+    assert editor._unsaved_label.options == {
+        "text": "Saved",
+        "style": theme_metrics.STATUS_LABEL_STYLE,
+        "anchor": "e",
+        "justify": "right",
+    }
+    assert editor._unsaved_label.pack_calls == [{"side": "right", "padx": (8, 0)}]
+    assert editor._unsaved_label.parent is editor.status_label.parent
 
     assert root.bind_calls[0][0] == "<Configure>"
     assert root.bind_calls[0][2] is True
@@ -55,11 +65,6 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
         for frame in registry["frames"]
         if frame.parent is right and frame.pack_calls == [{"fill": "x", "pady": (0, 6)}]
     )
-    backdrop_buttons = next(
-        frame
-        for frame in registry["frames"]
-        if frame.parent is right and frame.pack_calls == [{"fill": "x", "pady": (0, 10)}]
-    )
 
     canvas = editor.canvas
     assert canvas is registry["canvases"][0]
@@ -70,15 +75,16 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
     }
     assert canvas.pack_calls == [{"side": "left", "fill": "both", "expand": True}]
 
+    # UX-03: backdrop Set/Reset + transparency live in Advanced, not the rail.
     scale = registry["scales"][0]
-    assert scale.parent is right
+    assert scale.parent is editor._advanced_backdrop_frame
     assert scale.options["from_"] == 0
     assert scale.options["to"] == 100
     assert scale.options["orient"] == "horizontal"
     assert scale.options["variable"] is editor.backdrop_transparency
     assert scale.options["command"].__self__ is editor
     assert scale.options["command"].__func__.__name__ == "_on_backdrop_transparency_changed"
-    assert scale.pack_calls == [{"fill": "x", "pady": (0, 10)}]
+    assert scale.grid_calls == [{"row": 2, "column": 0, "columnspan": 2, "sticky": "ew", "pady": (4, 0)}]
 
     wheel = editor.color_wheel
     assert wheel is registry["wheels"][0]
@@ -108,9 +114,7 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
         "Reset Backdrop": "_reset_backdrop",
         "Fill All": "_fill_all",
         "Clear All": "_clear_all",
-        "1. Keyboard Setup": "_toggle_layout_setup",
-        "2. Keymap Calibrator": "_run_calibrator",
-        "3. Overlay Alignment": "_toggle_overlay",
+        "Run Keymap Calibrator": "_run_calibrator",
         "New": "_new_profile",
         "Activate": "_activate_profile",
         "Save": "_save_profile",
@@ -120,24 +124,36 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
 
     assert backdrop_row.columnconfigure_calls == [{"index": 1, "weight": 1}]
     assert editor._backdrop_mode_combo.grid_calls == [{"row": 0, "column": 1, "sticky": "ew", "padx": (8, 0)}]
-    assert backdrop_buttons.columnconfigure_calls == [{"index": 0, "weight": 1}, {"index": 1, "weight": 1}]
     assert next(button for button in registry["buttons"] if button.options["text"] == "Set Backdrop...").grid_calls == [
         {"row": 0, "column": 0, "sticky": "ew", "padx": (0, 6)}
     ]
     assert next(button for button in registry["buttons"] if button.options["text"] == "Reset Backdrop").grid_calls == [
         {"row": 0, "column": 1, "sticky": "ew", "padx": (6, 0)}
     ]
+    # Backdrop buttons are parented inside the Advanced backdrop frame.
+    assert (
+        next(button for button in registry["buttons"] if button.options["text"] == "Set Backdrop...").parent
+        is editor._advanced_backdrop_frame
+    )
+    assert (
+        next(button for button in registry["buttons"] if button.options["text"] == "Reset Backdrop").parent
+        is editor._advanced_backdrop_frame
+    )
+    # Calibrator launcher lives in Setup and uses the exact existing callback.
+    calibrator = next(button for button in registry["buttons"] if button.options["text"] == "Run Keymap Calibrator")
+    assert calibrator.parent is editor._setup_tab
+    assert calibrator.grid_calls == [{"row": 1, "column": 0, "sticky": "ew", "pady": (10, 0)}]
 
     button_texts = [button.options["text"] for button in registry["buttons"]]
-    assert button_texts[4:7] == [
-        "1. Keyboard Setup",
-        "2. Keymap Calibrator",
-        "3. Overlay Alignment",
-    ]
+    assert not any(text.startswith(("1.", "2.", "3.", "4.")) for text in button_texts)
+    assert "1. Keyboard Setup" not in button_texts
+    assert "2. Keymap Calibrator" not in button_texts
+    assert "3. Overlay Alignment" not in button_texts
+    assert "4. Lighting Areas" not in button_texts
     label_texts = [label.options.get("text") for label in registry["labels"]]
     assert "Backdrop transparency" in label_texts
     assert "Config" in label_texts
-    assert "Setup" in label_texts
+    assert "Setup" not in label_texts
     assert "Lighting profile" in label_texts
     assert "Use on AC" in label_texts
     assert "Use on battery" in label_texts
@@ -145,7 +161,6 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
     assert label_styles["Backdrop"] == theme_metrics.BODY_LABEL_STYLE
     assert label_styles["Backdrop transparency"] == theme_metrics.BODY_LABEL_STYLE
     assert label_styles["Config"] == theme_metrics.SECTION_LABEL_STYLE
-    assert label_styles["Setup"] == theme_metrics.SECTION_LABEL_STYLE
 
     button_styles = {button.options["text"]: button.options.get("style") for button in registry["buttons"]}
     assert button_styles["Save"] == theme_metrics.PRIMARY_BUTTON_STYLE
@@ -159,7 +174,7 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
     assert button_styles["Reset Backdrop"] is None
     assert "font" not in editor.status_label.options
     assert all("font" not in label.options for label in registry["labels"])
-    assert len(registry["separators"]) == 2
+    assert len(registry["separators"]) == 1
     assert all(
         separator.grid_calls == [{"row": 0, "column": 1, "sticky": "ew", "padx": (8, 0)}]
         for separator in registry["separators"]
@@ -180,8 +195,30 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
     assert editor._backdrop_mode_var.get() == "none"
     assert editor._on_backdrop_mode_changed_calls == 1
 
+    # UX-03 notebook hierarchy: single notebook spanning full width below content.
+    assert len(registry["notebooks"]) == 1
+    notebook = editor._editor_notebook
+    assert notebook is registry["notebooks"][0]
+    assert notebook.parent is main
+    assert notebook.pack_calls == [{"fill": "x", "pady": (12, 0)}]
+    assert [text for _child, text in notebook.tabs] == ["Profiles", "Setup", "Advanced"]
+    assert editor._profiles_tab.parent is notebook
+    assert editor._setup_tab.parent is notebook
+    assert editor._advanced_tab.parent is notebook
+    # Default build has no secondaries: the left column spans both columns
+    # and column 1 carries no weight.
+    assert editor._advanced_tab.columnconfigure_calls == [
+        {"index": 0, "weight": 1},
+        {"index": 1, "weight": 1},
+        {"index": 1, "weight": 0},
+    ]
+    assert [call[0] for call in notebook.bind_calls] == ["<<NotebookTabChanged>>"]
+    assert notebook.bind_calls[0][2] == "+"
+    assert editor._advanced_backdrop_frame.grid_calls == [{"row": 0, "column": 0, "columnspan": 2, "sticky": "nsew"}]
+
     assert editor._profiles_frame.options["text"] == "Lighting profiles"
     assert editor._profiles_frame.options["padding"] == 10
+    assert editor._profiles_frame.parent is editor._profiles_tab
     assert editor._profiles_frame.grid_calls == [{"row": 0, "column": 0, "sticky": "nsew"}]
     assert editor._profiles_frame.columnconfigure_calls == [{"index": 1, "weight": 1}]
 
@@ -248,10 +285,53 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
     assert overlay_controls is registry["overlay_controls"][0]
     assert layout_controls.editor is editor
     assert overlay_controls.editor is editor
+    assert layout_controls.parent is editor._setup_tab
+    assert overlay_panel.parent is editor._advanced_tab
+    assert overlay_controls.parent is overlay_panel
     assert layout_controls.grid_calls == [{"row": 0, "column": 0, "sticky": "nsew"}]
     assert overlay_controls.grid_calls == [{"row": 0, "column": 0, "sticky": "nsew"}]
-    assert layout_controls.grid_remove_calls == 1
-    assert overlay_panel.grid_calls == [{"row": 0, "column": 0, "sticky": "nsew"}]
-    assert overlay_panel.grid_remove_calls == 1
+    assert layout_controls.grid_remove_calls == 0
+    assert overlay_panel.grid_calls == [{"row": 1, "column": 0, "columnspan": 2, "sticky": "nsew", "pady": (10, 0)}]
+    assert overlay_panel.grid_remove_calls == 0
     assert overlay_controls.sync_calls == 1
     assert editor.lightbar_controls is None
+
+
+def test_notebook_tab_clicks_refresh_setup_and_advanced_without_recursion(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from tests.gui.perkey.editor.ui._editor_ui_fakes import _build_ui
+
+    editor, _root, registry = _build_ui(monkeypatch)
+    notebook = editor._editor_notebook
+    callback = next(call[1] for call in notebook.bind_calls if call[0] == "<<NotebookTabChanged>>")
+
+    def _select_tab(pos: int) -> None:
+        notebook.selected_index = pos
+        notebook.selected = notebook.tabs[pos][0]
+
+    # Setup tab refreshes layout slots and keeps layout mode.
+    _select_tab(1)
+    callback(None)
+    assert editor._setup_panel_mode == "layout"
+    assert editor._show_setup_panel_calls == ["layout"]
+
+    # Re-firing the event for the already-selected tab is a no-op.
+    callback(None)
+    assert editor._show_setup_panel_calls == ["layout"]
+
+    # Advanced tab keeps overlay mode.
+    _select_tab(2)
+    callback(None)
+    assert editor._setup_panel_mode == "overlay"
+    assert editor._show_setup_panel_calls == ["layout", "overlay"]
+    callback(None)
+    assert editor._show_setup_panel_calls == ["layout", "overlay"]
+
+    # Profiles tab clears the mode without hiding any tab.
+    _select_tab(0)
+    callback(None)
+    assert editor._setup_panel_mode is None
+    assert editor._show_setup_panel_calls == ["layout", "overlay"]
+    assert [text for _child, text in notebook.tabs] == ["Profiles", "Setup", "Advanced"]
+    assert registry["notebooks"][0] is notebook

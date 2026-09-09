@@ -126,3 +126,90 @@ def test_selecting_keyboard_slot_returns_shared_wheel_to_keyboard(monkeypatch) -
     editor.select_slot_id("key-a")
 
     assert calls == ["keyboard", "key-a"]
+
+
+def test_lighting_areas_panel_remembers_canonical_grid_options_on_reshow() -> None:
+    """H1: grid() with no args must restore column 1, never row 0 / col 0."""
+
+    from types import SimpleNamespace as _NS
+
+    from keyrgb.gui.perkey.ui import lighting_areas as _areas
+
+    grid_calls: list[dict[str, object]] = []
+    remove_calls: list[str] = []
+
+    class _Frame:
+        def grid(self, **kwargs: object) -> None:
+            grid_calls.append(dict(kwargs))
+
+        def grid_remove(self) -> None:
+            remove_calls.append("removed")
+
+        def columnconfigure(self, *args: object, **kwargs: object) -> None:
+            return None
+
+    class _Ttk:
+        def LabelFrame(self, parent, **kwargs: object) -> _Frame:
+            return _Frame()
+
+        def Label(self, parent, **kwargs: object) -> _NS:
+            label = _NS()
+            label.grid = lambda **_k: None
+            label.grid_remove = lambda: None
+            return label
+
+        def Frame(self, parent, **kwargs: object) -> _NS:
+            frame = _NS()
+            frame.grid = lambda **_k: None
+            frame.columnconfigure = lambda *a, **k: None
+            return frame
+
+        def Radiobutton(self, *args: object, **kwargs: object) -> _NS:
+            rb = _NS()
+            rb.grid = lambda **_k: None
+            return rb
+
+        def Checkbutton(self, *args: object, **kwargs: object) -> _NS:
+            cb = _NS()
+            cb.grid = lambda **_k: None
+            return cb
+
+        def Combobox(self, *args: object, **kwargs: object) -> _NS:
+            combo = _NS()
+            combo.grid = lambda **_k: None
+            combo.bind = lambda *a, **k: None
+            return combo
+
+    class _Tk:
+        def StringVar(self, value: object = "") -> _Variable:
+            return _Variable(value)
+
+        def BooleanVar(self, value: object = False) -> _Variable:
+            return _Variable(value)
+
+        def Canvas(self, *args: object, **kwargs: object) -> _NS:
+            canvas = _NS()
+            canvas.grid = lambda **_k: None
+            canvas.create_rectangle = lambda *a, **k: 1
+            canvas.delete = lambda *a, **k: None
+            return canvas
+
+    editor = SimpleNamespace(secondary_lighting=None, config=None)
+    panel = _areas.LightingAreasPanel.__new__(_areas.LightingAreasPanel)
+    panel._tk = _Tk()  # type: ignore[attr-defined]
+    panel._ttk = _Ttk()  # type: ignore[attr-defined]
+    panel._frame = _Frame()  # type: ignore[attr-defined]
+    panel.editor = editor
+    panel._rows = {}
+    panel._grid_options = {}
+    panel._selection = _Variable("keyboard")
+    panel._should_show = False
+
+    canonical = {"row": 0, "column": 1, "rowspan": 2, "sticky": "nsew", "padx": (6, 0)}
+    panel.grid(**canonical)
+    panel.grid_remove()
+    # Activation resync calls grid() with no args; it must retain column 1.
+    panel.grid()
+
+    assert grid_calls == [canonical, canonical]
+    assert remove_calls == ["removed"]
