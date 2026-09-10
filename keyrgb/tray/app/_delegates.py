@@ -133,7 +133,7 @@ class KeyRGBTrayDelegateMixin:
         run_tray_transition(self, lambda: _application_module().callbacks.on_turn_on_clicked(self))
 
     def _on_perkey_clicked(self, _icon, _item):
-        _application_module().callbacks.on_perkey_clicked()
+        _application_module().callbacks.on_perkey_clicked(self)
 
     def _on_tuxedo_gui_clicked(self, _icon, _item):
         _application_module().callbacks.on_uniform_gui_clicked()

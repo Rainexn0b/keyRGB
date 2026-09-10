@@ -10,16 +10,16 @@ from typing import TYPE_CHECKING
 from keyrgb.gui.utils.window_bindings import install_window_bindings
 from keyrgb.gui.utils.window_state import WindowGeometryTracker
 
-from ._support import (
-    _support_window_actions as support_actions,
-    _support_window_geometry,
-    _support_window_jobs as support_jobs,
-    _support_window_runtime_services,
-    _support_window_session_bridge as support_session_bridge,
-    _support_window_state as support_window_state,
-    _support_window_ui as support_window_ui,
-)
+from . import _support_clipboard_actions as _clipboard_actions, _support_module_bundle as _module_bundle
 from ._support._support_window_text_io import copy_text, save_text_via_dialog, set_status, set_text
+
+support_actions = _module_bundle._support_window_actions
+_support_window_geometry = _module_bundle._support_window_geometry
+support_jobs = _module_bundle._support_window_jobs
+_support_window_runtime_services = _module_bundle._support_window_runtime_services
+support_session_bridge = _module_bundle._support_window_session_bridge
+support_window_state = _module_bundle._support_window_state
+support_window_ui = _module_bundle._support_window_ui
 
 if TYPE_CHECKING:
     from keyrgb.gui.windows._support._support_window_state import (
@@ -280,51 +280,22 @@ class SupportToolsGUI(support_session_bridge.SupportWindowSessionBridgeMixin):
         )
 
     def copy_debug_output(self) -> None:
-        self._copy_text(
-            self._diagnostics_json,
-            empty_message="Run diagnostics first",
-            ok_message="Diagnostics copied to clipboard",
-        )
+        _clipboard_actions.copy_debug_output(self)
 
     def save_debug_output(self) -> None:
-        self._save_text_via_dialog(
-            self._diagnostics_json,
-            title="Save diagnostics output",
-            initialfile="keyrgb-diagnostics.json",
-            empty_message="Run diagnostics first",
-        )
+        _clipboard_actions.save_debug_output(self)
 
     def copy_discovery_output(self) -> None:
-        self._copy_text(
-            self._discovery_json,
-            empty_message="Run discovery first",
-            ok_message="Discovery output copied to clipboard",
-        )
+        _clipboard_actions.copy_discovery_output(self)
 
     def save_discovery_output(self) -> None:
-        self._save_text_via_dialog(
-            self._discovery_json,
-            title="Save discovery output",
-            initialfile="keyrgb-device-discovery.json",
-            empty_message="Run discovery first",
-        )
+        _clipboard_actions.save_discovery_output(self)
 
     def copy_issue_report(self) -> None:
-        text = str((self._issue_report or {}).get("markdown") or "")
-        self._copy_text(
-            text,
-            empty_message="Run diagnostics or discovery first",
-            ok_message="Issue draft copied to clipboard",
-        )
+        _clipboard_actions.copy_issue_report(self)
 
     def save_issue_report(self) -> None:
-        text = str((self._issue_report or {}).get("markdown") or "")
-        self._save_text_via_dialog(
-            text,
-            title="Save issue draft",
-            initialfile="keyrgb-support-issue.md",
-            empty_message="Run diagnostics or discovery first",
-        )
+        _clipboard_actions.save_issue_report(self)
 
     def save_support_bundle(self) -> None:
         support_jobs.save_support_bundle(

@@ -54,6 +54,23 @@ class _SaveCurrentKeymapFn(Protocol):
     def __call__(self, keymap: Keymap, *, physical_layout: str | None = None) -> None: ...
 
 
+class _WriteGuidedResultFn(Protocol):
+    def __call__(
+        self,
+        path: str | Path,
+        keymap: Keymap,
+        *,
+        physical_layout: str | None,
+    ) -> Path: ...
+
+
+class _GuidedSaveAppLike(Protocol):
+    keymap: Keymap
+
+    @property
+    def lbl_status(self) -> _app_profile_layout._ConfigurableWidget: ...
+
+
 LoadBackdropModeFn: TypeAlias = Callable[[str], str]
 ResolvedLayoutLabelFn: TypeAlias = Callable[[str], str]
 DefaultKeymapForLayoutFn: TypeAlias = Callable[[str], Keymap]
@@ -241,6 +258,25 @@ def save_current_keymap(
 ) -> None:
     save_keymap_fn(app.keymap, physical_layout=physical_layout_id_fn(app))
     app.lbl_status.configure(text=f"Saved to {keymap_path_fn()!s}")
+
+
+def save_guided_result(
+    app: _GuidedSaveAppLike,
+    *,
+    session_path: Path,
+    physical_layout: str | None,
+    write_result_fn: _WriteGuidedResultFn,
+) -> None:
+    """Write the normalized keymap into the guided session file ("Use Result").
+
+    Unlike :func:`save_current_keymap`, this never touches profile storage;
+    closing without calling this leaves the session ``result`` unchanged.
+    The caller resolves ``session_path`` (guided mode membership) and the
+    layout id so this function stays a pure routing step.
+    """
+
+    write_result_fn(session_path, app.keymap, physical_layout=physical_layout)
+    app.lbl_status.configure(text=f"Wrote result to {session_path!s}")
 
 
 def save_and_close(app: _CalibratorAppLike) -> None:

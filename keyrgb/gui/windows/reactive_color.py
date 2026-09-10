@@ -14,15 +14,16 @@ from keyrgb.gui.theme import metrics as theme_metrics
 from keyrgb.gui.theme.focus import schedule_initial_focus
 from keyrgb.gui.utils.window_bindings import install_window_bindings
 from keyrgb.gui.utils.window_state import WindowGeometryTracker
-from keyrgb.gui.windows import (
-    _reactive_color_geometry,
-    _reactive_color_init_adapter,
-    _reactive_color_interactions,
-    _reactive_color_settings_adapter,
-    _reactive_color_state,
-    _reactive_color_ui,
-    _reactive_color_wiring,
-)
+
+from . import _reactive_module_bundle as _module_bundle
+
+_reactive_color_geometry = _module_bundle._reactive_color_geometry
+_reactive_color_init_adapter = _module_bundle._reactive_color_init_adapter
+_reactive_color_interactions = _module_bundle._reactive_color_interactions
+_reactive_color_settings_adapter = _module_bundle._reactive_color_settings_adapter
+_reactive_color_state = _module_bundle._reactive_color_state
+_reactive_color_ui = _module_bundle._reactive_color_ui
+_reactive_color_wiring = _module_bundle._reactive_color_wiring
 
 if TYPE_CHECKING:
     from keyrgb.core.config import Config as ConfigType

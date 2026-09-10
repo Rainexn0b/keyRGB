@@ -1,158 +1,34 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
-from typing import Protocol, TypeAlias, TypeVar
-
-from . import _support_window_probe_dialog_layout as _dialog_layout
-
-_GridPadding: TypeAlias = tuple[int, int]
-_DialogAction: TypeAlias = Callable[[], None]
-_DialogBindCallback: TypeAlias = Callable[[object | None], object]
-_ChoiceValueT = TypeVar("_ChoiceValueT")
-
-
-class _ProbeDialogRoot(Protocol):
-    def update_idletasks(self) -> None: ...
-
-    def winfo_screenwidth(self) -> int: ...
-
-    def winfo_screenheight(self) -> int: ...
-
-    def winfo_rootx(self) -> int: ...
-
-    def winfo_rooty(self) -> int: ...
-
-    def winfo_width(self) -> int: ...
-
-    def winfo_height(self) -> int: ...
-
-
-class _ProbeDialogWindow(Protocol):
-    root: _ProbeDialogRoot
-
-
-class _ThemedProbeDialogWindow(_ProbeDialogWindow, Protocol):
-    _bg_color: str
-    _fg_color: str
-
-
-class _WidthWidget(Protocol):
-    def winfo_width(self) -> int: ...
-
-
-class _ConfigurableWidget(Protocol):
-    def configure(self, **kwargs: object) -> None: ...
-
-
-class _FocusableWidget(Protocol):
-    def focus_set(self) -> None: ...
-
-
-class _GridWidget(Protocol):
-    def grid(
-        self,
-        *,
-        row: int,
-        column: int,
-        sticky: str,
-        padx: _GridPadding | None = None,
-        pady: _GridPadding | None = None,
-    ) -> None: ...
-
-
-class _BindableWidget(Protocol):
-    def bind(self, sequence: str, callback: _DialogBindCallback, add: str | None = None) -> None: ...
-
-
-class _DialogContainer(_WidthWidget, _BindableWidget, _GridWidget, Protocol):
-    def pack(self, *, fill: str, expand: bool = False) -> None: ...
-
-    def columnconfigure(self, index: int, weight: int = 0) -> None: ...
-
-    def rowconfigure(self, index: int, weight: int = 0) -> None: ...
-
-
-class _DialogButton(_GridWidget, _FocusableWidget, Protocol):
-    pass
-
-
-class _DialogLabel(_GridWidget, _ConfigurableWidget, Protocol):
-    pass
-
-
-class _DialogTextWidget(_GridWidget, _FocusableWidget, _ConfigurableWidget, Protocol):
-    def insert(self, index: str, value: str) -> None: ...
-
-    def get(self, start: str, end: str) -> str: ...
-
-
-class _DialogWidget(_BindableWidget, Protocol):
-    def title(self, value: str) -> None: ...
-
-    def transient(self, parent: object) -> None: ...
-
-    def geometry(self, value: str) -> None: ...
-
-    def minsize(self, width: int, height: int) -> None: ...
-
-    def resizable(self, width: bool, height: bool) -> None: ...
-
-    def protocol(self, name: str, callback: _DialogAction) -> None: ...
-
-    def after(self, delay_ms: int, callback: _DialogAction) -> None: ...
-
-    def grab_set(self) -> None: ...
-
-    def grab_release(self) -> None: ...
-
-    def destroy(self) -> None: ...
-
-    def wait_window(self) -> None: ...
-
-    def focus_get(self) -> object: ...
-
-
-class _FrameFactory(Protocol):
-    def __call__(self, parent: object, *, padding: int | None = None) -> _DialogContainer: ...
-
-
-class _ButtonFactory(Protocol):
-    def __call__(self, parent: object, *, text: str, command: _DialogAction) -> _DialogButton: ...
-
-
-class _LabelFactory(Protocol):
-    def __call__(self, parent: object, *, text: str, justify: str, wraplength: int) -> _DialogLabel: ...
-
-
-class _ScrolledTextFactory(Protocol):
-    def __call__(
-        self,
-        parent: object,
-        *,
-        wrap: str,
-        height: int,
-        background: str,
-        foreground: str,
-        insertbackground: str,
-    ) -> _DialogTextWidget: ...
-
-
-class _ToplevelFactory(Protocol):
-    def __call__(self, parent: object) -> _DialogWidget: ...
-
-
-class _TtkDialogModule(Protocol):
-    Frame: _FrameFactory
-    Button: _ButtonFactory
-    Label: _LabelFactory
-
-
-class _TkDialogModule(Protocol):
-    Toplevel: _ToplevelFactory
-
-
-class _ScrolledTextModule(Protocol):
-    ScrolledText: _ScrolledTextFactory
+from collections.abc import Sequence
+
+from . import _support_window_probe_dialog_layout as _dialog_layout, _support_window_probe_dialog_types as _dialog_types
+from ._support_window_probe_dialog_types import _ChoiceValueT
+
+_GridPadding = _dialog_types._GridPadding
+_DialogAction = _dialog_types._DialogAction
+_DialogBindCallback = _dialog_types._DialogBindCallback
+_ProbeDialogRoot = _dialog_types._ProbeDialogRoot
+_ProbeDialogWindow = _dialog_types._ProbeDialogWindow
+_ThemedProbeDialogWindow = _dialog_types._ThemedProbeDialogWindow
+_WidthWidget = _dialog_types._WidthWidget
+_ConfigurableWidget = _dialog_types._ConfigurableWidget
+_FocusableWidget = _dialog_types._FocusableWidget
+_GridWidget = _dialog_types._GridWidget
+_BindableWidget = _dialog_types._BindableWidget
+_DialogContainer = _dialog_types._DialogContainer
+_DialogButton = _dialog_types._DialogButton
+_DialogLabel = _dialog_types._DialogLabel
+_DialogTextWidget = _dialog_types._DialogTextWidget
+_DialogWidget = _dialog_types._DialogWidget
+_FrameFactory = _dialog_types._FrameFactory
+_ButtonFactory = _dialog_types._ButtonFactory
+_LabelFactory = _dialog_types._LabelFactory
+_ScrolledTextFactory = _dialog_types._ScrolledTextFactory
+_ToplevelFactory = _dialog_types._ToplevelFactory
+_TtkDialogModule = _dialog_types._TtkDialogModule
+_TkDialogModule = _dialog_types._TkDialogModule
+_ScrolledTextModule = _dialog_types._ScrolledTextModule
 
 
 _PROBE_DIALOG_SCREEN_RATIO_CAP = _dialog_layout._PROBE_DIALOG_SCREEN_RATIO_CAP

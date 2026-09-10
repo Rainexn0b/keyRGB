@@ -359,6 +359,35 @@ def test_on_hardware_static_mode_clicked_falls_back_to_hw_uniform_when_last_hard
     tray._refresh_ui.assert_called_once()
 
 
+def test_on_perkey_clicked_without_tray_launches_with_no_snapshot() -> None:
+    from keyrgb.tray.app import callbacks
+
+    with patch("keyrgb.tray.app.callbacks.launch_perkey_gui") as launch:
+        callbacks.on_perkey_clicked()
+
+    launch.assert_called_once_with()
+
+
+def test_on_perkey_clicked_forwards_cached_backend_snapshot() -> None:
+    from keyrgb.tray.app import callbacks
+
+    caps = MagicMock()
+    tray = MagicMock()
+    tray.backend_caps = caps
+
+    with (
+        patch(
+            "keyrgb.tray.app.callbacks.gui_launch.perkey_preflight_snapshot_from_tray",
+            return_value=(caps, "ite8291r3_perkey", (6, 18)),
+        ) as snapshot,
+        patch("keyrgb.tray.app.callbacks.launch_perkey_gui") as launch,
+    ):
+        callbacks.on_perkey_clicked(tray)
+
+    snapshot.assert_called_once_with(tray)
+    launch.assert_called_once_with(backend_caps=caps, backend_name="ite8291r3_perkey", dimensions=(6, 18))
+
+
 def test_on_hardware_color_clicked_applies_effect_refreshes_and_launches_gui() -> None:
     from keyrgb.tray.app.callbacks import on_hardware_color_clicked
 

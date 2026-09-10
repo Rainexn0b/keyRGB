@@ -18,13 +18,6 @@ specs for larger changes.
 
 ### Active follow-up plans
 
-- `2026-09-09/pre-1.0-tk-ux-hardening-plan.md` — active Tkinter UX campaign;
-  categorized Settings and shared visual, spacing, contrast, and focus behavior
-  and native per-key controls are complete; duplicate-instance prevention is
-  complete, including geometry persistence and keyboard access accepted in an
-  owner desktop walkthrough; the responsive two-column per-key editor notebook
-  redesign is owner-accepted, while the guided calibration workflow remains
-  deferred pending its dedicated UX discussion
 - `2026-08-11/architecture-concerns-plan.md` — confirmation and remediation
   tracker for the 2026-08-11 architecture review; one finding per pass, with
   test-first contracts and explicit confirmed/rejected status
@@ -43,6 +36,10 @@ specs for larger changes.
 
 ### Implemented dependencies / historical plans
 
+- `2026-09-09/pre-1.0-tk-ux-hardening-plan.md` — completed Tkinter UX campaign:
+  categorized Settings, shared visual/focus behavior, native controls,
+  duplicate prevention, geometry and keyboard access, the responsive per-key
+  editor, and the validated transactional guided setup/calibration workflow
 - `2026-08-28/effect-and-backend-extension-friction.md` — implemented the
   registration-plus-test path for shipped software/reactive effects and the
   backend package-marker completeness tripwire, with no new visible effects

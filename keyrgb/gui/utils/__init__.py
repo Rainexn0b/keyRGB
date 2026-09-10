@@ -6,27 +6,23 @@ windows.
 
 from __future__ import annotations
 
+from . import window_state as _window_state_pkg
 from .key_draw_style import KeyDrawStyle, key_draw_style
-from .profile_backdrop_storage import (
-    load_backdrop_image,
-    reset_backdrop_image,
-    save_backdrop_image,
-)
+from .profile_backdrop_storage import load_backdrop_image, reset_backdrop_image, save_backdrop_image
 from .tk_async import TkAsyncCoordinator, TkAsyncJob, run_in_thread, submit_gui_work
 from .window_bindings import install_window_bindings
 from .window_centering import center_window_on_screen
 from .window_geometry import compute_centered_window_geometry
 from .window_icon import apply_keyrgb_window_icon, find_keyrgb_logo_path
-from .window_state import (
-    WindowGeometry,
-    WindowGeometryTracker,
-    geometry_string,
-    load_window_geometry,
-    prepare_restored_geometry,
-    save_window_geometry,
-    ui_state_lock_path,
-    ui_state_path,
-)
+
+WindowGeometry = _window_state_pkg.WindowGeometry
+WindowGeometryTracker = _window_state_pkg.WindowGeometryTracker
+geometry_string = _window_state_pkg.geometry_string
+load_window_geometry = _window_state_pkg.load_window_geometry
+prepare_restored_geometry = _window_state_pkg.prepare_restored_geometry
+save_window_geometry = _window_state_pkg.save_window_geometry
+ui_state_lock_path = _window_state_pkg.ui_state_lock_path
+ui_state_path = _window_state_pkg.ui_state_path
 
 __all__ = [
     "KeyDrawStyle",

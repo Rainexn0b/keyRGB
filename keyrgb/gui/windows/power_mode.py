@@ -10,12 +10,20 @@ from tkinter import ttk
 from keyrgb.core.config import Config
 from keyrgb.core.power import system as _power_system
 from keyrgb.gui import theme as gui_theme
-from keyrgb.gui.theme import metrics as theme_metrics
 from keyrgb.gui.utils.tk_async import TkAsyncCoordinator, submit_gui_work
 from keyrgb.gui.utils.window_bindings import install_window_bindings
 from keyrgb.gui.utils.window_geometry import compute_centered_window_geometry
 from keyrgb.gui.utils.window_icon import apply_keyrgb_window_icon
 from keyrgb.gui.utils.window_state import WindowGeometryTracker
+
+from . import _power_mode_ui
+
+_CONTENT_WRAP_PX = _power_mode_ui._CONTENT_WRAP_PX
+_INTRO_TEXT = _power_mode_ui._INTRO_TEXT
+_EXTREME_HELP_TEXT = _power_mode_ui._EXTREME_HELP_TEXT
+_BALANCED_HELP_TEXT = _power_mode_ui._BALANCED_HELP_TEXT
+_PERFORMANCE_HELP_TEXT = _power_mode_ui._PERFORMANCE_HELP_TEXT
+_CAP_NOTE_TEXT = _power_mode_ui._CAP_NOTE_TEXT
 
 DEFAULT_EXTREME_SAVER_CAP_KHZ = _power_system.DEFAULT_EXTREME_SAVER_CAP_KHZ
 MAX_EXTREME_SAVER_CAP_KHZ = _power_system.MAX_EXTREME_SAVER_CAP_KHZ
@@ -35,28 +43,7 @@ schedule_initial_focus = gui_theme.schedule_initial_focus
 
 _GUI_RUNTIME_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _GEOMETRY_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
-_CONTENT_WRAP_PX = 760
 _LIVE_PREVIEW_INTERVAL_MS = 1000
-
-_INTRO_TEXT = (
-    "Tune KeyRGB's lightweight CPU power-mode integration. Changes here only affect "
-    "what happens when you pick Extreme Saver from the tray."
-)
-_EXTREME_HELP_TEXT = (
-    "Extreme Saver pins the CPU min/max frequency to the configured target, "
-    "prefers the powersave governor, and turns boost off."
-)
-_BALANCED_HELP_TEXT = (
-    "Balanced restores the CPU min/max frequency range, prefers the schedutil governor, and keeps boost on."
-)
-_PERFORMANCE_HELP_TEXT = (
-    "Performance restores the CPU min/max frequency range, prefers the performance governor, and keeps boost on."
-)
-_CAP_NOTE_TEXT = (
-    "The configured target is stored in KeyRGB config and applied the next time you "
-    "choose Extreme Saver. KeyRGB clamps the final write to your CPU's supported "
-    "min/max before pinning the range."
-)
 
 
 def _cap_mhz_bounds() -> tuple[int, int]:
@@ -121,6 +108,9 @@ def _format_live_freq_text() -> str:
 
 class PowerModeSettingsGUI:
     _geometry_restored = False
+    _main_frame: ttk.Frame
+    scale_cap: ttk.Scale
+    btn_save: ttk.Button
 
     def __init__(self) -> None:
         self.root = tk.Tk()
@@ -263,126 +253,12 @@ class PowerModeSettingsGUI:
             save_now()
 
     def _build_ui(self) -> None:
-        self._main_frame = ttk.Frame(self.root, padding=theme_metrics.OUTER_PADDING)
-        self._main_frame.pack(fill="both", expand=True)
-
-        ttk.Label(self._main_frame, text="Power Mode Settings", style=theme_metrics.TITLE_LABEL_STYLE).pack(
-            anchor="w", pady=(0, theme_metrics.CONTROL_GAP_Y)
+        _power_mode_ui.build_power_mode_ui(
+            self,
+            ttk=ttk,
+            schedule_initial_focus_fn=schedule_initial_focus,
+            cap_mhz_bounds=_cap_mhz_bounds(),
         )
-        ttk.Label(
-            self._main_frame,
-            text=_INTRO_TEXT,
-            style=theme_metrics.BODY_LABEL_STYLE,
-            justify="left",
-            wraplength=_CONTENT_WRAP_PX,
-        ).pack(anchor="w", fill="x", pady=(0, theme_metrics.SECTION_GAP_Y))
-
-        status_frame = ttk.LabelFrame(self._main_frame, text="Current Status", padding=10)
-        status_frame.pack(fill="x", pady=(0, theme_metrics.SECTION_GAP_Y))
-        ttk.Label(
-            status_frame,
-            textvariable=self._status_var,
-            style=theme_metrics.STATUS_LABEL_STYLE,
-            justify="left",
-            wraplength=_CONTENT_WRAP_PX,
-        ).pack(anchor="w", fill="x")
-
-        help_frame = ttk.LabelFrame(self._main_frame, text="What The Modes Do", padding=10)
-        help_frame.pack(fill="x", pady=(0, theme_metrics.SECTION_GAP_Y))
-        for text in (_EXTREME_HELP_TEXT, _BALANCED_HELP_TEXT, _PERFORMANCE_HELP_TEXT):
-            ttk.Label(
-                help_frame,
-                text=text,
-                style=theme_metrics.BODY_LABEL_STYLE,
-                justify="left",
-                wraplength=_CONTENT_WRAP_PX,
-            ).pack(anchor="w", fill="x", pady=(0, theme_metrics.CONTROL_GAP_Y))
-
-        cap_frame = ttk.LabelFrame(self._main_frame, text="Extreme Saver Target", padding=10)
-        cap_frame.pack(fill="x", pady=(0, theme_metrics.SECTION_GAP_Y))
-
-        header = ttk.Frame(cap_frame)
-        header.pack(fill="x")
-        header.columnconfigure(0, weight=1)
-
-        ttk.Label(header, text="Configured CPU frequency target", style=theme_metrics.BODY_LABEL_STYLE).grid(
-            row=0, column=0, sticky="w"
-        )
-        ttk.Label(header, textvariable=self._cap_value_var, style=theme_metrics.VALUE_LABEL_STYLE).grid(
-            row=0, column=1, sticky="e"
-        )
-
-        min_mhz, max_mhz = _cap_mhz_bounds()
-        self.scale_cap = ttk.Scale(
-            cap_frame,
-            from_=float(min_mhz),
-            to=float(max_mhz),
-            orient="horizontal",
-            variable=self._cap_var,
-            command=self._sync_cap_label,
-        )
-        self.scale_cap.pack(fill="x", pady=(theme_metrics.CONTROL_GAP_Y, theme_metrics.CONTROL_GAP_Y))
-
-        ttk.Label(
-            cap_frame,
-            text=_CAP_NOTE_TEXT,
-            style=theme_metrics.BODY_LABEL_STYLE,
-            justify="left",
-            wraplength=_CONTENT_WRAP_PX,
-        ).pack(anchor="w", fill="x")
-
-        footer = ttk.Frame(self._main_frame)
-        footer.pack(fill="x", pady=(theme_metrics.CONTROL_GAP_Y, 0))
-        footer.columnconfigure(0, weight=1)
-        footer.columnconfigure(1, weight=0)
-        footer.columnconfigure(2, weight=0)
-        footer.columnconfigure(3, weight=0)
-
-        ttk.Label(
-            footer,
-            textvariable=self._save_status_var,
-            style=theme_metrics.STATUS_LABEL_STYLE,
-            justify="left",
-            wraplength=420,
-        ).grid(
-            row=0,
-            column=0,
-            columnspan=4,
-            sticky="ew",
-            pady=(0, theme_metrics.CONTROL_GAP_Y),
-        )
-        ttk.Button(footer, text="Refresh Status", command=self._refresh_status).grid(
-            row=1,
-            column=1,
-            sticky="ew",
-            padx=(0, 8),
-        )
-        self.btn_save = ttk.Button(
-            footer,
-            text="Save",
-            command=self._save,
-            style=theme_metrics.PRIMARY_BUTTON_STYLE,
-        )
-        self.btn_save.grid(row=1, column=2, sticky="ew", padx=(0, 8))
-        ttk.Button(footer, text="Close", command=self._close).grid(row=1, column=3, sticky="ew")
-        ttk.Label(
-            footer,
-            textvariable=self._live_freq_var,
-            style=theme_metrics.STATUS_LABEL_STYLE,
-            justify="left",
-            wraplength=_CONTENT_WRAP_PX,
-        ).grid(
-            row=2,
-            column=0,
-            columnspan=4,
-            sticky="w",
-            pady=(theme_metrics.SECTION_GAP_Y, 0),
-        )
-
-        # Intentional non-forcing initial focus (UX-05): Save is the primary
-        # action and is always present; the helper schedules via `after`,
-        # never grabs, and never steals an already-focused child.
-        schedule_initial_focus(self.root, self.btn_save)
 
     def run(self) -> None:
         self.root.mainloop()

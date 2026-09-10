@@ -20,14 +20,25 @@ from __future__ import annotations
 import json
 import logging
 import os
-import re
 import tempfile
 from collections.abc import Callable
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol, TypeGuard, cast
+from typing import Protocol, cast
 
-from keyrgb.core.config.paths import config_dir
+from . import window_state_geometry as _geometry, window_state_lock as _lock
+
+WindowGeometry = _geometry.WindowGeometry
+geometry_string = _geometry.geometry_string
+prepare_restored_geometry = _geometry.prepare_restored_geometry
+_normalize_window_id = _geometry.normalize_window_id
+_is_wayland = _geometry.is_wayland
+_is_valid_dimension = _geometry.is_valid_dimension
+_is_valid_coord = _geometry.is_valid_coord
+_parse_geometry_entry = _geometry.parse_geometry_entry
+ui_state_path = _lock.ui_state_path
+ui_state_lock_path = _lock.ui_state_lock_path
+_acquire_ui_state_lock = _lock.acquire_ui_state_lock
+_release_ui_state_lock = _lock.release_ui_state_lock
 
 logger = logging.getLogger(__name__)
 
@@ -41,24 +52,6 @@ __all__ = [
     "ui_state_lock_path",
     "ui_state_path",
 ]
-
-_UI_STATE_FILENAME = "ui-state.json"
-_UI_STATE_LOCK_FILENAME = "ui-state.lock"
-
-_STATIC_WINDOW_IDS = frozenset(
-    {
-        "settings",
-        "reactive-color",
-        "power-mode",
-        "support",
-        "perkey",
-        "calibrator",
-    }
-)
-_UNIFORM_WINDOW_ID_RE = re.compile(r"uniform-[a-z0-9]+(?:-[a-z0-9]+)*\Z")
-
-_MAX_DIMENSION_PX = 16384
-_MAX_COORD_ABS_PX = 32768
 
 _STATE_LOAD_ERRORS = (OSError, ValueError, TypeError)
 _STATE_SAVE_ERRORS = (OSError, ValueError, TypeError)
@@ -84,120 +77,6 @@ class _WindowRootProtocol(Protocol):
     def after(self, delay_ms: int, callback: Callable[[], object]) -> object: ...
 
     def after_cancel(self, after_id: object) -> object: ...
-
-
-@dataclass(frozen=True)
-class WindowGeometry:
-    """Validated window size with optional position."""
-
-    width: int
-    height: int
-    x: int | None = None
-    y: int | None = None
-
-
-def ui_state_path() -> Path:
-    """Return the UI-state JSON path (``config_dir()/ui-state.json``)."""
-    return config_dir() / _UI_STATE_FILENAME
-
-
-def ui_state_lock_path() -> Path:
-    """Return the UI-state advisory-lock path (distinct from the JSON file)."""
-    return config_dir() / _UI_STATE_LOCK_FILENAME
-
-
-def _normalize_window_id(window_id: object) -> str | None:
-    if not isinstance(window_id, str):
-        return None
-    normalized = window_id.lower()
-    if normalized in _STATIC_WINDOW_IDS:
-        return normalized
-    if _UNIFORM_WINDOW_ID_RE.fullmatch(normalized) is not None:
-        return normalized
-    return None
-
-
-def _is_wayland() -> bool:
-    if os.environ.get("WAYLAND_DISPLAY"):
-        return True
-    return (os.environ.get("XDG_SESSION_TYPE") or "").strip().lower() == "wayland"
-
-
-def _acquire_ui_state_lock(*, exclusive: bool) -> int | None:
-    """Acquire a blocking advisory lock on ``ui-state.lock``.
-
-    Returns the fd on success or ``None`` when locking is unavailable (missing
-    ``fcntl`` or an ``OSError`` while opening/locking). Callers needing strict
-    exclusion treat ``None`` as failure; best-effort readers proceed unlocked.
-    """
-    try:
-        import fcntl
-    except ImportError:
-        logger.debug("fcntl unavailable; proceeding without UI-state lock")
-        return None
-    try:
-        lock_path = ui_state_lock_path()
-        lock_path.parent.mkdir(parents=True, exist_ok=True)
-        fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR, 0o600)
-    except OSError as exc:
-        logger.debug("Failed to open UI-state lock: %s", exc)
-        return None
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
-        return fd
-    except OSError as exc:
-        logger.debug("Failed to acquire UI-state lock: %s", exc)
-        try:
-            os.close(fd)
-        except OSError:
-            pass
-        return None
-
-
-def _release_ui_state_lock(fd: int) -> None:
-    try:
-        import fcntl
-    except ImportError:
-        try:
-            os.close(fd)
-        except OSError:
-            pass
-        return
-    try:
-        fcntl.flock(fd, fcntl.LOCK_UN)
-    except OSError:
-        pass
-    try:
-        os.close(fd)
-    except OSError:
-        pass
-
-
-def _is_valid_dimension(value: object) -> TypeGuard[int]:
-    return isinstance(value, int) and not isinstance(value, bool) and 1 <= value <= _MAX_DIMENSION_PX
-
-
-def _is_valid_coord(value: object) -> TypeGuard[int]:
-    return isinstance(value, int) and not isinstance(value, bool) and abs(value) <= _MAX_COORD_ABS_PX
-
-
-def _parse_geometry_entry(raw: object) -> WindowGeometry | None:
-    if not isinstance(raw, dict):
-        return None
-    raw_entry = cast(dict[str, object], raw)
-    width_raw = raw_entry.get("width")
-    height_raw = raw_entry.get("height")
-    if not _is_valid_dimension(width_raw) or not _is_valid_dimension(height_raw):
-        return None
-    width_px = int(width_raw)
-    height_px = int(height_raw)
-    x_raw = raw_entry.get("x", None)
-    y_raw = raw_entry.get("y", None)
-    if x_raw is None and y_raw is None:
-        return WindowGeometry(width=width_px, height=height_px)
-    if not _is_valid_coord(x_raw) or not _is_valid_coord(y_raw):
-        return None
-    return WindowGeometry(width=width_px, height=height_px, x=int(x_raw), y=int(y_raw))
 
 
 def _read_state_unlocked(state_path: Path) -> dict[str, object] | None:
@@ -322,73 +201,6 @@ def save_window_geometry(window_id: str, geometry: WindowGeometry) -> bool:
     finally:
         if lock_fd is not None:
             _release_ui_state_lock(lock_fd)
-
-
-def prepare_restored_geometry(
-    saved: WindowGeometry | None,
-    screen_width: int,
-    screen_height: int,
-    min_width: int,
-    min_height: int,
-    screen_ratio_cap: float = 0.95,
-) -> WindowGeometry | None:
-    """Clamp *saved* to the current screen or reject it with ``None``.
-
-    Malformed/absurd sizes, unusable screen/minimum inputs, and wholly
-    off-screen positions return ``None`` so callers fall back to centered
-    geometry. Valid sizes are clamped up to the window minimum and down to the
-    screen work-area cap; size-only entries are centered on the current screen
-    so Wayland restores do not land top-left.
-    """
-    if saved is None or not isinstance(saved, WindowGeometry):
-        return None
-    if isinstance(screen_width, bool) or isinstance(screen_height, bool):
-        return None
-    if isinstance(min_width, bool) or isinstance(min_height, bool):
-        return None
-    try:
-        screen_w = int(screen_width)
-        screen_h = int(screen_height)
-        floor_w = int(min_width)
-        floor_h = int(min_height)
-        cap = float(screen_ratio_cap)
-    except (TypeError, ValueError):
-        return None
-    if screen_w <= 0 or screen_h <= 0 or floor_w <= 0 or floor_h <= 0:
-        return None
-    if not 0.0 < cap <= 1.0:
-        return None
-    if not _is_valid_dimension(saved.width) or not _is_valid_dimension(saved.height):
-        return None
-
-    max_w = max(1, int(screen_w * cap))
-    max_h = max(1, int(screen_h * cap))
-    # The screen cap wins when a display is smaller than the normal minimum;
-    # keeping the whole window reachable is more useful than enforcing a
-    # minimum that cannot fit on the current display.
-    clamped_w = min(max(saved.width, floor_w), max_w)
-    clamped_h = min(max(saved.height, floor_h), max_h)
-
-    if saved.x is None and saved.y is None:
-        centered_x = (screen_w - clamped_w) // 2
-        centered_y = (screen_h - clamped_h) // 2
-        return WindowGeometry(width=clamped_w, height=clamped_h, x=centered_x, y=centered_y)
-    if saved.x is None or saved.y is None:
-        return None
-    if not _is_valid_coord(saved.x) or not _is_valid_coord(saved.y):
-        return None
-    x = saved.x
-    y = saved.y
-    if x + clamped_w <= 0 or y + clamped_h <= 0 or x >= screen_w or y >= screen_h:
-        return None
-    return WindowGeometry(width=clamped_w, height=clamped_h, x=x, y=y)
-
-
-def geometry_string(geometry: WindowGeometry) -> str:
-    """Return a Tk geometry string for *geometry* (size-only without x/y)."""
-    if geometry.x is None or geometry.y is None:
-        return f"{geometry.width}x{geometry.height}"
-    return f"{geometry.width}x{geometry.height}{geometry.x:+d}{geometry.y:+d}"
 
 
 class WindowGeometryTracker:

@@ -333,6 +333,7 @@ def test_effect_and_power_wrappers_delegate(monkeypatch):
         ("_on_selected_device_turn_on_clicked", "on_selected_device_turn_on_clicked", (None, None)),
         ("_on_off_clicked", "on_off_clicked", (None, None)),
         ("_on_turn_on_clicked", "on_turn_on_clicked", (None, None)),
+        ("_on_perkey_clicked", "on_perkey_clicked", (None, None)),
         ("_on_hardware_static_mode_clicked", "on_hardware_static_mode_clicked", (None, None)),
         ("_on_hardware_color_clicked", "on_hardware_color_clicked", (None, None)),
     ],
@@ -356,7 +357,6 @@ def test_callback_wrapper_methods_delegate(monkeypatch, method_name, cb_attr, ar
 @pytest.mark.parametrize(
     "method_name,cb_attr",
     [
-        ("_on_perkey_clicked", "on_perkey_clicked"),
         ("_on_tuxedo_gui_clicked", "on_uniform_gui_clicked"),
         ("_on_reactive_color_clicked", "on_reactive_color_gui_clicked"),
         ("_on_power_settings_clicked", "on_power_settings_clicked"),

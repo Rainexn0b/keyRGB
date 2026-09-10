@@ -136,8 +136,20 @@ def on_turn_on_clicked(tray: LightingTrayProtocol) -> None:
     turn_on(tray)
 
 
-def on_perkey_clicked() -> None:
-    launch_perkey_gui()
+def on_perkey_clicked(tray: object | None = None) -> None:
+    """Launch the per-key editor, forwarding the cached backend snapshot.
+
+    Called with no arguments (existing callers), no snapshot is attached.
+    The tray delegate passes ``self`` so the editor subprocess receives the
+    already-cached ``backend_caps`` plus safe metadata from the
+    already-selected backend — never a fresh probe or hardware open.
+    """
+
+    if tray is None:
+        launch_perkey_gui()
+        return
+    backend_caps, backend_name, dimensions = gui_launch.perkey_preflight_snapshot_from_tray(tray)
+    launch_perkey_gui(backend_caps=backend_caps, backend_name=backend_name, dimensions=dimensions)
 
 
 def on_uniform_gui_clicked() -> None:

@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 0.36.0 (2026-09-10)
+
+Pre-release UX, guided keyboard setup, AppImage runtime, and release-quality hardening. Public commands and existing config/profile formats remain compatible; validate the new guided setup on representative hardware before promoting this release train.
+
+- GUI/Settings: Reorganize settings into navigable categories, separate everyday and advanced controls, replace custom dropdown behavior with native ttk controls, and standardize spacing, typography, focus indicators, disabled contrast, and initial keyboard focus.
+- GUI/Lifecycle: Prevent duplicate instances of every standalone GUI, persist and safely restore window geometry, center size-only legacy state, and add consistent `Ctrl+S`, `Ctrl+W`, `Escape`, and dialog keyboard behavior where appropriate.
+- GUI/Per-Key: Simplify the editor around the keyboard canvas and compact paint rail, move profile/setup/advanced controls into a responsive two-column notebook, add an explicit saved/unsaved indicator, and preserve canonical slot IDs, legacy keymap loading, profile formats, selection, and secondary-device routing.
+- GUI/Guided Setup: Add a modal Preflight → Layout → Optional keys → Calibration → Overlay → Review workflow. Back/Next/Cancel keep setup in an isolated draft; Finish persists once, rolls back setup/profile state on expected failure, and never upgrades brightness-only backends to per-key capability.
+- GUI/Calibration: Add opt-in `keyrgb-calibrate --guided-session PATH`, returning a versioned temporary keymap instead of writing profile data. Share controller matrix dimensions with the parent and retain the standalone calibrator's entrypoint, singleton, geometry, shortcuts, and Save behavior.
+- GUI/Recovery: Journal Config-mediated calibration preview state before the first probe, restore it on orderly close, automatically recover stale journals, and preserve the true original snapshot across partial restore failures.
+- Core/Privileged Helper: Align the installed helper with the application's narrowly validated ITE 8297 LED channel allowlist, add denied-write escalation for exact supported channels, and keep path traversal and non-keyboard LEDs rejected.
+- Packaging/AppImage: Bundle interpreter-matched Tcl/Tk runtime assets so packaged Tk GUIs use compatible libraries, and expand AppImage smoke coverage for the embedded runtime and resources.
+- Release/CI: Add fail-closed AppImage checksum handling, dependency auditing and Dependabot coverage, Python 3.10–3.14 runtime CI, stricter repository/type/format gates, sandboxed distro/install tests, and more factual coverage/build health reporting.
+
 ## 0.35.0 (2026-09-08)
 
 Wake/brightness ownership and release-quality hardening. Public entrypoints and on-disk config stay compatible; controller-native sleep remains opt-in and is now identified in Settings as recommended for supported ITE controllers.

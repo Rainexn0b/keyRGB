@@ -114,6 +114,7 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
         "Reset Backdrop": "_reset_backdrop",
         "Fill All": "_fill_all",
         "Clear All": "_clear_all",
+        "Guided Setup…": "_open_guided_setup",
         "Run Keymap Calibrator": "_run_calibrator",
         "New": "_new_profile",
         "Activate": "_activate_profile",

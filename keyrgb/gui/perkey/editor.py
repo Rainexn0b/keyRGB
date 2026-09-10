@@ -160,6 +160,18 @@ class PerKeyEditor:
         editor_ui.build_editor_ui(self)
 
     def _on_close(self) -> None:
+        guided_setup = vars(self).get("_guided_setup_wizard")
+        is_alive = getattr(guided_setup, "is_alive", None)
+        if callable(is_alive):
+            try:
+                if bool(is_alive()):
+                    focus = getattr(guided_setup, "focus", None)
+                    if callable(focus):
+                        focus()
+                    return
+            except (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError):
+                pass
+
         try:
             self.tk_jobs.cancel()
         except AttributeError:
@@ -288,6 +300,11 @@ class PerKeyEditor:
 
     def _run_calibrator(self):
         editor_actions.run_calibrator(self)
+
+    def _open_guided_setup(self):
+        from .setup_workflow.wizard import open_guided_setup
+
+        return open_guided_setup(self)
 
     def _reload_keymap(self):
         editor_actions.reload_keymap(self)

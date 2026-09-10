@@ -146,6 +146,8 @@ def build_widgets(
     ttk: object,
     tk_runtime_errors: tuple[type[BaseException], ...],
     wrap_sync_errors: tuple[type[BaseException], ...],
+    save_text: str = "Save",
+    save_and_close_text: str = "Save && Close",
 ) -> None:
     tk_mod = cast(_TkModuleProtocol, tk)
     ttk_mod = cast(_TtkModuleProtocol, ttk)
@@ -236,8 +238,8 @@ def build_widgets(
     ttk_mod.Button(side, text="Reset Keymap Defaults", command=app._reset_keymap_defaults).grid(
         row=7, column=0, sticky="ew", pady=(18, 0)
     )
-    ttk_mod.Button(side, text="Save", command=app._save).grid(row=8, column=0, sticky="ew", pady=(18, 0))
-    ttk_mod.Button(side, text="Save && Close", command=app._save_and_close).grid(
+    ttk_mod.Button(side, text=save_text, command=app._save).grid(row=8, column=0, sticky="ew", pady=(18, 0))
+    ttk_mod.Button(side, text=save_and_close_text, command=app._save_and_close).grid(
         row=9, column=0, sticky="ew", pady=(6, 0)
     )
 

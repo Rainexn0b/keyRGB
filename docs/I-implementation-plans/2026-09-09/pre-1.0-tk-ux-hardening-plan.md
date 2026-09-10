@@ -4,7 +4,7 @@
 **Target:** pre-1.0 UX hardening; exact release assignment TBD
 **Baseline:** `481ac142` (`main`)
 **Lane:** `I-implementation-plans`
-**Status:** active
+**Status:** complete
 **Source:** the user-approved nine-item UX backlog mapped below, following the
 2026-09-09 repository UX review and decision to retain Tkinter
 
@@ -105,7 +105,7 @@ outcome.
 | 1. Reorganize Settings into categories or tabs | UX-01 | accepted |
 | 2. Separate basic and advanced settings | UX-02 | accepted |
 | 3. Simplify the per-key editor's default view | UX-03 | deferred until last, pending dedicated UX discussion |
-| 4. Make keyboard setup/calibration a guided workflow | UX-04 | deferred until last, pending dedicated UX discussion |
+| 4. Make keyboard setup/calibration a guided workflow | UX-04 | done; owner desktop validation accepted |
 | 5. Improve spacing, fonts, focus states, and disabled contrast | UX-05 | accepted |
 | 6. Persist window geometry | UX-06 | accepted |
 | 7. Replace custom dropdown behavior with standard controls | UX-07 | accepted |
@@ -120,7 +120,7 @@ outcome.
 | UX-01 | Reorganize Settings into clear categories/tabs | P0 | M | done | UX-00 |
 | UX-02 | Separate basic and advanced settings | P0 | M | done | UX-01 |
 | UX-03 | Simplify the per-key editor's default view | P2 | L | done | UX-01, UX-02, UX-05–UX-09, and dedicated UX discussion |
-| UX-04 | Turn keyboard setup and calibration into a guided workflow | P2 | L | deferred | UX-03 direction and dedicated UX discussion |
+| UX-04 | Turn keyboard setup and calibration into a guided workflow | P2 | L | done | UX-03 direction and dedicated UX discussion |
 | UX-05 | Establish consistent spacing, typography, focus, and disabled contrast | P1 | M | done | UX-07 |
 | UX-06 | Persist and safely restore main-window geometry | P1 | M | done | UX-09 |
 | UX-07 | Replace custom dropdowns with standard Tk controls | P1 | M | done | UX-00 |
@@ -621,10 +621,9 @@ this tracker text alone.
 
 ### Status and decision gate
 
-Deferred and sequenced last. It depends on the UX-03 editor shell direction and
-requires a dedicated discussion of hardware probing, cancellation, save, and
-recovery behavior. Existing standalone `keyrgb-calibrate` behavior must remain
-available until a replacement workflow has proven parity.
+Done after owner desktop validation. Existing standalone `keyrgb-calibrate`
+behavior remains available; guided mode is opt-in through a temporary session
+file.
 
 ### Discussion scope
 
@@ -1311,3 +1310,85 @@ coverage.
   - `git diff --check`: passed.
 - UX-03 is `done`. UX-04 remains deferred until its dedicated workflow
   discussion begins.
+
+### 2026-09-09 — UX-04 lifecycle audit and proposed contract
+
+- UX-04 is now `active` at its design-discussion gate. No workflow production
+  code has been approved or started.
+- The standalone calibrator currently owns a separate Tk root and process. Key
+  assignments remain in memory until its Save action, while each probe step
+  temporarily writes brightness and per-key colours through `Config` so the
+  tray can display the white-cell preview. Orderly close restores the original
+  lighting configuration; a crash can leave the temporary preview persisted.
+- Current Setup actions do not form a transaction: layout and legend selection
+  write global config immediately, optional-key edits write layout-slot storage
+  immediately, overlay edits are mostly in memory, and the calibrator writes its
+  keymap independently. A real Cancel contract therefore requires a new draft
+  boundary rather than simply sequencing the existing callbacks.
+- The proposed workflow is a modal child of the per-key editor with these steps:
+  1. **Preflight** — use one capability/discovery snapshot without acquiring a
+     second hardware handle; classify live-preview, config-only, and blocked
+     states and provide permission, busy, disconnect, and diagnostics guidance.
+  2. **Layout** — choose physical layout and legends in a workflow-local draft.
+  3. **Optional keys** — edit visibility and labels in the same draft.
+  4. **Calibration** — launch the existing calibrator in an opt-in guided-session
+     mode that returns a temporary keymap result instead of writing the profile.
+  5. **Overlay** — reuse alignment behavior against draft state; this step may be
+     skipped.
+  6. **Review and Finish** — summarize changes, persist config/profile state at
+     one commit boundary, apply the result, and mark the editor saved.
+- Back and Next never persist. Cancel/close discards the workflow draft. If the
+  calibrator child is active, the parent asks the user to close or cancel that
+  window first rather than terminating it unsafely. A failed Finish restores the
+  original config/profile snapshot and keeps the workflow open with an error.
+- The calibrator child owns temporary hardware-preview state only while open.
+  Guided mode records a small recovery journal before the first preview, restores
+  the snapshot and removes the journal on orderly exit, and offers recovery from
+  a stale journal on the next launch. The parent owns all layout/keymap/overlay
+  draft state.
+- Existing `keyrgb-calibrate`, its Save/Save-and-Close behavior, profile schemas,
+  canonical slot IDs, legacy keymap loading, shortcuts, singleton identity, and
+  geometry persistence remain unchanged outside guided-session mode.
+- Owner-approved defaults implemented by UX-04:
+  - open the workflow as a modal editor child rather than replacing Setup;
+  - allow config-only continuation with a clear “no verified live flash” warning;
+  - allow Calibration to be skipped only when the current keymap validates;
+  - write no setup/profile state until Finish.
+
+### 2026-09-10 — UX-04 implementation and automated validation
+
+- Added a singleton modal `Guided Setup…` child to the per-key editor with
+  Preflight, Layout and legends, Optional keys, Calibration, optional Overlay,
+  and Review/Finish pages. The editor itself cannot close while this modal is
+  live, and an active calibrator child must close normally before the workflow
+  can be cancelled.
+- Added a Tk-free setup draft/controller and one explicit Finish transaction.
+  Back, Next, and Cancel do not write setup/profile state. Finish writes only
+  the layout pair and current profile's keymap/layout/slot payloads; expected
+  failures restore the original persisted and in-memory setup and keep the
+  modal open.
+- Added capability-based preflight using a tray-provided snapshot of the
+  existing `backend_caps`, backend name, and dimensions. It never selects,
+  probes, or opens another backend/device. Brightness-only and missing backend
+  evidence remain config-only; live flashing is offered only for a tray-managed
+  per-key backend.
+- Added opt-in `keyrgb-calibrate --guided-session PATH` behavior. Guided Save
+  returns a versioned temporary keymap result instead of saving profile data;
+  the standalone no-argument command and its Save actions remain unchanged.
+  Session matrix dimensions are shared by parent and child so non-reference
+  controller geometries are validated consistently.
+- Added a crash-recovery journal for Config-mediated preview state. A stale
+  valid journal is restored on the next calibrator launch; partial restoration
+  retains and reuses the true original snapshot instead of overwriting it.
+- Automated validation:
+  - `.venv/bin/python -m pytest tests/gui/perkey tests/gui/calibrator tests/tray -q -o addopts=`:
+    `1879 passed`;
+  - focused Ruff, Ruff Format, and Mypy checks across the changed setup,
+    calibrator, editor, and tray paths: passed;
+  - `.venv/bin/python -m buildpython --run-steps=1,4,13,16,17,19,20`:
+    `7 passed`; architecture checked `24` rules across `627` files with zero
+    errors or warnings;
+  - `git diff --check`: passed.
+- Owner desktop validation accepted modal sizing, preflight copy, guided key
+  flashing, Cancel, and Finish behavior. UX-04 is `done`; every UX-01–UX-09
+  campaign item is now complete.

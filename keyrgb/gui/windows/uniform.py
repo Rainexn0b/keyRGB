@@ -17,16 +17,17 @@ from keyrgb.gui.theme.focus import schedule_initial_focus
 from keyrgb.gui.utils.tk_async import TkAsyncCoordinator, submit_gui_work
 from keyrgb.gui.utils.window_bindings import install_window_bindings
 from keyrgb.gui.utils.window_geometry import compute_centered_window_geometry
-from keyrgb.gui.utils.window_icon import apply_keyrgb_window_icon
-from keyrgb.gui.utils.window_state import WindowGeometryTracker
-from keyrgb.gui.widgets.color_wheel import ColorWheel
-from keyrgb.gui.windows import (
-    _uniform_color_bootstrap as uniform_color_bootstrap,
-    _uniform_color_interactions as uniform_color_interactions,
-    _uniform_color_state as uniform_color_state,
-    _uniform_color_ui as uniform_color_ui,
-    _uniform_init_adapter as uniform_init_adapter,
-)
+
+from . import _uniform_identity as _identity, _uniform_module_bundle as _module_bundle
+
+apply_keyrgb_window_icon = _module_bundle.apply_keyrgb_window_icon
+ColorWheel = _module_bundle.ColorWheel
+WindowGeometryTracker = _module_bundle.WindowGeometryTracker
+uniform_color_bootstrap = _module_bundle._uniform_color_bootstrap
+uniform_color_interactions = _module_bundle._uniform_color_interactions
+uniform_color_state = _module_bundle._uniform_color_state
+uniform_color_ui = _module_bundle._uniform_color_ui
+uniform_init_adapter = _module_bundle._uniform_init_adapter
 
 if TYPE_CHECKING:
     from keyrgb.gui.windows._uniform_color_state import _UniformStatusLabel
@@ -53,28 +54,17 @@ def uniform_instance_identity(
 ) -> str:
     """Return the UX-09 single-instance identity for the Uniform Color window.
 
-    Uses the same route resolution as :class:`UniformColorGUI` so the lock
-    matches the window that would actually open: ``uniform-keyboard`` for the
-    primary keyboard target, otherwise ``uniform-<route.state_key>`` with
-    underscores normalized to hyphens (e.g. ``uniform-lightbar``,
-    ``uniform-ite8258-chassis-logo``). ``None`` arguments fall back to the
-    ``KEYRGB_UNIFORM_TARGET_CONTEXT``/``KEYRGB_UNIFORM_BACKEND`` environment,
-    mirroring GUI construction. The explicit backend wins over the context,
-    matching ``resolve_secondary_route`` priority.
+    Resolution lives in :mod:`keyrgb.gui.windows._uniform_identity` so the
+    lock matches the window that would actually open; see that module for
+    the ``uniform-<route>`` naming contract.
     """
-    raw_context = (
-        target_context if target_context is not None else os.environ.get("KEYRGB_UNIFORM_TARGET_CONTEXT", "keyboard")
-    )
-    raw_backend = requested_backend if requested_backend is not None else os.environ.get("KEYRGB_UNIFORM_BACKEND", "")
-    route = uniform_color_bootstrap.resolve_secondary_route(
-        target_context=str(raw_context or "keyboard"),
-        requested_backend=str(raw_backend or ""),
+    return _identity.uniform_instance_identity(
+        target_context=target_context,
+        requested_backend=requested_backend,
+        resolve_secondary_route_fn=uniform_color_bootstrap.resolve_secondary_route,
         route_for_backend_name_fn=route_for_backend_name,
         route_for_device_type_fn=route_for_device_type,
     )
-    if route is None:
-        return "uniform-keyboard"
-    return f"uniform-{str(route.state_key).strip().lower().replace('_', '-')}"
 
 
 class UniformColorGUI:

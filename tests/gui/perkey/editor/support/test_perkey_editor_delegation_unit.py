@@ -190,6 +190,34 @@ def test_on_close_handles_guard_failure_cancel_and_close_errors(monkeypatch: pyt
     assert destroyed == ["ok"]
 
 
+def test_on_close_focuses_live_guided_setup_before_editor_teardown(monkeypatch: pytest.MonkeyPatch) -> None:
+    import keyrgb.gui.perkey.editor as editor_mod
+
+    confirm = MagicMock()
+    wizard = SimpleNamespace(is_alive=lambda: True, focus=MagicMock())
+    editor = SimpleNamespace(_guided_setup_wizard=wizard, root=SimpleNamespace(destroy=MagicMock()))
+    monkeypatch.setattr(editor_mod.dirty_state, "confirm_destructive_action", confirm)
+
+    PerKeyEditor._on_close(editor)
+
+    wizard.focus.assert_called_once_with()
+    confirm.assert_not_called()
+    editor.root.destroy.assert_not_called()
+
+
+def test_on_close_ignores_broken_guided_setup_reference(monkeypatch: pytest.MonkeyPatch) -> None:
+    import keyrgb.gui.perkey.editor as editor_mod
+
+    wizard = SimpleNamespace(is_alive=MagicMock(side_effect=editor_mod.tk.TclError("gone")))
+    root = SimpleNamespace(destroy=MagicMock())
+    editor = SimpleNamespace(_guided_setup_wizard=wizard, kb=None, root=root)
+    monkeypatch.setattr(editor_mod.dirty_state, "confirm_destructive_action", lambda *_a, **_k: False)
+
+    PerKeyEditor._on_close(editor)
+
+    root.destroy.assert_not_called()
+
+
 def test_backdrop_and_layout_helpers_delegate(monkeypatch: pytest.MonkeyPatch) -> None:
     import keyrgb.gui.perkey.editor as editor_mod
 
