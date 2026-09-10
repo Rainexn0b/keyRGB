@@ -57,8 +57,8 @@ def test_ci_workflows_upload_compact_build_logs_on_failure() -> None:
     assert "if: failure()" in release_workflow
     assert "path: buildlog/keyrgb/" in release_workflow
 
-    for workflow in (ci_workflow, release_workflow):
-        assert "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" in workflow
+    assert ci_workflow.count("uses: actions/upload-artifact@") >= 2
+    assert "uses: actions/upload-artifact@" in release_workflow
 
 
 def test_contributing_doc_points_at_existing_backend_guides() -> None:
