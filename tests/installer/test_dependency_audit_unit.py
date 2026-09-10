@@ -9,7 +9,11 @@ from pathlib import Path
 from types import ModuleType
 
 import pytest
-import tomllib
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10
+    import tomli as tomllib
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCRIPT_PATH = _REPO_ROOT / "scripts" / "dependency_audit.py"
