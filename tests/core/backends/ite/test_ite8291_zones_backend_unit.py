@@ -66,6 +66,55 @@ def test_device_set_key_colors_falls_back_to_average_uniform_color() -> None:
     assert sent[1:5] == [protocol.build_zone_color_report(zone, (85, 85, 85)) for zone in range(protocol.NUM_ZONES)]
 
 
+def test_device_set_key_colors_writes_distinct_zone_colors() -> None:
+    sent: list[bytes] = []
+    device = Ite8291ZonesKeyboardDevice(sent.append)
+
+    device.set_key_colors(
+        {
+            0: (0x11, 0x22, 0x33),
+            (0, 1): (0x44, 0x55, 0x66),
+            "2": (0x77, 0x88, 0x99),
+            (0, 3): (0xAA, 0xBB, 0xCC),
+        },
+        brightness=25,
+    )
+
+    assert sent[0] == protocol.build_zone_enable_report()
+    assert sent[1:5] == [
+        protocol.build_zone_color_report(0, (0x11, 0x22, 0x33)),
+        protocol.build_zone_color_report(1, (0x44, 0x55, 0x66)),
+        protocol.build_zone_color_report(2, (0x77, 0x88, 0x99)),
+        protocol.build_zone_color_report(3, (0xAA, 0xBB, 0xCC)),
+    ]
+    assert sent[5] == protocol.build_commit_state_report(25)
+
+
+def test_device_set_key_colors_supports_partial_zone_writes() -> None:
+    sent: list[bytes] = []
+    device = Ite8291ZonesKeyboardDevice(sent.append)
+    device.set_color((0x10, 0x10, 0x10), brightness=25)
+
+    sent.clear()
+    device.set_key_colors({(0, 1): (0xFF, 0x00, 0x00)}, brightness=25)
+
+    assert sent[1:5] == [
+        protocol.build_zone_color_report(0, (0x10, 0x10, 0x10)),
+        protocol.build_zone_color_report(1, (0xFF, 0x00, 0x00)),
+        protocol.build_zone_color_report(2, (0x10, 0x10, 0x10)),
+        protocol.build_zone_color_report(3, (0x10, 0x10, 0x10)),
+    ]
+
+
+def test_device_set_key_colors_falls_back_to_average_when_any_key_is_not_a_zone() -> None:
+    sent: list[bytes] = []
+    device = Ite8291ZonesKeyboardDevice(sent.append)
+
+    device.set_key_colors({0: (255, 0, 0), "esc": (0, 0, 255)}, brightness=50)
+
+    assert sent[1:5] == [protocol.build_zone_color_report(zone, (127, 0, 127)) for zone in range(protocol.NUM_ZONES)]
+
+
 def test_device_turn_off_sends_full_sequence() -> None:
     sent: list[bytes] = []
     device = Ite8291ZonesKeyboardDevice(sent.append)
@@ -83,6 +132,7 @@ def test_backend_reports_research_backed_experimental_metadata() -> None:
     assert backend.experimental_evidence == ExperimentalEvidence.REVERSE_ENGINEERED
     assert backend.capabilities().per_key is False
     assert backend.capabilities().color is True
+    assert backend.capabilities().zoned is True
 
 
 def test_find_matching_supported_hidraw_device_uses_forced_existing_path(

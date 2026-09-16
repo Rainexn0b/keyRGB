@@ -187,7 +187,7 @@ select live controls; **Lighting Profiles** remains the persistent whole-scene e
 
 Support is **controller-specific**, not brand-wide. Two laptops with the same
 badge can use different ITE chips or only a brightness-only sysfs backlight.
-When unsure, open **Settings → Version → Support Tools…**, run diagnostics and
+When unsure, open **Settings → About & Support → Support Tools…**, run diagnostics and
 device discovery, then choose **Save full support bundle…**. As a terminal
 fallback, run `lsusb` (look for `048d:`) and `keyrgb-diagnostics` (or
 `keyrgb --diagnostics`).
@@ -203,6 +203,7 @@ fallback, run `lsusb` (look for `048d:`) and `keyrgb-diagnostics` (or
 | Lenovo Legion Pro 7 Gen10 | `048d:c197` | `ite8258_perkey_chassis` | experimental | Per-key keyboard plus logo / neon / vent |
 | Lenovo IdeaPad / Legion 4-zone | `048d:c963` and related PIDs | `ite8295_zones_lenovo_ideapad` | experimental | 4-zone keyboard |
 | Clevo / TUXEDO lightbar | `048d:7001` / `7000` / `6010` | `ite8233_none_chassis_lightbar_clevo` | experimental | Lightbar only, no keyboard deck |
+| Tongfang / Ionico front lightbar | `048d:6005`, expected HID usage `ff03:01` from OpenRGB | `ite8291_none_chassis_lightbar_tongfang` | experimental | Independent chassis lightbar; uniform control pending hardware validation |
 
 Wootbook and Lenovo Gen10 USB devices usually need the udev rules in
 `system/udev/99-ite8291-wootbook.rules` for hidraw/USB access.
@@ -230,6 +231,7 @@ unless you opt in to experimental ones (**Settings → Backend policy** or
 | `ite8295_zones_lenovo_ideapad` | experimental | IdeaPad / Legion 4-zone family |
 | `ite8297_uniform` | experimental | Uniform-color ITE 8297 |
 | `ite8233_none_chassis_lightbar_clevo` | experimental | Clevo lightbar |
+| `ite8291_none_chassis_lightbar_tongfang` | experimental | Auxiliary Tongfang / Ionico front lightbar; never auto-selected as the keyboard |
 | `sysfs-mouse` | experimental | Auxiliary mouse LEDs in sysfs; never auto-selected as the keyboard |
 
 Older `KEYRGB_BACKEND` values such as `ite8291r3`, `ite8258`, and
@@ -253,6 +255,7 @@ installs the matching KeyRGB udev rules for supported USB / hidraw access.
 | `KEYRGB_ITE8295_ZONES_HIDRAW_PATH` | Override `/dev/hidraw*` for `ite8295_zones_lenovo_ideapad`. |
 | `KEYRGB_ITE8297_HIDRAW_PATH` | Override `/dev/hidraw*` for `ite8297_uniform`. |
 | `KEYRGB_ITE8233_HIDRAW_PATH` | Override `/dev/hidraw*` for the Clevo lightbar backend. |
+| `KEYRGB_ITE8291_TONGFANG_LIGHTBAR_HIDRAW_PATH` | Override `/dev/hidraw*` for the Tongfang / Ionico `048d:6005` front-lightbar backend. |
 | `KEYRGB_ITE8910_HIDRAW_PATH` | Override `/dev/hidraw*` for `ite8910_perkey`. |
 | `KEYRGB_HID_REPORT_DELAY_MS` | Milliseconds to sleep between USB HID reports (default `1`). Increase if the controller resets under heavy frames; `0` disables pacing. |
 | `KEYRGB_<BACKEND>_REPORT_DELAY_MS` | Per-backend HID pacing, punctuation normalized to underscores (for example `KEYRGB_ITE8291R3_PERKEY_REPORT_DELAY_MS`). Falls back to `KEYRGB_HID_REPORT_DELAY_MS`. |

@@ -14,14 +14,19 @@ class _DummyEngine:
         brightness: int,
         reactive_brightness: int,
         has_per_key: bool = True,
+        has_zoned: bool = False,
         reactive_visual_mode: str | None = None,
     ):
         self.brightness = brightness
         self.reactive_brightness = reactive_brightness
         self.per_key_colors = None
         self.per_key_brightness = None
-        self.backend_caps = SimpleNamespace(per_key=has_per_key)
-        self.kb = SimpleNamespace(set_key_colors=lambda *_args, **_kwargs: None) if has_per_key else SimpleNamespace()
+        self.backend_caps = SimpleNamespace(per_key=has_per_key, zoned=has_zoned)
+        self.kb = (
+            SimpleNamespace(set_key_colors=lambda *_args, **_kwargs: None)
+            if has_per_key or has_zoned
+            else SimpleNamespace()
+        )
         if reactive_visual_mode is not None:
             self.reactive_visual_mode = reactive_visual_mode
         self._reactive_active_pulse_mix = 0.0
@@ -38,6 +43,22 @@ def test_active_pulse_mix_does_not_lift_hw_on_per_key_backends() -> None:
     eng._reactive_active_pulse_mix = 1.0
 
     _base, eff, hw = _resolve_brightness(eng)
+
+    assert eff == 50
+    assert hw == 10
+
+
+def test_active_pulse_mix_does_not_lift_hw_on_zoned_backends() -> None:
+    from keyrgb.core.effects.reactive.render import _resolve_brightness
+
+    eng = _DummyEngine(brightness=10, reactive_brightness=50, has_per_key=False, has_zoned=True)
+    eng._last_rendered_brightness = 10
+    eng._reactive_active_pulse_mix = 1.0
+
+    hw = 10
+    for _ in range(12):
+        _base, eff, hw = _resolve_brightness(eng)
+        eng._last_rendered_brightness = hw
 
     assert eff == 50
     assert hw == 10

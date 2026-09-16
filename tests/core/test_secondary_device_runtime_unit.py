@@ -60,19 +60,20 @@ def test_simulation_flag_normalizes_common_environment_values(monkeypatch: pytes
         assert secondary_device_simulation_enabled() is False
 
 
-def test_simulation_exposes_all_five_registered_routes(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_simulation_exposes_all_six_registered_routes(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(SIMULATION_ENVIRONMENT_VARIABLE, "1")
 
     effective = iter_effective_secondary_routes()
 
     assert [entry.state_key for entry in effective] == [
         "lightbar",
+        "ite8291_tongfang_lightbar",
         "mouse",
         "ite8258_chassis_logo",
         "ite8258_chassis_neon",
         "ite8258_chassis_vent",
     ]
-    assert len({entry.state_key for entry in effective}) == 5
+    assert len({entry.state_key for entry in effective}) == 6
     assert all(entry.available for entry in effective)
     assert all(entry.simulated for entry in effective)
     assert {entry.availability_source for entry in effective} == {"simulation"}

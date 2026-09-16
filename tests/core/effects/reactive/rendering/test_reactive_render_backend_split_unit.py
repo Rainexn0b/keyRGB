@@ -70,6 +70,32 @@ def test_per_key_reactive_pulse_keeps_hw_at_profile_brightness() -> None:
     assert not [call for call in kb.calls if call[0] == "set_brightness"]
 
 
+def test_zoned_reactive_frame_uses_spatial_writer() -> None:
+    from keyrgb.core.effects.reactive.render import render
+
+    kb = _DummyKB()
+    engine = SimpleNamespace(
+        backend_caps=SimpleNamespace(per_key=False, zoned=True),
+        kb=kb,
+        kb_lock=_DummyLock(),
+        brightness=15,
+        reactive_brightness=50,
+        per_key_colors=None,
+        per_key_brightness=None,
+        _hw_brightness_cap=None,
+        _dim_temp_active=False,
+        _reactive_active_pulse_mix=1.0,
+        _last_rendered_brightness=15,
+        _last_hw_mode_brightness=15,
+    )
+    color_map = {(0, 0): (255, 0, 0), (0, 1): (0, 0, 255)}
+
+    render(engine, color_map=color_map)
+
+    assert kb.frames == [color_map]
+    assert ("set_key_colors", 15) in kb.calls
+
+
 def test_per_key_reactive_frame_fans_out_average_color_to_enabled_secondaries(monkeypatch) -> None:
     from keyrgb.core.effects.reactive import _render_runtime
     from keyrgb.core.effects.reactive.render import render

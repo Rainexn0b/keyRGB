@@ -1,13 +1,19 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from typing import SupportsIndex, SupportsInt, cast
 
 from . import protocol
 
 _logger = logging.getLogger(__name__)
 
 FeatureReportWriter = Callable[[bytes], int | None]
+IntCoercible = SupportsInt | SupportsIndex | str | bytes | bytearray
+
+
+def _coerce_int(value: object) -> int:
+    return int(cast(IntCoercible, value))
 
 
 def _coerce_rgb(color) -> tuple[int, int, int]:
@@ -21,6 +27,28 @@ def _coerce_rgb(color) -> tuple[int, int, int]:
         protocol.clamp_channel(green),
         protocol.clamp_channel(blue),
     )
+
+
+def _coerce_zone_index(key_id: object) -> int | None:
+    if isinstance(key_id, tuple):
+        if len(key_id) != 2:
+            return None
+        row, col = key_id
+        try:
+            if _coerce_int(row) != 0:
+                return None
+            zone_index = _coerce_int(col)
+        except (TypeError, ValueError):
+            return None
+    else:
+        try:
+            zone_index = _coerce_int(key_id)
+        except (TypeError, ValueError):
+            return None
+
+    if 0 <= zone_index < protocol.NUM_ZONES:
+        return zone_index
+    return None
 
 
 class Ite8291ZonesKeyboardDevice:
@@ -81,23 +109,38 @@ class Ite8291ZonesKeyboardDevice:
 
     def set_key_colors(self, color_map, *, brightness: int, enable_user_mode: bool = True):
         del enable_user_mode
-        if not color_map:
+        if not isinstance(color_map, Mapping) or not color_map:
             self.set_color((0, 0, 0), brightness=brightness)
             return
 
-        red = green = blue = count = 0
-        for color in color_map.values():
-            r, g, b = _coerce_rgb(color)
-            red += r
-            green += g
-            blue += b
-            count += 1
+        zone_colors = list(self._zone_colors)
+        parsed_all = True
+        for key_id, color in color_map.items():
+            zone_index = _coerce_zone_index(key_id)
+            if zone_index is None:
+                parsed_all = False
+                break
+            zone_colors[zone_index] = _coerce_rgb(color)
 
-        if count <= 0:
-            self.set_color((0, 0, 0), brightness=brightness)
+        if not parsed_all:
+            red = green = blue = count = 0
+            for color in color_map.values():
+                r, g, b = _coerce_rgb(color)
+                red += r
+                green += g
+                blue += b
+                count += 1
+
+            if count <= 0:
+                self.set_color((0, 0, 0), brightness=brightness)
+                return
+
+            self.set_color((red // count, green // count, blue // count), brightness=brightness)
             return
 
-        self.set_color((red // count, green // count, blue // count), brightness=brightness)
+        self._zone_colors = zone_colors
+        self._current_brightness = protocol.clamp_ui_brightness(brightness)
+        self._apply_current_state()
 
     def set_effect(self, effect_data) -> None:
         del effect_data

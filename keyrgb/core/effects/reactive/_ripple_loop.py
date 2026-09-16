@@ -7,9 +7,10 @@ from collections.abc import Callable, Mapping, Sequence
 from operator import attrgetter
 from typing import TYPE_CHECKING, Protocol
 
-from keyrgb.core.backends.base import supports_per_key_output
+from keyrgb.core.backends.base import supports_spatial_output
 from keyrgb.core.effects.matrix_layout import geometry_for_engine
 
+from ._runtime_inputs import project_slot_cells_for_engine
 from .input import EvdevKeyboardDevices
 from .utils import frame_elapsed_dt_s, log_frame_overrun_if_slow, remaining_frame_delay_s
 
@@ -68,7 +69,7 @@ def _engine_int_attr_or_fallback(
 
 
 def _has_per_key_writer(engine: EffectsEngine) -> bool:
-    return supports_per_key_output(getattr(engine, "backend_caps", None), getattr(engine, "kb", None))
+    return supports_spatial_output(getattr(engine, "backend_caps", None), getattr(engine, "kb", None))
 
 
 class _PressSourceProtocol(Protocol):
@@ -282,7 +283,10 @@ def run_reactive_ripple_loop(engine: EffectsEngine, *, api: _ReactiveRippleApiPr
             if pressed_slot_ids:
                 ttl = _BASE_PULSE_TTL_S / p
                 for pressed_slot_id in pressed_slot_ids:
-                    mapped_cells = api.mapped_slot_cells(slot_keymap, pressed_slot_id)
+                    mapped_cells = project_slot_cells_for_engine(
+                        engine,
+                        api.mapped_slot_cells(slot_keymap, pressed_slot_id),
+                    )
                     if mapped_cells:
                         for row, col in mapped_cells:
                             pulses.append(

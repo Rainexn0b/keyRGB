@@ -5,6 +5,7 @@ import re
 import subprocess
 from dataclasses import dataclass, field
 
+from ...resources.defaults import REFERENCE_MATRIX_COLS
 from ...resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS
 from ..base import KeyboardDevice
 
@@ -119,8 +120,8 @@ class AsusctlAuraKeyboardDevice(KeyboardDevice):
         self._run_ok(["aura", "effect", "static", "-c", hex_color], timeout_s=2.0)
 
     def set_key_colors(self, color_map, *, brightness: int, enable_user_mode: bool = True):
-        # Note: `asusctl` CLI is zone-based. We implement "virtual per-key" mapping
-        # by averaging keys into zones when multiple zones are configured.
+        # `asusctl` CLI is zone-based. Map spatial effect cells into configured
+        # zones by averaging each horizontal bucket.
 
         if not color_map:
             return
@@ -142,7 +143,15 @@ class AsusctlAuraKeyboardDevice(KeyboardDevice):
         zone_lists: list[list[tuple[int, int, int]]] = [[] for _ in self.zones]
 
         for key_id, color in color_map.items():
-            z_idx = self._key_to_zone_idx.get(key_id)
+            z_idx = self._key_to_zone_idx.get(key_id) if isinstance(key_id, str) else None
+            if z_idx is None and isinstance(key_id, tuple) and len(key_id) == 2:
+                try:
+                    row, col = int(key_id[0]), int(key_id[1])
+                except (TypeError, ValueError):
+                    continue
+                if row < 0 or col < 0:
+                    continue
+                z_idx = min(len(self.zones) - 1, col * len(self.zones) // int(REFERENCE_MATRIX_COLS))
             if z_idx is None:
                 continue
             zone_lists[z_idx].append((int(color[0]), int(color[1]), int(color[2])))

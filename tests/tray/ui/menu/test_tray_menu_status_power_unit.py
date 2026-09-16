@@ -36,6 +36,7 @@ class DummyCaps:
     brightness: bool = True
     color: bool = True
     palette: bool = False
+    zoned: bool = False
 
 
 class DummyConfig:
@@ -157,6 +158,27 @@ def test_menu_groups_controls_in_the_agreed_order() -> None:
     ]
     positions = [labels.index(label) for label in expected]
     assert positions == sorted(positions)
+
+
+def test_zoned_backend_can_enter_software_effect_mode_from_hardware_mode() -> None:
+    tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False, zoned=True))
+
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+    submenu = next(
+        entry["action"] for entry in items if isinstance(entry, dict) and entry["text"] == "Software Effects"
+    )
+    effect_items = [
+        entry
+        for entry in submenu.items
+        if isinstance(entry, dict) and entry["text"] not in {"Reactive Typing Settings…", "None (static per-key)"}
+    ]
+
+    assert effect_items
+    assert all(entry["enabled"] is True for entry in effect_items)
+    per_key_item = next(
+        entry for entry in submenu.items if isinstance(entry, dict) and entry["text"] == "None (static per-key)"
+    )
+    assert per_key_item["enabled"] is False
 
 
 def test_keyboard_status_badges_research_backed_experimental_backend(monkeypatch: pytest.MonkeyPatch) -> None:

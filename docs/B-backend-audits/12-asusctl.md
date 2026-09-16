@@ -136,15 +136,16 @@ lightbar or logo independently cannot do so through KeyRGB.
 ### 6. Capabilities
 
 ```python
-BackendCapabilities(per_key=(len(zones) > 1), color=True, hardware_effects=False, palette=False)
+BackendCapabilities(per_key=False, zoned=(len(zones) > 1), color=True, hardware_effects=False, palette=False)
 ```
 
-- `per_key`: `True` only if zones are configured. This is virtual per-key via
-  horizontal bucketing, not true per-key addressing.
+- `per_key`: `False`; asusctl does not expose true per-key addressing here.
+- `zoned`: `True` when multiple zones are configured. Software frames use
+  horizontal bucketing without unlocking per-key profiles or calibration.
 - `color`: `True`.
 - `hardware_effects`: `False` — currently accurate because effects are not wired.
 
-**Finding:** ✅ Correct for current implementation.
+**Finding:** ✅ Capability semantics distinguish zoned software output from true per-key control.
 
 ---
 

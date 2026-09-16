@@ -210,7 +210,9 @@ class Ite8291ZonesBackend(KeyboardBackend):
         )
 
     def capabilities(self) -> BackendCapabilities:
-        return BackendCapabilities(brightness=True, per_key=False, color=True, hardware_effects=False, palette=False)
+        return BackendCapabilities(
+            brightness=True, per_key=False, color=True, hardware_effects=False, palette=False, zoned=True
+        )
 
     def get_device(self) -> KeyboardDevice:
         from ..exceptions import (

@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from operator import attrgetter
 from typing import TYPE_CHECKING, SupportsIndex, SupportsInt, cast
 
-from keyrgb.core.backends.base import supports_per_key_output
+from keyrgb.core.backends.base import supports_spatial_output
 from keyrgb.core.backends.policies.per_key_mode import per_key_mode_requires_frame_reassert
 from keyrgb.core.effects.device import optional_output_transaction
 from keyrgb.core.effects.matrix_layout import geometry_for_engine
@@ -164,7 +164,13 @@ def animation_step_s(
 
 
 def has_per_key(engine: EffectsEngine) -> bool:
-    return supports_per_key_output(_engine_attr_or_none(engine, "backend_caps"), _engine_attr_or_none(engine, "kb"))
+    """Return whether the device accepts spatial frames (per-key or zoned).
+
+    The historical name is retained as a tested compatibility seam for effect
+    implementations and third-party callers.
+    """
+
+    return supports_spatial_output(_engine_attr_or_none(engine, "backend_caps"), _engine_attr_or_none(engine, "kb"))
 
 
 def _software_hardware_writes_allowed(engine: EffectsEngine) -> bool:
@@ -227,7 +233,7 @@ def scale(rgb: Color, s: float) -> Color:
 
 
 def render(engine: EffectsEngine, *, color_map: Mapping[Key, Color]) -> None:
-    """Render per-key when available, otherwise fall back to uniform."""
+    """Render spatially when available, otherwise fall back to uniform."""
 
     if has_per_key(engine):
         try:

@@ -5,7 +5,7 @@ import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from keyrgb.core.backends.base import supports_per_key_output
+from keyrgb.core.backends.base import supports_spatial_output
 
 from . import _render_brightness_support as _support
 from ._constants import UNIFORM_PULSE_HW_LIFT_STREAK_MIN
@@ -44,8 +44,8 @@ def _can_lift_hw_brightness(
 ) -> bool:
     """Return whether a uniform-only backend may temporarily raise hardware brightness.
 
-    Per-key backends keep hardware brightness fixed and express reactive intensity
-    through per-key color contrast instead (invariant #2). Uniform-only backends
+    Spatial backends keep hardware brightness fixed and express reactive intensity
+    through per-key or per-zone color contrast instead (invariant #2). Uniform-only backends
     need a short stable-frame gate before lifting hardware brightness so the first
     keypress of a burst does not produce an immediate full-frame spike.
 
@@ -54,7 +54,7 @@ def _can_lift_hw_brightness(
     single-frame brightness spikes on the first keypress after idle.
 
     Args:
-        per_key_hw: True if the backend supports per-key colors.
+        per_key_hw: True if the backend supports per-key or zoned spatial colors.
         uniform_hw_streak_count: Consecutive frames with active pulse on uniform.
         pulse_mix: Current pulse intensity (0.0..1.0).
         effective_brightness: The effect (reactive) brightness target.
@@ -102,7 +102,7 @@ def _resolve_hw_brightness_with_pulse_mix(
         - allow_pulse_hw_lift: whether a uniform pulse lift was applied
         - per_key_hw: whether this is a per-key backend
     """
-    per_key_hw = supports_per_key_output(
+    per_key_hw = supports_spatial_output(
         getattr(engine, "backend_caps", None),
         _support.keyboard_or_none(engine),
     )

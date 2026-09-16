@@ -23,6 +23,7 @@ body:
         - ite8295_zones_lenovo_ideapad
         - ite8297_uniform
         - ite8233_none_chassis_lightbar_clevo
+        - ite8291_none_chassis_lightbar_tongfang
         - sysfs-mouse
         - Other experimental backend
     validations:
@@ -81,7 +82,7 @@ body:
     id: diagnostics
     attributes:
       label: Support bundle or fallback diagnostics
-      description: Attach the bundle from **Settings → Version → Support Tools… → Save full support bundle…**. If the UI cannot be opened, paste the full `keyrgb-diagnostics` or `keyrgb --diagnostics` output from the successful setup.
+      description: Attach the bundle from **Settings → About & Support → Support Tools… → Save full support bundle…**. If the UI cannot be opened, paste the full `keyrgb-diagnostics` or `keyrgb --diagnostics` output from the successful setup.
       placeholder: Drag the support bundle here, or paste fallback diagnostics JSON.
     validations:
       required: true

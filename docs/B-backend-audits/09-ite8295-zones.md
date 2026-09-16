@@ -155,11 +155,11 @@ range.
 ### 8. Capabilities
 
 ```python
-BackendCapabilities(per_key=False, color=True, hardware_effects=True, palette=False)
+BackendCapabilities(per_key=False, zoned=True, color=True, hardware_effects=True, palette=False)
 ```
 
-This is correct: the 4-zone device supports per-zone color and hardware effects (breathing,
-wave, smooth/spectrum_cycle), but not per-key control.
+This is correct: the 4-zone device supports spatial software frames, per-zone color, and hardware
+effects (breathing, wave, smooth/spectrum_cycle), but not per-key control.
 
 ---
 

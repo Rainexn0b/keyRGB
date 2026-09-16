@@ -63,6 +63,7 @@ def test_zones_available_when_parent_probe_succeeds(monkeypatch) -> None:
     # Persisted state is reported for every registered secondary route.
     assert set(snap["secondary_device_state"]) == {
         "lightbar",
+        "ite8291_tongfang_lightbar",
         "mouse",
         "ite8258_chassis_logo",
         "ite8258_chassis_neon",
@@ -97,6 +98,7 @@ def test_simulation_snapshot_reports_all_routes_without_hardware(monkeypatch) ->
 
     assert [route["device_type"] for route in snap["effective_routes"]] == [
         "lightbar",
+        "lightbar",
         "mouse",
         "logo",
         "neon",
@@ -113,7 +115,7 @@ def test_simulation_snapshot_reports_all_routes_without_hardware(monkeypatch) ->
         "neon",
         "vent",
     ]
-    assert len(snap["expected_profile_editor_rows"]) == 5
+    assert len(snap["expected_profile_editor_rows"]) == 6
     assert all(row["simulated"] for row in snap["expected_profile_editor_rows"])
 
 

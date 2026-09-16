@@ -103,7 +103,14 @@ def test_simulation_context_entries_expose_all_registered_routes(monkeypatch: py
 
     entries = menu_status.device_context_entries(tray)
 
-    assert [entry["device_type"] for entry in entries[1:]] == ["lightbar", "mouse", "logo", "neon", "vent"]
+    assert [entry["device_type"] for entry in entries[1:]] == [
+        "lightbar",
+        "lightbar",
+        "mouse",
+        "logo",
+        "neon",
+        "vent",
+    ]
     assert all("(simulated)" in entry["text"] for entry in entries[1:])
 
 

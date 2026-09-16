@@ -64,6 +64,23 @@ class _UniformBackend:
         raise FileNotFoundError("geometry unit tests do not open hardware")
 
 
+class _ZonedBackend(_UniformBackend):
+    name = "zones-test"
+
+    def capabilities(self) -> BackendCapabilities:
+        return BackendCapabilities(
+            brightness=True,
+            per_key=False,
+            color=True,
+            hardware_effects=False,
+            palette=False,
+            zoned=True,
+        )
+
+    def dimensions(self) -> tuple[int, int]:
+        return (1, 4)
+
+
 def test_effect_geometry_from_dimensions_uses_backend_matrix_when_per_key() -> None:
     geometry = effect_geometry_from_dimensions((7, 20), backend_name="ite8258_perkey_chassis", per_key=True)
 
@@ -83,6 +100,22 @@ def test_effect_geometry_from_dimensions_keeps_reference_for_non_per_key() -> No
     assert geometry.cols == REFERENCE_EFFECT_GEOMETRY.cols
 
 
+def test_effect_geometry_from_dimensions_uses_zoned_matrix() -> None:
+    geometry = effect_geometry_from_dimensions(
+        (1, 4),
+        backend_name="ite8291_zones_clevo",
+        per_key=False,
+        zoned=True,
+    )
+
+    assert geometry == EffectGridGeometry(
+        rows=1,
+        cols=4,
+        source="backend",
+        backend_name="ite8291_zones_clevo",
+    )
+
+
 def test_engine_owns_backend_geometry_for_per_key_backend() -> None:
     engine = EffectsEngine(backend=_PerKeyBackend(name="ite8258_perkey_chassis", rows=7, cols=20))
 
@@ -98,6 +131,18 @@ def test_engine_keeps_reference_geometry_for_uniform_backend() -> None:
     assert engine.effect_geometry.source == "reference"
     assert engine.effect_geometry.rows == REFERENCE_EFFECT_GEOMETRY.rows
     assert engine.effect_geometry.cols == REFERENCE_EFFECT_GEOMETRY.cols
+
+
+def test_engine_owns_backend_geometry_for_zoned_backend() -> None:
+    engine = EffectsEngine(backend=_ZonedBackend())
+
+    assert engine.effect_geometry == EffectGridGeometry(
+        rows=1,
+        cols=4,
+        source="backend",
+        backend_name="zones-test",
+    )
+    assert software_base.base_color_map(engine).keys() == {(0, col) for col in range(4)}
 
 
 def test_engine_geometry_refreshes_on_backend_change() -> None:

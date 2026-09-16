@@ -128,7 +128,7 @@ valid via aliases (see *Deprecated aliases*).
 
 | Identifier | Directory | Stability | Notes |
 |---|---|---|---|
-| `asusctl-aura` | `asusctl/` | VALIDATED | Wraps `asusctl` CLI; supports virtual per-key via zone bucketing. |
+| `asusctl-aura` | `asusctl/` | VALIDATED | Wraps `asusctl` CLI; supports spatial software effects via zone bucketing. |
 | `ite8291r3_perkey` | `ite8291r3_perkey/` | VALIDATED | USB control-transfer protocol; multi-OEM Tongfang-class. |
 | `ite8910_perkey` | `ite8910_perkey/` | VALIDATED | Per-key HID backend. |
 | `ite8291_perkey` | `ite8291_perkey/` | EXPERIMENTAL | Native HID feature-report variant. |
@@ -137,6 +137,7 @@ valid via aliases (see *Deprecated aliases*).
 | `ite8258_perkey_chassis` | `ite8258_perkey_chassis/` | EXPERIMENTAL | Composite keyboard + chassis lighting (Lenovo Legion Pro 7 Gen10, `0x048d:0xc197`). Exposes logo/neon/vent zones. |
 | `ite8295_zones_lenovo_ideapad` | `ite8295_zones_lenovo_ideapad/` | EXPERIMENTAL | Lenovo IdeaPad/Legion 4-zone family. Covers PIDs `0xC955/0xC963/0xC965/0xC973/0xC975/0xC984/0xC985`. |
 | `ite8233_none_chassis_lightbar_clevo` | `ite8233_none_chassis_lightbar_clevo/` | EXPERIMENTAL | Clevo lightbar (no keyboard). OpenRGB calls this "ITE 8291 rev 0.03" but the device's own HID descriptor reports "ITE Device(8233)". |
+| `ite8291_none_chassis_lightbar_tongfang` | `ite8291_none_chassis_lightbar_tongfang/` | EXPERIMENTAL | Auxiliary Tongfang / Ionico front lightbar (`0x048d:0x6005`, expected HID usage `0xFF03:0x01`). Separate Ionico protocol; never a primary keyboard backend. |
 | `ite8297_uniform` | `ite8297_uniform/` | EXPERIMENTAL | Uniform-color sysfs/hidraw backend. |
 | `sysfs-leds` | `sysfs/` | VALIDATED | Generic sysfs LED subsystem; handles Tuxedo/Clevo/System76 multi-intensity and ITE 8297 channel LEDs. |
 | `sysfs-mouse` | `sysfs_mouse/` | EXPERIMENTAL | Auxiliary sysfs LED backend for external mice. |
@@ -202,6 +203,15 @@ misleading. Verify against real descriptors before changing.
 not implement a scan effect. The 7-slot color behavior for KeyRGB's
 multi-slot protocol is unconfirmed.
 
+### ite8291_none_chassis_lightbar_tongfang — 22-LED report-size discrepancy
+
+OpenRGB identifies `0x048d:0x6005` as the independent Ionico front lightbar and
+declares 22 LEDs, but writes a 65-byte direct report containing one report-ID
+byte. Only 21 complete RGB triplets fit. KeyRGB therefore keeps this controller
+in a separate experimental auxiliary backend, writes only complete triplets,
+does not persist changes automatically, and requires real-hardware confirmation
+before broadening the capability claim.
+
 ### ite8291_perkey vs. ite8291r3_perkey — transport split
 
 Both target ITE 8291-family devices but use different transports:
@@ -246,7 +256,7 @@ backend is more of a "sysfs LED aggregator" than a single-chip driver.
 ### Shared hidraw modules
 
 Several backends depend on hidraw transport modules from other backends:
-- `ite8291_perkey/hidraw.py` — used by `ite8291_zones_clevo`, `ite8295_zones_lenovo_ideapad`, `ite8258_zones_lenovo_legion`, `ite8258_perkey_chassis`.
+- `ite8291_perkey/hidraw.py` — used by `ite8291_zones_clevo`, `ite8295_zones_lenovo_ideapad`, `ite8258_zones_lenovo_legion`, `ite8258_perkey_chassis`, and `ite8291_none_chassis_lightbar_tongfang`.
 - `ite8910_perkey/hidraw.py` — used by `ite8233_none_chassis_lightbar_clevo`, `ite8297_uniform`.
 - `shared_hidraw_probe.py` — common find/open/identifier glue for ite8291-style
   and ite8910-style scanners (prefer this over copying forced-path + product-id

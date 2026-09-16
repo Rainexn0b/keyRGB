@@ -17,6 +17,7 @@ DEVICE_TYPES_BY_USB_KEY: dict[tuple[int, int], str] = {
     (0x048D, 0xC963): "keyboard",
     (0x048D, 0xC966): "keyboard",
     (0x048D, 0x600B): "keyboard",
+    (0x048D, 0x6005): "lightbar",
     (0x048D, 0x6010): "lightbar",
     (0x048D, 0x7000): "lightbar",
     (0x048D, 0x7001): "lightbar",

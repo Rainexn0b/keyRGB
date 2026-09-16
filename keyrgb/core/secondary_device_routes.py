@@ -72,6 +72,22 @@ def _get_ite8233_lightbar_backend() -> object:
     return Ite8233Backend()
 
 
+def _get_ite8291_tongfang_lightbar_backend() -> object:
+    from keyrgb.core.backends.ite8291_none_chassis_lightbar_tongfang.backend import (
+        Ite8291TongfangLightbarBackend,
+    )
+
+    return Ite8291TongfangLightbarBackend()
+
+
+def _acquire_ite8291_tongfang_lightbar() -> object:
+    from keyrgb.core.backends.ite8291_none_chassis_lightbar_tongfang.backend import (
+        Ite8291TongfangLightbarBackend,
+    )
+
+    return Ite8291TongfangLightbarBackend().get_device()
+
+
 def _acquire_sysfs_mouse() -> object:
     return SysfsMouseBackend().get_device()
 
@@ -101,6 +117,20 @@ _ROUTES: tuple[SecondaryDeviceRoute, ...] = (
         state_key="lightbar",
         get_backend=_get_ite8233_lightbar_backend,
         get_device=_acquire_ite8233_lightbar,
+        config_brightness_attr="lightbar_brightness",
+        config_color_attr="lightbar_color",
+        supports_uniform_color=True,
+        supports_software_target=True,
+        supports_profile_state=True,
+        brightness_policy=BRIGHTNESS_POLICY_INDEPENDENT,
+    ),
+    SecondaryDeviceRoute(
+        device_type="lightbar",
+        backend_name="ite8291_none_chassis_lightbar_tongfang",
+        display_name="Front Lightbar",
+        state_key="ite8291_tongfang_lightbar",
+        get_backend=_get_ite8291_tongfang_lightbar_backend,
+        get_device=_acquire_ite8291_tongfang_lightbar,
         config_brightness_attr="lightbar_brightness",
         config_color_attr="lightbar_color",
         supports_uniform_color=True,
@@ -176,7 +206,13 @@ _ROUTES: tuple[SecondaryDeviceRoute, ...] = (
     ),
 )
 
-_ROUTES_BY_DEVICE_TYPE = {route.device_type: route for route in _ROUTES}
+# Multiple routes may share the same device_type (e.g. two independent
+# lightbar controllers). The legacy device_type lookup stays deterministic by
+# keeping the first registered route; backend_name / context-entry lookups
+# resolve the specific route.
+_ROUTES_BY_DEVICE_TYPE: dict[str, SecondaryDeviceRoute] = {}
+for _route in _ROUTES:
+    _ROUTES_BY_DEVICE_TYPE.setdefault(_route.device_type, _route)
 _ROUTES_BY_BACKEND_NAME = {route.backend_name: route for route in _ROUTES}
 
 

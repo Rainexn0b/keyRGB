@@ -23,13 +23,19 @@ def test_builtin_primary_backends_are_discovered_from_package_markers() -> None:
     assert "sysfs-mouse" not in names
 
 
-def test_auxiliary_sysfs_mouse_is_excluded_from_primary_specs_but_constructable() -> None:
+def test_auxiliary_backends_are_excluded_from_primary_specs_but_constructable() -> None:
     _invalidate_discovery_cache()
     auxiliary = iter_auxiliary_specs()
 
-    assert [spec.name for spec in auxiliary] == ["sysfs-mouse"]
+    assert [spec.name for spec in auxiliary] == [
+        "ite8291_none_chassis_lightbar_tongfang",
+        "sysfs-mouse",
+    ]
     backends = iter_backends(specs=auxiliary)
-    assert [backend.name for backend in backends] == ["sysfs-mouse"]
+    assert [backend.name for backend in backends] == [
+        "ite8291_none_chassis_lightbar_tongfang",
+        "sysfs-mouse",
+    ]
 
 
 def test_metadata_drives_provider_tier_and_safety() -> None:

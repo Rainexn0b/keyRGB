@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.36.2 (2026-09-17)
+
+Four-zone software-effect support and experimental MEDION Beast X30 front-lightbar integration. The new lightbar path remains opt-in pending hardware validation.
+
+- Effects/Backends: Distinguish zoned spatial output from true per-key control, enabling software and reactive effects across ITE 8291/8295 four-zone keyboards while keeping per-key profiles and calibration gated. Canonical reactive key positions are bucketed into logical zones; existing asusctl zone bucketing now uses the same truthful capability.
+- Backends/Experimental: Add an isolated auxiliary `ite8291_none_chassis_lightbar_tongfang` backend for the MEDION Beast X30 / Ionico `0x048d:0x6005` front lightbar, based on OpenRGB's dedicated Ionico protocol. The path is opt-in, hidraw-gated, does not participate in primary keyboard selection, does not persist writes automatically, and keeps the upstream 22-LED/65-byte direct-report discrepancy explicit pending hardware validation.
+- Multi-device/Permissions: Route the `0x048d:0x6005` controller as an independent Front Lightbar context and add its hidraw seat-access rule without changing the separately validated `0x048d:0xce00` four-zone keyboard path.
+
 ## 0.36.1 (2026-09-16)
 
 Diagnostics availability and support-reporting follow-up for AppImage users and new hardware reports. Backend enablement for unverified controller IDs remains evidence-gated.

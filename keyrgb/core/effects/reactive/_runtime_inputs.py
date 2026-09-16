@@ -3,6 +3,9 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Protocol
 
+from keyrgb.core.backends.base import normalize_backend_capabilities
+from keyrgb.core.effects.matrix_layout import REFERENCE_EFFECT_GEOMETRY, geometry_for_engine
+
 from .input import EvdevKeyboardDevices
 from .render import pace
 
@@ -55,3 +58,26 @@ def mapped_slot_cells(
     if not pressed_slot_id:
         return ()
     return slot_keymap.get(str(pressed_slot_id).lower(), ())
+
+
+def project_slot_cells_for_engine(engine: EffectsEngine, cells: Sequence[Key]) -> Sequence[Key]:
+    """Project canonical key cells into a zoned backend's logical matrix."""
+
+    caps = normalize_backend_capabilities(getattr(engine, "backend_caps", None))
+    if caps.per_key or not caps.zoned:
+        return cells
+
+    geometry = geometry_for_engine(engine)
+    rows = max(1, int(geometry.rows))
+    cols = max(1, int(geometry.cols))
+    projected: list[Key] = []
+    seen: set[Key] = set()
+    for row, col in cells:
+        projected_cell = (
+            min(rows - 1, max(0, int(row)) * rows // REFERENCE_EFFECT_GEOMETRY.rows),
+            min(cols - 1, max(0, int(col)) * cols // REFERENCE_EFFECT_GEOMETRY.cols),
+        )
+        if projected_cell not in seen:
+            seen.add(projected_cell)
+            projected.append(projected_cell)
+    return tuple(projected)

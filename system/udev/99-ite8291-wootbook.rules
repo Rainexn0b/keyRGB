@@ -40,3 +40,6 @@ KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="c197", TAG+="uacc
 KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="6010", TAG+="uaccess", RUN{builtin}+="uaccess"
 KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="7000", TAG+="uaccess", RUN{builtin}+="uaccess"
 KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="7001", TAG+="uaccess", RUN{builtin}+="uaccess"
+# Tongfang/Ionico front lightbar (ite8291_none_chassis_lightbar_tongfang).
+# Hidraw-only backend: no SUBSYSTEM=="usb" control-transfer rule.
+KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="6005", TAG+="uaccess", RUN{builtin}+="uaccess"

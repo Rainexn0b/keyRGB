@@ -4,7 +4,7 @@ import logging
 import time
 from collections.abc import Callable
 
-from keyrgb.core.backends.base import supports_per_key_output
+from keyrgb.core.backends.base import supports_spatial_output
 from keyrgb.core.utils.safe_attrs import safe_int_attr
 from keyrgb.tray import idle_power_state
 from keyrgb.tray.controllers._power._transition_constants import idle_fade_duration_s
@@ -95,9 +95,9 @@ def execute_idle_action(
         )
 
 
-def _engine_supports_per_key_output(engine: object) -> bool:
+def _engine_supports_spatial_output(engine: object) -> bool:
     kb = getattr(engine, "kb", None)
-    return supports_per_key_output(getattr(engine, "backend_caps", None), kb)
+    return supports_spatial_output(getattr(engine, "backend_caps", None), kb)
 
 
 def _execute_turn_off(
@@ -122,7 +122,7 @@ def _execute_turn_off(
     route = classify_effect_route(effect, reactive_effects_set, frozenset())
     use_soft_fade = should_soft_fade_for_turn_off(
         route=route,
-        engine_supports_perkey=_engine_supports_per_key_output(tray.engine),
+        engine_supports_perkey=_engine_supports_spatial_output(tray.engine),
     )
 
     idle_power_state.reset_dim_state_on_tray(tray)

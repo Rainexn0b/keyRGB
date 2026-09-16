@@ -18,6 +18,7 @@ reference implementations (OpenRGB, tuxedo-drivers, pobrn/ite8291r3-ctl, etc.).
 - `10-ite8233.md` — ITE 8233 lightbar
 - `11-sysfs-mouse.md` — Sysfs mouse LEDs
 - `12-asusctl.md` — ASUS Aura CLI
+- `13-ite8291-tongfang-lightbar.md` — Tongfang / Ionico ITE 8291 front lightbar
 - `BACKEND_AUDIT_HANDOFF.md` — naming convention and audit completion handoff
 
 ## See also

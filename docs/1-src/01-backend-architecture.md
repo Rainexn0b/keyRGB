@@ -36,7 +36,7 @@ A backend provides:
 - `is_available()`: *fast* detection/probe (should not spam logs)
 - `capabilities()`: feature flags
 - `get_device()`: returns a device instance implementing the minimal keyboard protocol
-- `dimensions()`: matrix dimensions `(rows, cols)` if per-key is supported
+- `dimensions()`: logical output dimensions `(rows, cols)` for per-key or zoned output
 - `effects()` / `colors()`: dictionaries used by existing menu/effects code
 
 ## Capabilities (current)
@@ -44,6 +44,7 @@ A backend provides:
 `BackendCapabilities` currently includes:
 
 - `per_key`: supports `set_key_colors` and a real matrix
+- `zoned`: supports spatial software frames on a logical zone matrix without claiming per-key control
 - `color`: supports setting a uniform RGB color
 - `hardware_effects`: has built-in firmware effects we can select
 - `palette`: supports firmware palette slots / named colors

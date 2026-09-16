@@ -79,11 +79,11 @@ def _usb_targets_from_backend_probes(backends: object) -> list[tuple[int, int]]:
 
 
 def _usb_targets_from_observed_ids(usb_ids: object) -> list[tuple[int, int]]:
-    """Return observed unknown ITE (0x048d) targets from a ``usb_ids`` snapshot.
+    """Return observed ITE (0x048d) targets from a ``usb_ids`` snapshot.
 
     ``usb_ids`` entries are ``"vvvv:pppp"`` hex strings collected read-only via
     pyusb enumeration. Only the ITE vendor is promoted to sysfs/devnode detail
-    targets so unsupported IDs (e.g. ``048d:6005``) gain evidence without
+    targets so unsupported or newly supported IDs gain evidence without
     pulling serials/details for unrelated vendors and without any device I/O.
     """
 
@@ -157,9 +157,9 @@ def collect_diagnostics(*, include_usb: bool = False) -> Diagnostics:
     # If any backend reported a USB VID/PID, collect sysfs USB details + devnode permissions.
     usb_targets = _usb_targets_from_backend_probes(backends)
     if include_usb:
-        # Also collect safe sysfs/devnode details for observed ITE vendor IDs
-        # that no backend advertises (e.g. unknown 048d:6005). Unrelated vendors
-        # are never promoted; detail collection itself stays read-only.
+        # Also collect safe sysfs/devnode details for every observed ITE vendor
+        # ID, including IDs that no backend advertises. Unrelated vendors are
+        # never promoted; detail collection itself stays read-only.
         usb_targets = sorted(set(usb_targets) | set(_usb_targets_from_observed_ids(usb_ids)))
     else:
         usb_targets = sorted(set(usb_targets))

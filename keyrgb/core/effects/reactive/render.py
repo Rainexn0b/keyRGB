@@ -5,7 +5,7 @@ import time as _time
 from operator import attrgetter
 from typing import TYPE_CHECKING
 
-from keyrgb.core.backends.base import supports_per_key_output
+from keyrgb.core.backends.base import supports_spatial_output
 from keyrgb.core.effects.matrix_layout import geometry_for_engine
 from keyrgb.core.effects.perkey_animation import build_full_color_grid
 
@@ -172,7 +172,9 @@ def pace(engine: EffectsEngine, *, min_factor: float = 0.25, max_factor: float =
 
 
 def has_per_key(engine: EffectsEngine) -> bool:
-    return supports_per_key_output(getattr(engine, "backend_caps", None), getattr(engine, "kb", None))
+    """Return whether the device accepts spatial frames (per-key or zoned)."""
+
+    return supports_spatial_output(getattr(engine, "backend_caps", None), getattr(engine, "kb", None))
 
 
 def base_color_map(engine: EffectsEngine) -> dict[Key, Color]:

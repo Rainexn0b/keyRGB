@@ -41,6 +41,7 @@ class BackendCapabilities:
     color: bool
     hardware_effects: bool
     palette: bool
+    zoned: bool = False
 
 
 DEFAULT_BACKEND_CAPABILITIES = BackendCapabilities(
@@ -49,6 +50,7 @@ DEFAULT_BACKEND_CAPABILITIES = BackendCapabilities(
     color=False,
     hardware_effects=False,
     palette=False,
+    zoned=False,
 )
 
 
@@ -74,6 +76,7 @@ def normalize_backend_capabilities(
         color=_field("color", default.color),
         hardware_effects=_field("hardware_effects", default.hardware_effects),
         palette=_field("palette", default.palette),
+        zoned=_field("zoned", default.zoned),
     )
 
 
@@ -83,6 +86,14 @@ def supports_per_key_output(capabilities: object | None, device: object | None) 
     declared = capabilities if capabilities is not None else getattr(device, "backend_caps", None)
     caps = normalize_backend_capabilities(declared)
     return caps.per_key and callable(getattr(device, "set_key_colors", None))
+
+
+def supports_spatial_output(capabilities: object | None, device: object | None) -> bool:
+    """Require declared per-key or zoned output plus an operational frame writer."""
+
+    declared = capabilities if capabilities is not None else getattr(device, "backend_caps", None)
+    caps = normalize_backend_capabilities(declared)
+    return (caps.per_key or caps.zoned) and callable(getattr(device, "set_key_colors", None))
 
 
 class BackendStability(str, Enum):

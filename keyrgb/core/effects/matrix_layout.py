@@ -1,9 +1,9 @@
 """Canonical effect-grid geometry.
 
 Software effects, reactive rendering, fades, and tray-icon mosaics render on one
-logical keyboard matrix owned by the effects engine at runtime.
+logical lighting matrix owned by the effects engine at runtime.
 
-The reference constants remain the fallback when no per-key backend geometry is
+The reference constants remain the fallback when no spatial backend geometry is
 available. Live frame construction must read the engine snapshot rather than
 assuming the historical 6x21 ITE matrix.
 """
@@ -75,10 +75,11 @@ def effect_geometry_from_dimensions(
     *,
     backend_name: str | None = None,
     per_key: bool,
+    zoned: bool = False,
 ) -> EffectGridGeometry:
-    """Build geometry from backend dimensions when per-key ownership is active."""
+    """Build geometry from dimensions when spatial output ownership is active."""
 
-    if not per_key:
+    if not (per_key or zoned):
         return reference_effect_geometry(backend_name=backend_name)
 
     rows: object

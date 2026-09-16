@@ -71,6 +71,16 @@ def test_sw_render_first_per_key_frame_initializes_mode_once() -> None:
     assert engine._last_hw_mode_brightness == 25
 
 
+def test_sw_render_zoned_frame_uses_spatial_writer() -> None:
+    engine = _mk_engine(brightness=25, last_hw_mode_brightness=25)
+    engine.backend_caps = SimpleNamespace(per_key=False, zoned=True)
+    color_map = {(0, 0): (255, 0, 0), (0, 1): (0, 0, 255)}
+
+    sw_base.render(engine, color_map=color_map)
+
+    assert engine.kb.calls == [("set_key_colors", 25)]
+
+
 def test_sw_render_subsequent_per_key_frame_respects_init_once_policy() -> None:
     engine = _mk_engine(brightness=25, last_hw_mode_brightness=25)
 

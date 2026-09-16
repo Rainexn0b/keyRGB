@@ -88,7 +88,7 @@ def _backend_capabilities(backend: object | None) -> BackendCapabilities:
 
 def _backend_effect_geometry(backend: object | None, *, capabilities: BackendCapabilities) -> EffectGridGeometry:
     backend_name = None if backend is None else _backend_name(backend)
-    if backend is None or not capabilities.per_key:
+    if backend is None or not (capabilities.per_key or capabilities.zoned):
         return reference_effect_geometry(backend_name=backend_name)
 
     dimensions_fn = getattr(backend, "dimensions", None)
@@ -104,7 +104,8 @@ def _backend_effect_geometry(backend: object | None, *, capabilities: BackendCap
     return effect_geometry_from_dimensions(
         dimensions,
         backend_name=backend_name,
-        per_key=True,
+        per_key=capabilities.per_key,
+        zoned=capabilities.zoned,
     )
 
 

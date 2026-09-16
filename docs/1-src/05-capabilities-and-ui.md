@@ -8,8 +8,8 @@ state separate from animated Effect output.
 ## Current state
 
 `BackendCapabilities` is the authoritative feature snapshot returned by every
-backend. It records brightness, per-key, uniform colour, hardware-effect and
-palette support. Brightness is independent from RGB: a brightness-only sysfs
+backend. It records brightness, per-key, zoned, uniform colour, hardware-effect
+and palette support. Brightness is independent from RGB: a brightness-only sysfs
 backend is valid and reports `brightness=True`, `color=False`.
 
 Missing or partial metadata fails closed. `normalize_backend_capabilities()`
@@ -26,6 +26,8 @@ topology.
 The tray and GUIs should:
 
 - Hide/disable per-key features when `per_key = False`
+- Allow spatial software effects when either `per_key = True` or `zoned = True`;
+  zoned output must not unlock the per-key editor or profiles.
 - Disable the primary brightness row when `brightness = False`
 - Hide/disable hardware effects when `hardware_effects = False`
 - Hide/disable palette-dependent items when `palette = False`

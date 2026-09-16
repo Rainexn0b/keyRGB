@@ -82,6 +82,7 @@ def test_secondary_software_render_targets_use_all_simulated_routes(
 
     assert [target.key for target in targets] == [
         "ite8233_none_chassis_lightbar_clevo",
+        "ite8291_none_chassis_lightbar_tongfang",
         "sysfs-mouse",
         "ite8258-chassis-logo",
         "ite8258-chassis-neon",

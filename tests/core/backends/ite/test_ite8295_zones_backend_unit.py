@@ -96,6 +96,31 @@ def test_device_set_key_colors_falls_back_to_average_uniform_color() -> None:
     assert sent == [protocol.build_static_report((85, 85, 85), brightness=protocol.RAW_BRIGHTNESS_LOW)]
 
 
+def test_device_set_key_colors_invalid_tuple_falls_back_to_average_uniform_color() -> None:
+    sent: list[bytes] = []
+    device = Ite8295ZonesKeyboardDevice(sent.append)
+
+    device.set_key_colors({("esc", 0): (255, 0, 0), (0, 1): (0, 0, 255)}, brightness=25)
+
+    assert sent == [protocol.build_static_report((127, 0, 127), brightness=protocol.RAW_BRIGHTNESS_LOW)]
+
+
+def test_device_set_key_colors_supports_partial_zone_writes() -> None:
+    sent: list[bytes] = []
+    device = Ite8295ZonesKeyboardDevice(sent.append)
+    device.set_color((0x10, 0x10, 0x10), brightness=50)
+
+    sent.clear()
+    device.set_key_colors({(0, 1): (0xFF, 0x00, 0x00)}, brightness=50)
+
+    assert sent == [
+        protocol.build_static_report(
+            ((0x10, 0x10, 0x10), (0xFF, 0x00, 0x00), (0x10, 0x10, 0x10), (0x10, 0x10, 0x10)),
+            brightness=protocol.RAW_BRIGHTNESS_HIGH,
+        )
+    ]
+
+
 def test_device_turn_off_sends_turn_off_report() -> None:
     sent: list[bytes] = []
     device = Ite8295ZonesKeyboardDevice(sent.append)
@@ -137,6 +162,7 @@ def test_backend_reports_research_backed_experimental_metadata() -> None:
     caps = backend.capabilities()
     assert caps.per_key is False
     assert caps.hardware_effects is True
+    assert caps.zoned is True
 
 
 def test_supported_product_ids_cover_lenovo_4zone_family() -> None:

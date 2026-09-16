@@ -98,6 +98,7 @@ class TestApplyProfileToConfig:
             "logo": {"brightness": 35, "legacy": "preserve", "enabled": False, "color": [255, 0, 7], "future": True},
             "neon": {"enabled": True, "color": [1, 2, 3]},
             "lightbar": {"enabled": False},
+            "ite8291_tongfang_lightbar": {"enabled": False},
             "mouse": {"enabled": False},
             "ite8258_chassis_logo": {"enabled": False},
             "ite8258_chassis_neon": {"enabled": False},

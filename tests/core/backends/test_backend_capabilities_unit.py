@@ -7,6 +7,7 @@ from keyrgb.core.backends.base import (
     BackendCapabilities,
     normalize_backend_capabilities,
     supports_per_key_output,
+    supports_spatial_output,
 )
 from keyrgb.core.effects.device import NullKeyboard
 
@@ -19,6 +20,7 @@ def test_normalize_backend_capabilities_defaults_missing_value_to_unsupported() 
         color=False,
         hardware_effects=False,
         palette=False,
+        zoned=False,
     )
 
 
@@ -37,6 +39,7 @@ def test_normalize_backend_capabilities_reads_partial_object_with_field_defaults
         color=False,
         hardware_effects=False,
         palette=False,
+        zoned=False,
     )
 
 
@@ -47,6 +50,7 @@ def test_normalize_backend_capabilities_honors_custom_default() -> None:
         color=False,
         hardware_effects=False,
         palette=False,
+        zoned=False,
     )
 
     assert normalize_backend_capabilities(SimpleNamespace(color=True), default=fallback) == BackendCapabilities(
@@ -55,6 +59,7 @@ def test_normalize_backend_capabilities_honors_custom_default() -> None:
         color=True,
         hardware_effects=False,
         palette=False,
+        zoned=False,
     )
 
 
@@ -75,3 +80,18 @@ def test_method_presence_cannot_replace_per_key_capability_evidence() -> None:
         )
         is True
     )
+
+
+def test_zoned_capability_supports_spatial_but_not_per_key_output() -> None:
+    device = NullKeyboard()
+    caps = BackendCapabilities(
+        brightness=True,
+        per_key=False,
+        color=True,
+        hardware_effects=False,
+        palette=False,
+        zoned=True,
+    )
+
+    assert supports_per_key_output(caps, device) is False
+    assert supports_spatial_output(caps, device) is True

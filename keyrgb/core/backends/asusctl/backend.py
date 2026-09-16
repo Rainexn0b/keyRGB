@@ -39,7 +39,7 @@ class AsusctlAuraBackend(KeyboardBackend):
     This is a pragmatic integration: it uses subprocess calls instead of re-
     implementing the Aura protocol.
 
-    Configure zones (for virtual per-key support) via:
+    Configure zones (for spatial software-effect support) via:
         KEYRGB_ASUSCTL_ZONES=one,two,three
     """
 
@@ -135,17 +135,18 @@ class AsusctlAuraBackend(KeyboardBackend):
         zones = self._zones()
         return BackendCapabilities(
             brightness=True,
-            per_key=(len(zones) > 1),
+            per_key=False,
             color=True,
             hardware_effects=False,
             palette=False,
+            zoned=(len(zones) > 1),
         )
 
     def get_device(self) -> KeyboardDevice:
         return AsusctlAuraKeyboardDevice(asusctl_path=self._asusctl_path(), zones=self._zones())
 
     def dimensions(self) -> tuple[int, int]:
-        # Not a real per-key matrix backend (unless mapped to zones).
+        # Virtual spatial matrix; the device buckets cells into configured zones.
         return (REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS)
 
     def effects(self) -> dict[str, Any]:

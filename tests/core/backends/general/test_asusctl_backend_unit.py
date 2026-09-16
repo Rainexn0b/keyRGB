@@ -162,6 +162,25 @@ def test_set_key_colors_multi_zone_buckets_and_skips_unknown_keys(monkeypatch: p
     ]
 
 
+def test_set_key_colors_multi_zone_buckets_spatial_tuple_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    device = AsusctlAuraKeyboardDevice(zones=["left", "right"])
+    brightness_calls: list[int] = []
+    run_ok_calls: list[list[str]] = []
+    monkeypatch.setattr(device, "set_brightness", lambda brightness: brightness_calls.append(int(brightness)))
+    monkeypatch.setattr(device, "_run_ok", lambda args, timeout_s=2.0: run_ok_calls.append(list(args)))
+
+    device.set_key_colors(
+        {(0, 0): (10, 20, 30), (3, 9): (30, 40, 50), (5, 19): (60, 70, 80)},
+        brightness=45,
+    )
+
+    assert brightness_calls == [45]
+    assert run_ok_calls == [
+        ["aura", "effect", "static", "-c", "141e28", "--zone", "left"],
+        ["aura", "effect", "static", "-c", "3c4650", "--zone", "right"],
+    ]
+
+
 def test_set_key_colors_ignores_empty_map(monkeypatch: pytest.MonkeyPatch) -> None:
     device = AsusctlAuraKeyboardDevice(zones=["left", "right"])
     brightness_calls: list[int] = []
@@ -186,7 +205,8 @@ def test_backend_env_helpers_and_capabilities(monkeypatch: pytest.MonkeyPatch) -
 
     assert _env_flag("KEYRGB_ASUSCTL_ENABLED") is True
     assert _parse_asusctl_zones(" left, right ,, center ") == ["left", "right", "center"]
-    assert backend.capabilities().per_key is True
+    assert backend.capabilities().per_key is False
+    assert backend.capabilities().zoned is True
     assert backend.capabilities().color is True
 
 

@@ -117,10 +117,27 @@ def test_secondary_device_route_is_frozen() -> None:
 def test_iter_secondary_routes_returns_every_registered_route() -> None:
     routes = iter_secondary_routes()
 
-    # The full catalogue is Lightbar + Mouse + the three composite zones.
+    # The full catalogue is Clevo lightbar + Tongfang front lightbar + Mouse
+    # + the three composite zones. Both lightbars share device_type="lightbar"
+    # but have distinct backend_name/state_key identities.
     assert {route.device_type for route in routes} == {"lightbar", "mouse", "logo", "neon", "vent"}
     # Ordering is stable and deterministic (see test_iter_secondary_routes_ordering_is_stable).
-    assert [route.device_type for route in routes] == ["lightbar", "mouse", "logo", "neon", "vent"]
+    assert [route.device_type for route in routes] == [
+        "lightbar",
+        "lightbar",
+        "mouse",
+        "logo",
+        "neon",
+        "vent",
+    ]
+    assert [route.backend_name for route in routes] == [
+        "ite8233_none_chassis_lightbar_clevo",
+        "ite8291_none_chassis_lightbar_tongfang",
+        "sysfs-mouse",
+        "ite8258-chassis-logo",
+        "ite8258-chassis-neon",
+        "ite8258-chassis-vent",
+    ]
 
 
 def test_iter_secondary_routes_is_a_superset_of_virtual_routes() -> None:
@@ -132,7 +149,7 @@ def test_iter_secondary_routes_is_a_superset_of_virtual_routes() -> None:
 
     assert virtual_keys.issubset(all_keys)
     # iter_secondary_routes additionally includes the standalone routes.
-    assert all_keys - virtual_keys == {"lightbar", "mouse"}
+    assert all_keys - virtual_keys == {"lightbar", "ite8291_tongfang_lightbar", "mouse"}
 
 
 def test_iter_secondary_routes_ordering_is_stable() -> None:
@@ -188,3 +205,66 @@ def test_brightness_policy_constants_are_distinct_and_covered() -> None:
     used = {route.brightness_policy for route in iter_secondary_routes()}
     assert {BRIGHTNESS_POLICY_INDEPENDENT, BRIGHTNESS_POLICY_PRIMARY_SHARED}.issubset(used)
     assert BRIGHTNESS_POLICY_UNSUPPORTED in BRIGHTNESS_POLICIES
+
+
+# ---------------------------------------------------------------------------
+# Tongfang/Ionico front lightbar (048d:6005): a second standalone route that
+# shares device_type="lightbar" with the legacy Clevo ite8233 route.
+# ---------------------------------------------------------------------------
+
+
+def test_tongfang_front_lightbar_route_metadata() -> None:
+    route = route_for_backend_name("ite8291_none_chassis_lightbar_tongfang")
+
+    assert route is not None
+    assert route.device_type == "lightbar"
+    assert route.backend_name == "ite8291_none_chassis_lightbar_tongfang"
+    assert route.display_name == "Front Lightbar"
+    assert route.state_key == "ite8291_tongfang_lightbar"
+    assert route.config_brightness_attr == "lightbar_brightness"
+    assert route.config_color_attr == "lightbar_color"
+    assert route.supports_uniform_color is True
+    assert route.supports_software_target is True
+    assert route.supports_profile_state is True
+    assert route.brightness_policy == BRIGHTNESS_POLICY_INDEPENDENT
+    assert route.parent_backend_name is None
+    assert route.zone_key is None
+
+
+def test_lightbar_routes_have_unique_state_keys_and_stable_order() -> None:
+    routes = iter_secondary_routes()
+    lightbars = [route for route in routes if route.device_type == "lightbar"]
+
+    assert [route.backend_name for route in lightbars] == [
+        "ite8233_none_chassis_lightbar_clevo",
+        "ite8291_none_chassis_lightbar_tongfang",
+    ]
+    assert [route.state_key for route in lightbars] == [
+        "lightbar",
+        "ite8291_tongfang_lightbar",
+    ]
+    # Clevo route keeps the legacy index; the new route follows immediately.
+    state_keys = [route.state_key for route in routes]
+    assert state_keys.index("lightbar") < state_keys.index("ite8291_tongfang_lightbar")
+    assert len(set(state_keys)) == len(state_keys)
+
+
+def test_route_for_device_type_lightbar_keeps_legacy_fallback() -> None:
+    route = route_for_device_type("lightbar")
+
+    assert route is not None
+    assert route.backend_name == "ite8233_none_chassis_lightbar_clevo"
+    assert route.state_key == "lightbar"
+
+
+def test_route_for_context_entry_resolves_tongfang_lightbar_by_backend_name() -> None:
+    entry = {
+        "backend_name": "ite8291_none_chassis_lightbar_tongfang",
+        "device_type": "lightbar",
+    }
+
+    route = route_for_context_entry(entry)
+
+    assert route is not None
+    assert route.backend_name == "ite8291_none_chassis_lightbar_tongfang"
+    assert route.state_key == "ite8291_tongfang_lightbar"

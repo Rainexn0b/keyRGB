@@ -43,9 +43,12 @@ def _coerce_zone_index(key_id: object) -> int | None:
         if len(key_id) != 2:
             return None
         row, col = key_id
-        if int(row) != 0:
+        try:
+            if int(row) != 0:
+                return None
+            zone_index = int(col)
+        except (TypeError, ValueError):
             return None
-        zone_index = int(col)
     else:
         try:
             zone_index = _coerce_int(key_id)

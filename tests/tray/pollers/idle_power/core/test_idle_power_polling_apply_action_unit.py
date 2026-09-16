@@ -51,6 +51,16 @@ def test_turn_off_uses_soft_fade_for_reactive_per_key_effects() -> None:
     assert tray._idle_forced_off is True
 
 
+def test_turn_off_uses_soft_fade_for_reactive_zoned_effects() -> None:
+    tray = _mk_tray(effect="reactive_ripple", brightness=25)
+    tray.engine.backend_caps = SimpleNamespace(per_key=False, zoned=True)
+    tray.engine.kb = SimpleNamespace(set_key_colors=MagicMock())
+
+    _apply_idle_action(tray, action="turn_off", dim_temp_brightness=5)
+
+    tray.engine.turn_off.assert_called_once_with(fade=True, fade_duration_s=DEFAULT_IDLE_FADE_DURATION_S)
+
+
 def test_turn_off_records_idle_turn_off_timestamp(monkeypatch: pytest.MonkeyPatch) -> None:
     tray = _mk_tray(effect="wave", brightness=25)
 

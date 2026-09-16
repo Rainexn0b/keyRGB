@@ -174,11 +174,11 @@ produce the same USB HID control transfer.
 ### 10. Capabilities and public contract
 
 ```python
-BackendCapabilities(per_key=False, color=True, hardware_effects=False, palette=False)
+BackendCapabilities(per_key=False, zoned=True, color=True, hardware_effects=False, palette=False)
 ```
 
-This is correct: the zone-only firmware supports 4-zone RGB color but not per-key control or
-hardware effects.
+This is correct: the zone-only firmware supports spatial software frames across four RGB zones,
+but not per-key control or hardware effects.
 
 ---
 
