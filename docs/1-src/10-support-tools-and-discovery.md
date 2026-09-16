@@ -25,10 +25,10 @@ right evidence without needing maintainer-only knowledge first.
 
 ## Current flow
 
-1. Open `Support Tools…` from the tray.
-2. Run diagnostics and or device discovery.
+1. Open **Settings → Version → Support Tools…** from the tray.
+2. Run diagnostics and/or device discovery.
 3. Review the support summary and suggested issue draft.
-4. Save diagnostics JSON, discovery JSON, or a full support bundle.
+4. Prefer **Save full support bundle…** for an issue; save the individual diagnostics or discovery JSON only when specifically needed.
 5. Optionally collect deeper evidence only if the safe scan was not enough.
 
 ## Design rules

@@ -47,9 +47,9 @@ body:
   - type: textarea
     id: diagnostics
     attributes:
-      label: Diagnostics (recommended)
-      description: Paste `keyrgb-diagnostics` output. If you prefer, you may redact DMI strings.
-      render: json
+      label: Support bundle / diagnostics (recommended)
+      description: Prefer attaching a bundle from **Settings → Version → Support Tools… → Save full support bundle…**. If the UI cannot be opened, paste `keyrgb-diagnostics` or `keyrgb --diagnostics` output. Review it before posting; you may redact DMI strings.
+      placeholder: Drag the support bundle here, or paste fallback diagnostics JSON.
     validations:
       required: false
 
@@ -57,7 +57,7 @@ body:
     id: logs
     attributes:
       label: Diagnostic-session logs
-      description: Run `keyrgb --diagnostic-session`, reproduce the failure, stop it with Ctrl-C, then attach `keyrgb-debug.log` and relevant `journal-*.log` files from the printed session directory. Review logs for personal data first.
+      description: For a reproducible runtime failure, run `keyrgb --diagnostic-session`, reproduce it, stop with Ctrl-C, then attach `keyrgb-debug.log` and relevant `journal-*.log` files from the printed session directory. Review logs for personal data first.
       render: text
     validations:
       required: false

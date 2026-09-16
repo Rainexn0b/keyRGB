@@ -5,7 +5,7 @@ Use this document to choose the right support path before opening an issue.
 ## Start Here
 
 - Read [README.md](README.md), especially the install, troubleshooting, and hardware-support sections.
-- Run `keyrgb-diagnostics` and keep the JSON output ready.
+- For hardware support, open **Settings → Version → Support Tools…**, run diagnostics and device discovery, then choose **Save full support bundle…**. If the UI cannot be opened, use `keyrgb-diagnostics` or `keyrgb --diagnostics` as the terminal fallback.
 - If the issue is runtime-related, run `keyrgb --diagnostic-session`, reproduce it, and include the reported session directory (or its relevant logs).
 - Stop other RGB tools or vendor daemons before reproducing the problem.
 
@@ -26,7 +26,7 @@ Issue chooser:
 
 - KeyRGB version or commit
 - Distro, kernel, desktop environment, and Wayland or X11 session
-- `keyrgb-diagnostics` output
+- The saved Support Tools bundle (`keyrgb-support-bundle.json`), or `keyrgb-diagnostics` / `keyrgb --diagnostics` JSON as a fallback
 - Relevant `lsusb` output for the controller
 - Whether brightness, uniform color, per-key mode, or effects work
 - Whether other RGB tools were running

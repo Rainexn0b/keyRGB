@@ -174,6 +174,7 @@ fi
 
 APPIMAGE_DST="$HOME/.local/bin/keyrgb.AppImage"
 LAUNCHER_DST="$HOME/.local/bin/keyrgb"
+DIAGNOSTICS_SHIM_DST="$HOME/.local/bin/keyrgb-diagnostics"
 
 if [ ! -f "$APPIMAGE_DST" ] && is_appimage_file "$LAUNCHER_DST"; then
   log_info "Migrating legacy AppImage install to wrapper-based launcher."
@@ -281,6 +282,7 @@ fi
 
 # Desktop exec should be absolute path.
 install_appimage_launcher "$LAUNCHER_DST" "$APPIMAGE_DST"
+install_appimage_diagnostics_shim "$DIAGNOSTICS_SHIM_DST" "$LAUNCHER_DST"
 
 install_icon_and_desktop_entries "$LAUNCHER_DST" "$RAW_REF"
 

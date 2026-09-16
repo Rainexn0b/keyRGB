@@ -43,8 +43,8 @@ These strings are often useful for heuristics, support triage, and quirk rules.
 
 ## Current support surface
 
-- Support Tools window from the tray
-- Saved diagnostics JSON, discovery JSON, and support bundles
+- Support Tools window at **Settings → Version → Support Tools…**
+- Full support bundle as the preferred hardware-support artifact; individual diagnostics and discovery JSON remain available when specifically needed
 - Suggested issue drafts and backend-speed probe notes
 - DEBUG logging for deeper local investigation
 

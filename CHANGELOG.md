@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.36.1 (2026-09-16)
+
+Diagnostics availability and support-reporting follow-up for AppImage users and new hardware reports. Backend enablement for unverified controller IDs remains evidence-gated.
+
+- Diagnostics/AppImage: Add `keyrgb --diagnostics` and an installer-managed `keyrgb-diagnostics` forwarding command as terminal fallbacks when the preferred **Settings → Version → Support Tools… → Save full support bundle…** workflow cannot be used.
+- Diagnostics/Hardware Support: Include read-only sysfs and device-node details for observed, unrecognized `0x048d` ITE devices, allowing new controller IDs such as issue #13's `048d:6005` to provide firmware revision and permission evidence before backend enablement.
+- Support/Documentation: Make the Support Tools full bundle the primary hardware-support artifact across issue templates, generated issue guidance, user and contributor documentation, while retaining diagnostic-session bundles for reproducible runtime failures.
+
 ## 0.36.0 (2026-09-10)
 
 Pre-release UX, guided keyboard setup, AppImage runtime, and release-quality hardening. Public commands and existing config/profile formats remain compatible; validate the new guided setup on representative hardware before promoting this release train.

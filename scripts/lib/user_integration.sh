@@ -419,6 +419,37 @@ EOF
   log_ok "Installed AppImage launcher: $launcher_path"
 }
 
+install_appimage_diagnostics_shim() {
+  local shim_path="$1" launcher_path="$2"
+  mkdir -p "$(dirname "$shim_path")"
+
+  if [ -e "$shim_path" ] && ! grep -Fqs -- "KeyRGB AppImage diagnostics shim" "$shim_path" 2>/dev/null; then
+    log_warn "Not replacing existing non-AppImage command: $shim_path"
+    return 0
+  fi
+
+  cat >"$shim_path" <<EOF
+#!/usr/bin/env bash
+
+# KeyRGB AppImage diagnostics shim.
+# Managed by KeyRGB AppImage installer - do not edit manually.
+
+set -euo pipefail
+
+KEYRGB_LAUNCHER="$launcher_path"
+
+if [ ! -x "\$KEYRGB_LAUNCHER" ]; then
+  echo "KeyRGB launcher not found or not executable: \$KEYRGB_LAUNCHER" >&2
+  exit 1
+fi
+
+exec "\$KEYRGB_LAUNCHER" --diagnostics "\$@"
+EOF
+
+  chmod +x "$shim_path"
+  log_ok "Installed AppImage diagnostics shim: $shim_path"
+}
+
 warn_if_no_usb_device_best_effort() {
   if ! have_cmd lsusb; then
     return 0

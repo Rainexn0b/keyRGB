@@ -13,10 +13,14 @@ Thanks for your interest in contributing. KeyRGB is a Linux-first tray app plus 
 ## Before you start
 
 - If you are changing architecture, backend policy, or install behavior, open an issue or draft PR early so the direction can be reviewed before the implementation gets large.
-- If you are adding device support, collect evidence first:
+- If you are adding device support, collect evidence first. Prefer **Settings →
+  Version → Support Tools… → Save full support bundle…**. If the UI is not
+  available, use the CLI fallback:
 
 ```bash
 keyrgb-diagnostics
+# Equivalent through the main launcher:
+keyrgb --diagnostics
 lsusb
 ```
 
@@ -54,6 +58,8 @@ keyrgb-uniform
 keyrgb-reactive-color
 keyrgb-calibrate
 keyrgb-diagnostics
+keyrgb --diagnostics
+keyrgb --diagnostic-session
 ```
 
 ## Project map
@@ -115,7 +121,7 @@ keyrgb-perkey
 ## Contributing a backend or new device support
 
 1. Confirm whether a kernel or sysfs path already exists. If Linux already exposes the keyboard through `/sys/class/leds`, extend that path before adding a new direct controller implementation.
-2. Gather evidence before writing code: `keyrgb-diagnostics`, `lsusb`, relevant `hidraw` or sysfs paths, permission behavior, and any protocol notes or captures you are relying on.
+2. Gather evidence before writing code: start with a **Support Tools** full support bundle (CLI fallback: `keyrgb-diagnostics` or `keyrgb --diagnostics`), then include `lsusb`, relevant `hidraw` or sysfs paths, permission behavior, and any protocol notes or captures you are relying on.
 3. Add the backend under `keyrgb/core/backends/<backend_name>/`. Most backends split into a `backend.py`, `device.py`, and protocol/helper modules.
 4. Implement the backend surface defined in `keyrgb/core/backends/base.py`: metadata (`name`, `priority`, `stability`, `experimental_evidence`) plus `probe()`, `capabilities()`, `get_device()`, `dimensions()`, `effects()`, and `colors()`.
 5. Register the backend with a package-owned `BACKEND_REGISTRATION` marker. Keep rename aliases in `keyrgb/core/backends/registry.py`.
@@ -176,7 +182,7 @@ If you use numeric step selectors, list steps first. Step numbers can move as th
 - Keep PRs narrow enough that the motivation, changed ownership area, and validation are easy to review.
 - Include the exact commands you ran.
 - State clearly whether the change was validated on real hardware, mocked tests only, or both.
-- For backend or device-support work, include diagnostics output, USB IDs, and any permission or udev requirements.
+- For backend or device-support work, include a Support Tools bundle (or CLI diagnostics fallback), USB IDs, and any permission or udev requirements.
 - Update `README.md`, `CONTRIBUTING.md`, or deeper docs when the user-facing workflow, support matrix, install behavior, or contributor workflow changes.
 - For GUI changes, screenshots are helpful when the change is materially visual.
 
@@ -194,8 +200,9 @@ If you use numeric step selectors, list steps first. Step numbers can move as th
 
 When filing an issue, include:
 
-- `keyrgb-diagnostics`
+- A full bundle from **Settings → Version → Support Tools… → Save full support bundle…**; if the UI cannot be opened, paste `keyrgb-diagnostics` or `keyrgb --diagnostics` output instead
 - `lsusb` output for the relevant controller
 - distro, kernel, desktop environment, and Wayland or X11 session details
 - whether other RGB tools or vendor daemons are running
 - steps to reproduce and what you expected instead
+- For a reproducible runtime failure, the bundle produced by `keyrgb --diagnostic-session`

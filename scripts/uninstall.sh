@@ -58,6 +58,7 @@ log_info "=== KeyRGB Uninstall ==="
 
 APPIMAGE_WRAPPER="$HOME/.local/bin/keyrgb"
 APPIMAGE_BIN="$HOME/.local/bin/keyrgb.AppImage"
+DIAGNOSTICS_SHIM="$HOME/.local/bin/keyrgb-diagnostics"
 HAS_APPIMAGE_INSTALL=0
 
 if is_appimage_file "$APPIMAGE_BIN"; then
@@ -66,11 +67,19 @@ fi
 if is_appimage_file "$APPIMAGE_WRAPPER" || file_has_marker "$APPIMAGE_WRAPPER" "KeyRGB AppImage launcher."; then
   HAS_APPIMAGE_INSTALL=1
 fi
+if is_keyrgb_managed_diagnostics_shim "$DIAGNOSTICS_SHIM"; then
+  HAS_APPIMAGE_INSTALL=1
+fi
 
 if [ "$HAS_APPIMAGE_INSTALL" -eq 1 ]; then
   if [ "$REMOVE_APPIMAGE" -eq 1 ] || confirm "Remove KeyRGB AppImage launcher/binary from ~/.local/bin ?"; then
     rm -f "$APPIMAGE_WRAPPER" || true
     rm -f "$APPIMAGE_BIN" || true
+    # Only remove the diagnostics shim when it is KeyRGB AppImage-owned, so
+    # pip/user-provided keyrgb-diagnostics files are never deleted.
+    if is_keyrgb_managed_diagnostics_shim "$DIAGNOSTICS_SHIM"; then
+      rm -f "$DIAGNOSTICS_SHIM" || true
+    fi
     log_ok "Removed AppImage launcher/binary (if present)"
   else
     log_info "Skipped removing AppImage launcher/binary"
@@ -299,4 +308,5 @@ log_info "Note: system packages installed by install.sh are not removed by defau
 
 log_info "If you uninstalled because KeyRGB didn't work on your hardware, please consider opening an issue:"
 log_info "  https://github.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/issues"
-log_info "Include: distro/version, lsusb output, and KeyRGB diagnostics/logs (KEYRGB_DEBUG=1)."
+log_info "Include: distro/version, lsusb output, and any saved Support Tools bundle."
+log_info "For reproducible runtime failures, also include a keyrgb --diagnostic-session bundle captured before uninstalling."

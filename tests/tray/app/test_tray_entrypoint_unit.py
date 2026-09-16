@@ -5,6 +5,48 @@ import pytest
 import keyrgb.tray.entrypoint as entry
 
 
+def test_main_diagnostics_dispatches_before_tray_startup(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        entry,
+        "diagnostics_from_cli",
+        lambda argv, *, prog: calls.append((argv, prog)) or 0,
+    )
+    monkeypatch.setattr(entry, "configure_logging", lambda: pytest.fail("tray startup called"))
+
+    entry.main(["--diagnostics", "--text", "--no-usb"])
+
+    assert calls == [(("--diagnostics", "--text", "--no-usb"), "keyrgb")]
+
+
+def test_main_diagnostics_propagates_failure_status(monkeypatch):
+    monkeypatch.setattr(entry, "diagnostics_from_cli", lambda _argv, *, prog: 2)
+
+    with pytest.raises(SystemExit) as exc_info:
+        entry.main(["--diagnostics"])
+
+    assert exc_info.value.code == 2
+
+
+def test_main_session_takes_priority_over_diagnostics(monkeypatch):
+    calls = {"session": 0, "diagnostics": 0}
+    monkeypatch.setattr(
+        entry,
+        "diagnostic_session_from_cli",
+        lambda _argv, *, prog: calls.__setitem__("session", calls["session"] + 1) or 0,
+    )
+    monkeypatch.setattr(
+        entry,
+        "diagnostics_from_cli",
+        lambda *_a, **_k: calls.__setitem__("diagnostics", calls["diagnostics"] + 1) or 0,
+    )
+    monkeypatch.setattr(entry, "configure_logging", lambda: pytest.fail("tray startup called"))
+
+    entry.main(["--diagnostic-session"])
+
+    assert calls == {"session": 1, "diagnostics": 0}
+
+
 def test_python_module_entrypoint_delegates_to_main(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[bool] = []
     monkeypatch.setattr(entry, "main", lambda: calls.append(True))

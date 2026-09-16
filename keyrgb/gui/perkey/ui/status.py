@@ -74,7 +74,7 @@ def _next_steps_for_exception(exc: Exception | None) -> str:
     if isinstance(exc, BackendDisconnectedError):
         return "Try: replug the keyboard"
     if isinstance(exc, BackendUnavailableError):
-        return "Try: check USB/driver connection and run KeyRGB diagnostics"
+        return "Try: check USB/driver connection, then open Settings → Version → Support Tools"
 
     # Permissions (sysfs, USB, etc.).
     if isinstance(exc, PermissionError):

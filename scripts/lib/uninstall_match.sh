@@ -24,6 +24,7 @@ files_match_exactly() {
 KEYRGB_MANAGED_UDEV_USB_MARKER='KEYRGB_MANAGED_UDEV_RULE=usb-hidraw'
 KEYRGB_MANAGED_UDEV_SYSFS_MARKER='KEYRGB_MANAGED_UDEV_RULE=sysfs-leds'
 KEYRGB_MANAGED_UDEV_INPUT_MARKER='KEYRGB_MANAGED_UDEV_RULE=input-uaccess'
+KEYRGB_MANAGED_DIAGNOSTICS_SHIM_MARKER='KeyRGB AppImage diagnostics shim'
 
 is_keyrgb_managed_usb_udev_rule() {
   local path="$1"
@@ -48,6 +49,12 @@ is_keyrgb_managed_input_udev_rule() {
   # rule text uses "reactive effects" in the security warning sentence.
   file_has_marker "$path" "Reactive Typing effects" && return 0
   file_has_marker "$path" "for reactive effects." && return 0
+  return 1
+}
+
+is_keyrgb_managed_diagnostics_shim() {
+  local path="$1"
+  file_has_marker "$path" "$KEYRGB_MANAGED_DIAGNOSTICS_SHIM_MARKER" && return 0
   return 1
 }
 

@@ -83,7 +83,10 @@ def hardware_support_fields(
     fields = {
         "what_happened": "\n".join(what_happened_lines),
         "diagnostics": report_text.json_text(diagnostics),
-        "debug_logs": "Paste KEYRGB_DEBUG=1 keyrgb output here if available.",
+        "debug_logs": (
+            "For a reproducible runtime failure, attach keyrgb-debug.log and relevant journal-*.log files "
+            "from the directory printed by `keyrgb --diagnostic-session`."
+        ),
         "lsusb": usb_ids,
     }
     capture_commands = report_text.optional_capture_commands_text(discovery)
@@ -121,7 +124,10 @@ def experimental_confirmation_fields(
         ),
         "environment": report_text.environment_text(diagnostics),
         "diagnostics": report_text.json_text(diagnostics),
-        "logs": "Paste KEYRGB_DEBUG=1 keyrgb output from a successful run here if available.",
+        "logs": (
+            "If runtime evidence is useful, attach keyrgb-debug.log and relevant journal-*.log files "
+            "from a successful `keyrgb --diagnostic-session` run."
+        ),
         "extra_notes": report_text.join_non_empty_sections(
             report_text.discovery_summary_text(discovery),
             report_text.optional_capture_commands_text(discovery, prefix="Optional deeper-evidence commands:"),
@@ -157,7 +163,10 @@ def bug_report_fields(
         "environment": report_text.environment_text(diagnostics),
         "diagnostics": report_text.json_text(diagnostics),
         "logs": report_text.join_non_empty_sections(
-            "Paste KEYRGB_DEBUG=1 keyrgb output around the failure here if available.",
+            (
+                "For a reproducible runtime failure, attach keyrgb-debug.log and relevant journal-*.log files "
+                "from the directory printed by `keyrgb --diagnostic-session`."
+            ),
             report_text.supplemental_evidence_text(
                 supplemental_evidence,
                 prefix="Collected additional evidence:",

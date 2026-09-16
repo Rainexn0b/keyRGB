@@ -165,13 +165,14 @@ If you installed via the installer, run KeyRGB from your app menu or start it fr
 | `keyrgb --diagnostic-session` | Run the canonical foreground diagnostic session; saves debug logs, before/after diagnostics, and journal slices in a timestamped cache directory. |
 | `keyrgb-diagnostic-launch` | Same diagnostic session as a dedicated command. From a checkout it uses source code; otherwise it uses the installed runtime. |
 | `keyrgb --capture-runtime-log` | Capture only a foreground runtime log. |
+| `keyrgb --diagnostics` | Terminal fallback: print hardware diagnostics JSON from every install type, including AppImage (`--text` and `--no-usb` are supported). |
 | `./keyrgb.sh` | Run attached to the terminal from a source checkout. |
 | `keyrgb-perkey` | Open the per-key editor. |
 | `keyrgb-uniform` | Open the uniform-color GUI. |
 | `keyrgb-reactive-color` | Open the reactive typing color GUI. |
 | `keyrgb-calibrate` | Open the keymap calibrator UI. |
 | `keyrgb-settings` | Open the settings GUI. |
-| `keyrgb-diagnostics` | Print hardware diagnostics JSON. |
+| `keyrgb-diagnostics` | Terminal fallback: print hardware diagnostics JSON. AppImage installs provide this as a forwarding command. |
 
 **Switching between devices:** when a supported auxiliary lighting device (or a
 composite controller's extra surfaces, such as the Legion Gen10 **Logo / Neon
@@ -186,7 +187,10 @@ select live controls; **Lighting Profiles** remains the persistent whole-scene e
 
 Support is **controller-specific**, not brand-wide. Two laptops with the same
 badge can use different ITE chips or only a brightness-only sysfs backlight.
-When unsure, run `lsusb` (look for `048d:`) and `keyrgb-diagnostics`.
+When unsure, open **Settings → Version → Support Tools…**, run diagnostics and
+device discovery, then choose **Save full support bundle…**. As a terminal
+fallback, run `lsusb` (look for `048d:`) and `keyrgb-diagnostics` (or
+`keyrgb --diagnostics`).
 
 | Family | Typical evidence | Backend | Stability | What you get |
 | --- | --- | --- | --- | --- |
@@ -327,7 +331,7 @@ Most supported controllers use a fixed LED matrix (e.g., 6×21). To map this to 
 | --- | --- |
 | No tray icon | Run `keyrgb` from a terminal to see errors. Check if the system tray extension is enabled (GNOME). |
 | Permission denied | Ensure KeyRGB udev rules are installed. Try replugging the device or rebooting/logging out so `uaccess` is refreshed. |
-| `0x048d:0x8910` is detected but not working | Ensure udev rules are installed and you have rebooted or logged out. Run `keyrgb-diagnostics` to check backend selection. |
+| `0x048d:0x8910` is detected but not working | Ensure udev rules are installed and you have rebooted or logged out. Use **Settings → Version → Support Tools…** to check backend selection (terminal fallback: `keyrgb-diagnostics`). |
 | Flickering effects | Ensure other tools (OpenRGB, TCC) are not running. KeyRGB needs exclusive access. |
 | Per-key not working | You likely need to run the Keymap Calibrator first. |
 | Brightness works but color does not (kernel / `kbd_backlight`) | The sysfs node is likely **brightness-only** (no `multi_intensity`, `color`, or `rgb` under `/sys/class/leds/*kbd_backlight*`). KeyRGB can only change color when the kernel exposes RGB attributes. On ASUS ROG, use `asusctl` / rog-control-center for Aura/RGB. |
@@ -348,17 +352,26 @@ If KeyRGB detects your device but behaves oddly, or if you have a new laptop mod
 
 For support routing, see [SUPPORT.md](SUPPORT.md). For contributor workflow details, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-1) Run diagnostics:
+1) Collect a support bundle:
+
+- Open **Settings → Version → Support Tools…**.
+- Run **Run diagnostics** and **Scan devices**.
+- Choose **Save full support bundle…**.
+
+If the UI cannot be opened, use the terminal fallback:
 
 ```bash
 keyrgb-diagnostics
+# Equivalent through the main launcher:
+keyrgb --diagnostics
 ```
 
 2) Open an issue:
 
 - https://github.com/Rainexn0b/keyRGB/issues/new/choose
 
-Select **Hardware support / diagnostics** and paste the JSON output from step 1.
+Select **Hardware support / diagnostics** and attach the saved support bundle.
+If you used the terminal fallback, paste its JSON output instead.
 
 3) Include details:
 
@@ -368,7 +381,9 @@ Select **Hardware support / diagnostics** and paste the JSON output from step 1.
 
 ### Privacy note
 
-`keyrgb-diagnostics` attempts to sanitize output, but please review the JSON before posting to ensure no personal paths/names are included.
+Support bundles, diagnostics JSON, and diagnostic-session logs are sanitized
+best-effort. Review them before posting and redact personal paths, names, serials,
+or DMI strings if needed while keeping the surrounding structure useful.
 
 ## Acknowledgements
 

@@ -157,6 +157,130 @@ def test_diagnostics_module_trampoline_invokes_package_main(monkeypatch: pytest.
     assert called == [True]
 
 
+def test_collect_diagnostics_includes_unknown_ite_observed_ids_without_unrelated_vendors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_usb_targets: list[tuple[int, int]] = []
+
+    monkeypatch.setattr(diagnostics_mod, "_dmi_snapshot", dict)
+    monkeypatch.setattr(diagnostics_mod, "_sysfs_leds_snapshot", lambda: ([], []))
+    monkeypatch.setattr(
+        diagnostics_mod,
+        "_usb_ids_snapshot",
+        lambda include_usb: (
+            ["048d:ce00", "048d:6005", "048D:6005", "046d:c52b", "8087:0029", "not-an-id", "048d:zzzz", 1234]
+            if include_usb
+            else []
+        ),
+    )
+    monkeypatch.setattr(diagnostics_mod, "_env_snapshot", dict)
+    monkeypatch.setattr(diagnostics_mod, "_virt_snapshot", dict)
+    monkeypatch.setattr(diagnostics_mod, "_system_snapshot", dict)
+    monkeypatch.setattr(diagnostics_mod, "_system_power_mode_snapshot", dict)
+    monkeypatch.setattr(diagnostics_mod, "_list_platform_hints", list)
+    monkeypatch.setattr(diagnostics_mod, "_list_module_hints", list)
+    monkeypatch.setattr(diagnostics_mod, "_app_snapshot", dict)
+    monkeypatch.setattr(diagnostics_mod, "_power_supply_snapshot", dict)
+    monkeypatch.setattr(
+        diagnostics_mod,
+        "_backend_probe_snapshot",
+        lambda: {"selected": None, "probes": [{"identifiers": {"usb_vid": "0x048d", "usb_pid": "0xce00"}}]},
+    )
+
+    def fake_usb_devices_snapshot(targets: list[tuple[int, int]]) -> list[dict[str, str]]:
+        captured_usb_targets.extend(targets)
+        return []
+
+    monkeypatch.setattr(diagnostics_mod, "_usb_devices_snapshot", fake_usb_devices_snapshot)
+    monkeypatch.setattr(diagnostics_mod, "_config_snapshot", dict)
+    monkeypatch.setattr(diagnostics_mod, "_process_snapshot", dict)
+
+    diagnostics_mod.collect_diagnostics(include_usb=True)
+
+    # Unknown ITE 048d:6005 is promoted; unrelated vendors and malformed IDs are not.
+    # Deterministic sorted dedup: 0x6005 < 0xce00.
+    assert captured_usb_targets == [(0x048D, 0x6005), (0x048D, 0xCE00)]
+
+
+def test_collect_diagnostics_skips_observed_ite_when_usb_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured_usb_targets: list[tuple[int, int]] = []
+
+    monkeypatch.setattr(diagnostics_mod, "_dmi_snapshot", dict)
+    monkeypatch.setattr(diagnostics_mod, "_sysfs_leds_snapshot", lambda: ([], []))
+    monkeypatch.setattr(diagnostics_mod, "_usb_ids_snapshot", lambda include_usb: [])
+    monkeypatch.setattr(diagnostics_mod, "_env_snapshot", dict)
+    monkeypatch.setattr(diagnostics_mod, "_virt_snapshot", dict)
+    monkeypatch.setattr(diagnostics_mod, "_system_snapshot", dict)
+    monkeypatch.setattr(diagnostics_mod, "_system_power_mode_snapshot", dict)
+    monkeypatch.setattr(diagnostics_mod, "_list_platform_hints", list)
+    monkeypatch.setattr(diagnostics_mod, "_list_module_hints", list)
+    monkeypatch.setattr(diagnostics_mod, "_app_snapshot", dict)
+    monkeypatch.setattr(diagnostics_mod, "_power_supply_snapshot", dict)
+    monkeypatch.setattr(
+        diagnostics_mod,
+        "_backend_probe_snapshot",
+        lambda: {"selected": None, "probes": [{"identifiers": {"usb_vid": "0x048d", "usb_pid": "0xce00"}}]},
+    )
+
+    def fake_usb_devices_snapshot(targets: list[tuple[int, int]]) -> list[dict[str, str]]:
+        captured_usb_targets.extend(targets)
+        return []
+
+    monkeypatch.setattr(diagnostics_mod, "_usb_devices_snapshot", fake_usb_devices_snapshot)
+    monkeypatch.setattr(diagnostics_mod, "_config_snapshot", dict)
+    monkeypatch.setattr(diagnostics_mod, "_process_snapshot", dict)
+
+    diagnostics_mod.collect_diagnostics(include_usb=False)
+
+    assert captured_usb_targets == [(0x048D, 0xCE00)]
+
+
+def test_usb_targets_from_observed_ids_filters_non_ite_and_malformed() -> None:
+    assert diagnostics_mod._usb_targets_from_observed_ids("not-a-list") == []
+    assert diagnostics_mod._usb_targets_from_observed_ids(None) == []
+    assert diagnostics_mod._usb_targets_from_observed_ids(
+        ["048d:6005", "046d:c52b", "no-colon", "048d:zzzz", "", 123, None, "0x048d:0x6005"]
+    ) == [(0x048D, 0x6005), (0x048D, 0x6005)]
+
+
+def test_diagnostics_from_cli_returns_none_without_flag() -> None:
+    assert diagnostics_mod.diagnostics_from_cli([], prog="keyrgb") is None
+    assert diagnostics_mod.diagnostics_from_cli(["--text"], prog="keyrgb") is None
+    # Singular session flags must not trigger the plural --diagnostics mode.
+    assert diagnostics_mod.diagnostics_from_cli(["--diagnostic-session"], prog="keyrgb") is None
+    assert diagnostics_mod.diagnostics_from_cli(["--diagnostic-mode", "full"], prog="keyrgb") is None
+
+
+def test_diagnostics_from_cli_supports_text_and_no_usb(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured_include_usb: list[bool] = []
+
+    def fake_collect_diagnostics(*, include_usb: bool) -> Diagnostics:
+        captured_include_usb.append(include_usb)
+        return _sample_diagnostics()
+
+    monkeypatch.setattr(diagnostics_mod, "collect_diagnostics", fake_collect_diagnostics)
+    monkeypatch.setattr(diagnostics_mod, "format_diagnostics_text", lambda diag: "diagnostics text")
+
+    assert diagnostics_mod.diagnostics_from_cli(["--diagnostics", "--text", "--no-usb"], prog="keyrgb") == 0
+    assert captured_include_usb == [False]
+    assert capsys.readouterr().out == "diagnostics text\n"
+
+
+def test_diagnostics_from_cli_prints_json_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(diagnostics_mod, "collect_diagnostics", lambda *, include_usb: _sample_diagnostics())
+
+    assert diagnostics_mod.diagnostics_from_cli(["--diagnostics"], prog="keyrgb") == 0
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["app"]["version"] == "test"
+
+
 def test_proc_open_holders_returns_empty_when_proc_root_missing(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: RealPath,

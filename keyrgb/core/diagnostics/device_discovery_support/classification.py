@@ -162,8 +162,8 @@ def support_actions(backends: dict[str, Any], candidates: list[dict[str, Any]]) 
     attention_candidates = [entry for entry in candidates if str(entry.get("status") or "") != "supported"]
     if attention_candidates:
         next_steps = [
-            "Run diagnostics and discovery from the tray, then attach the saved support bundle to a hardware-support issue.",
-            "Include KEYRGB_DEBUG=1 logs if the tray starts but the keyboard does not respond.",
+            "Open Settings → Version → Support Tools, run diagnostics and discovery, then attach the saved full support bundle to a hardware-support issue.",
+            "If the failure is reproducible at runtime, also attach the bundle from `keyrgb --diagnostic-session`.",
         ]
         lead_usb_vid = (
             str(lead_candidate.get("usb_vid") or "").strip().lower() if isinstance(lead_candidate, dict) else ""
@@ -217,8 +217,8 @@ def support_actions(backends: dict[str, Any], candidates: list[dict[str, Any]]) 
         summary["recommended_issue_template"] = BUG_REPORT_TEMPLATE
         summary["recommended_issue_url"] = issue_url_for_template(BUG_REPORT_TEMPLATE)
         summary["next_steps"] = [
-            "If supported hardware is still misbehaving, attach diagnostics to a bug report.",
-            "Include KEYRGB_DEBUG=1 logs from a failing run if you can reproduce the problem.",
+            "If supported hardware is still misbehaving, attach a full Support Tools bundle to a bug report.",
+            "If you can reproduce the failure, also attach the bundle from `keyrgb --diagnostic-session`.",
         ]
         return summary
 

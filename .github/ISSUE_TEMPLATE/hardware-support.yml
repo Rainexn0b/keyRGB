@@ -8,7 +8,9 @@ body:
       value: |
         Thanks for helping improve KeyRGB hardware support.
 
-        Please paste the outputs below. These are *read-only* commands.
+        In KeyRGB, open **Settings → Version → Support Tools…**, run **Run diagnostics** and **Scan devices**, then choose **Save full support bundle…**. Drag the saved `keyrgb-support-bundle.json` into the evidence field below.
+
+        If the UI cannot be opened, paste the output of `keyrgb-diagnostics` or `keyrgb --diagnostics` instead. These fallback commands are read-only.
 
   - type: textarea
     id: what_happened
@@ -28,10 +30,9 @@ body:
   - type: textarea
     id: diagnostics
     attributes:
-      label: keyrgb-diagnostics output (JSON)
-      description: Run `keyrgb-diagnostics` and paste the full JSON.
-      render: json
-      placeholder: "{ ... }"
+      label: Support bundle or fallback diagnostics
+      description: Attach the `keyrgb-support-bundle.json` saved by Support Tools. If the UI was unavailable, paste the full `keyrgb-diagnostics` or `keyrgb --diagnostics` JSON instead.
+      placeholder: Drag the support bundle here, or paste fallback diagnostics JSON.
     validations:
       required: true
 
@@ -39,7 +40,7 @@ body:
     id: debug_logs
     attributes:
       label: Diagnostic-session logs
-      description: Run `keyrgb --diagnostic-session`, reproduce the problem, then attach `keyrgb-debug.log` and relevant `journal-*.log` files from the printed session directory. Review logs for personal data first.
+      description: Only for a reproducible runtime failure, run `keyrgb --diagnostic-session`, reproduce the problem, then attach `keyrgb-debug.log` and relevant `journal-*.log` files from the printed session directory. Review logs for personal data first.
       render: text
     validations:
       required: false
@@ -57,7 +58,7 @@ body:
     id: additional_evidence
     attributes:
       label: Additional evidence (optional)
-      description: Paste any extra capture results such as `lsusb -v -d <vid:pid>`, `usbhid-dump -e descriptor`, or support-bundle evidence collected from the Support Tools window.
+      description: Paste any extra capture results such as `lsusb -v -d <vid:pid>` or `usbhid-dump -e descriptor`.
       render: text
     validations:
       required: false
@@ -66,7 +67,7 @@ body:
     id: privacy
     attributes:
       label: Privacy
-      description: Diagnostics do not include usernames or home paths. If you prefer, you may redact DMI strings, but please keep the structure.
+      description: Support outputs are sanitized best-effort but may still contain host-identifying strings, paths, serials, or journal details. Review files before posting. You may redact DMI strings while keeping the surrounding structure.
       options:
         - label: I confirm this report contains no secrets.
           required: true

@@ -74,6 +74,8 @@ def test_build_issue_report_prefers_hardware_support_for_attention_candidates() 
     assert "Guided backend probes:" in report["fields"]["additional_evidence"]
     assert "selection_effect: hw:spectrum_cycle" in report["fields"]["additional_evidence"]
     assert "1 and 3 looked nearly identical" in report["fields"]["additional_evidence"]
+    assert "keyrgb --diagnostic-session" in report["fields"]["debug_logs"]
+    assert "KEYRGB_DEBUG=1" not in report["fields"]["debug_logs"]
     assert "Template: Hardware support / diagnostics" in report["markdown"]
 
 
@@ -110,6 +112,26 @@ def test_build_issue_report_uses_experimental_confirmation_for_selected_experime
     assert report["fields"]["backend"] == "ite8297_uniform"
     assert report["fields"]["usb_id"] == "0x048d:0x8297"
     assert "Selected backend shown by KeyRGB: ite8297_uniform" in report["fields"]["confirmation"]
+    assert "keyrgb --diagnostic-session" in report["fields"]["logs"]
+
+
+def test_build_issue_report_uses_diagnostic_session_guidance_for_runtime_bug() -> None:
+    diagnostics = {
+        "app": {"version": "0.36.0"},
+        "backends": {"selected": "ite8291r3_perkey", "probes": []},
+        "dmi": {"sys_vendor": "Tongfang", "product_name": "Test Laptop"},
+    }
+    discovery = {
+        "selected_backend": "ite8291r3_perkey",
+        "support_actions": {"recommended_issue_template": "bug-report"},
+        "candidates": [],
+    }
+
+    report = build_issue_report_with_evidence(diagnostics=diagnostics, discovery=discovery, supplemental_evidence=None)
+
+    assert report["template"] == "bug-report"
+    assert "keyrgb --diagnostic-session" in report["fields"]["logs"]
+    assert "KEYRGB_DEBUG=1" not in report["fields"]["logs"]
 
 
 def test_build_support_bundle_payload_embeds_issue_report() -> None:

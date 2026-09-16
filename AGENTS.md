@@ -31,7 +31,8 @@
     - System76: standard ACPI drivers
   - 2) **USB direct (fallback):** userspace `ite8291r3` / `hidapi` for Tongfang devices without kernel RGB.
 - **Force backend:** `KEYRGB_BACKEND=auto|sysfs-leds|ite8291r3_perkey` (old short names such as `ite8291r3` still alias)
-- **Runtime support bundle:** `keyrgb --diagnostic-session` (full logs, snapshots, and journal slices).
+- **Hardware-support bundle:** **Settings → Version → Support Tools… → Save full support bundle…** (diagnostics, discovery, and issue-oriented evidence).
+- **Runtime diagnostic-session bundle:** `keyrgb --diagnostic-session` (full logs, before/after snapshots, and journal slices).
 - **Capture modes:** `debug` (`KEYRGB_DEBUG`), `brightness` (+ `KEYRGB_DEBUG_BRIGHTNESS`), and `full` (+ `KEYRGB_DEBUG_REACTIVE_INPUT`, the default diagnostic session).
 - **Focused debug flags:** `KEYRGB_DEBUG=1`, `KEYRGB_DEBUG_BRIGHTNESS=1`, and `KEYRGB_DEBUG_REACTIVE_INPUT=1`.
 
@@ -49,7 +50,7 @@
 ## What to tell users (fast checklist)
 
 - **"Keyboard RGB not working"**
-  - Ask for `lsusb` (look for `048d:ce00`) and/or run `keyrgb-diagnostics`.
+  - Ask for a full bundle from **Settings → Version → Support Tools…** and relevant `lsusb` output (look for `048d:ce00`). Use `keyrgb-diagnostics` or `keyrgb --diagnostics` only as the terminal fallback.
   - If the laptop is Clevo/Tuxedo/System76, check `/sys/class/leds` exists and consider installing the relevant kernel driver.
 - **"Permission denied / not detected"**
   - Ensure udev rules are installed (see `system/udev/99-ite8291-wootbook.rules`), then reload udev or reboot.

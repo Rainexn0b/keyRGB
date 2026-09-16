@@ -16,7 +16,14 @@ body:
       label: Experimental backend
       description: Which experimental backend did you test?
       options:
-        - ite8297
+        - ite8291_perkey
+        - ite8291_zones_clevo
+        - ite8258_zones_lenovo_legion
+        - ite8258_perkey_chassis
+        - ite8295_zones_lenovo_ideapad
+        - ite8297_uniform
+        - ite8233_none_chassis_lightbar_clevo
+        - sysfs-mouse
         - Other experimental backend
     validations:
       required: true
@@ -73,10 +80,9 @@ body:
   - type: textarea
     id: diagnostics
     attributes:
-      label: keyrgb-diagnostics output (JSON)
-      description: Paste the full `keyrgb-diagnostics` output from the successful setup.
-      render: json
-      placeholder: "{ ... }"
+      label: Support bundle or fallback diagnostics
+      description: Attach the bundle from **Settings → Version → Support Tools… → Save full support bundle…**. If the UI cannot be opened, paste the full `keyrgb-diagnostics` or `keyrgb --diagnostics` output from the successful setup.
+      placeholder: Drag the support bundle here, or paste fallback diagnostics JSON.
     validations:
       required: true
 

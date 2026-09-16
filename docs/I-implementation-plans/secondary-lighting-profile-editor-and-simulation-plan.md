@@ -782,7 +782,8 @@ After simulation and automated gates pass, ask the issue #7 reporter to:
 6. verify **Include enabled lighting areas** unchecked and checked during animation;
 7. stop the animation and confirm static colours return;
 8. verify Turn Off/On, sleep/resume, and AC/battery profile restoration;
-9. attach a fresh support bundle and targeted debug log.
+9. attach a fresh Support Tools bundle and a `keyrgb --diagnostic-session`
+   bundle for any reproducible runtime failure.
 
 Do not mark the backend or this UX hardware-verified from simulation alone.
 

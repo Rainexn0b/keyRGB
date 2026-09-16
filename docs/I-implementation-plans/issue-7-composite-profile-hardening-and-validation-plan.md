@@ -121,7 +121,7 @@ this plan and debug the actual report stream first.
    coordinator-only fix does not itself require reinstalling udev rules.
 4. Ask the reporter to run the checklist in Phase 8 and attach:
    - a pass/fail result per surface and transition;
-   - `KEYRGB_DEBUG=1` and `KEYRGB_DEBUG_BRIGHTNESS=1` logs for a failure;
+   - a `keyrgb --diagnostic-session --diagnostic-mode=brightness` bundle for a failure;
    - a fresh support bundle;
    - the exact tested artifact version or hash.
 5. Record whether the original v0.28.2 config was reused or a fresh profile was
@@ -561,7 +561,8 @@ Using the exact candidate artifact:
 10. Exercise suspend/resume and lid close/open when configured.
 11. Run rapid all-compatible animation long enough to expose report pacing or
     flicker issues.
-12. Attach a fresh support bundle and debug log for any failure.
+12. Attach a fresh Support Tools bundle and a `keyrgb --diagnostic-session`
+    bundle for any reproducible runtime failure.
 
 ### Exit criteria
 

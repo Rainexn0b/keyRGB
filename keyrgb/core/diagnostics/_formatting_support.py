@@ -89,7 +89,8 @@ def append_support_hints(
                     "      note: this VID/PID is commonly reported on Lenovo Legion / IdeaPad Gaming keyboard RGB controllers."
                 )
                 support_lines.append(
-                    "      next: please open an issue and include this diagnostics output + your laptop model."
+                    "      next: open Settings → Version → Support Tools and attach a full support bundle + your "
+                    "laptop model; if the UI is unavailable, include this diagnostics output."
                 )
 
     seen_candidate_usb_ids = _collect_candidate_usb_ids(usb_ids=usb_ids, usb_devices=usb_devices)

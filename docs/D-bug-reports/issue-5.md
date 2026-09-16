@@ -270,10 +270,9 @@ Use this when resuming issue #5 testing on a real `0x7001` machine.
 KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1 ./keyrgb
 ```
 
-2. Open `Support Tools…` and save:
-   - diagnostics JSON
-   - discovery JSON
-   - full support bundle
+2. Open **Settings → Version → Support Tools…**, run diagnostics and device
+   discovery, then choose **Save full support bundle…**. Save the individual
+   diagnostics or discovery JSON only if a maintainer specifically requests it.
 
 3. Confirm discovery shows both:
    - keyboard controller

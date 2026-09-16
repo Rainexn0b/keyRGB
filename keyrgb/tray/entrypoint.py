@@ -11,6 +11,7 @@ import signal
 import sys
 from collections.abc import Sequence
 
+from keyrgb.core.diagnostics import diagnostics_from_cli
 from keyrgb.core.diagnostics.diagnostic_session import diagnostic_session_from_cli
 from keyrgb.core.diagnostics.runtime_capture import capture_runtime_log_from_cli
 
@@ -71,6 +72,15 @@ def main(argv: Sequence[str] | None = None) -> None:
     if capture_exit_code is not None:
         if capture_exit_code != 0:
             raise SystemExit(capture_exit_code)
+        return
+
+    # Read-only diagnostics mode (AppImage-forwardable ``keyrgb --diagnostics``).
+    # Keep this after the session/capture dispatches so their existing priority
+    # is unchanged, but before any tray startup (logging, singleton, KeyRGBTray).
+    diagnostics_exit_code = diagnostics_from_cli(argv_tuple, prog="keyrgb")
+    if diagnostics_exit_code is not None:
+        if diagnostics_exit_code != 0:
+            raise SystemExit(diagnostics_exit_code)
         return
 
     app: KeyRGBTray | None = None
