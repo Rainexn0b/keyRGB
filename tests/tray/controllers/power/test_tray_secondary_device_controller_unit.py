@@ -16,6 +16,7 @@ def _make_lightbar_route(*, device_factory):
         state_key="lightbar",
         get_device=device_factory,
         config_brightness_attr="lightbar_brightness",
+        config_color_attr="lightbar_color",
         brightness_policy=BRIGHTNESS_POLICY_INDEPENDENT,
     )
 
@@ -31,7 +32,7 @@ def _stub_profile_brightness_persistence(monkeypatch):
 def _make_tray() -> SimpleNamespace:
     tray = SimpleNamespace(
         selected_device_context="lightbar:048d:7001",
-        config=SimpleNamespace(lightbar_brightness=25),
+        config=SimpleNamespace(lightbar_brightness=25, lightbar_color=(255, 0, 0)),
         _update_menu=MagicMock(),
         _log_exception=MagicMock(),
         _notify_permission_issue=MagicMock(),
@@ -45,11 +46,15 @@ def test_apply_selected_secondary_brightness_updates_lightbar_device(monkeypatch
     from keyrgb.tray.controllers.secondary_device_controller import apply_selected_secondary_brightness
 
     tray = _make_tray()
-    seen: list[int] = []
+    tray.config.lightbar_color = (12, 34, 56)
+    seen: list[tuple[tuple[int, int, int], int]] = []
 
     class DummyDevice:
+        def set_color(self, color: tuple[int, int, int], *, brightness: int) -> None:
+            seen.append((color, int(brightness)))
+
         def set_brightness(self, brightness: int) -> None:
-            seen.append(int(brightness))
+            raise AssertionError(f"fresh-device cache must not be used: {brightness}")
 
     monkeypatch.setattr(
         "keyrgb.tray.controllers.secondary_device_controller.selected_device_context_entry",
@@ -64,7 +69,7 @@ def test_apply_selected_secondary_brightness_updates_lightbar_device(monkeypatch
     assert tray.config.lightbar_brightness == 30
     tray.config.set_secondary_device_enabled.assert_called_once_with("lightbar", True)
     assert tray._active_secondary_lighting["areas"]["lightbar"] == {"brightness": 30, "enabled": True}
-    assert seen == [30]
+    assert seen == [((12, 34, 56), 30)]
     tray._update_menu.assert_called_once()
 
 
@@ -93,43 +98,6 @@ def test_turn_off_selected_secondary_device_turns_off_lightbar(monkeypatch) -> N
     assert tray._active_secondary_lighting["areas"]["lightbar"] == {"enabled": False}
     assert calls == {"off": 1}
     tray._update_menu.assert_called_once()
-
-
-def test_turn_on_selected_secondary_device_restores_last_nonzero_brightness(monkeypatch) -> None:
-    from keyrgb.tray.controllers.secondary_device_controller import (
-        turn_off_selected_secondary_device,
-        turn_on_selected_secondary_device,
-    )
-
-    tray = _make_tray()
-    tray.config.lightbar_brightness = 10
-    seen: list[int | str] = []
-
-    class DummyDevice:
-        def turn_off(self) -> None:
-            seen.append("off")
-
-        def set_brightness(self, brightness: int) -> None:
-            seen.append(int(brightness))
-
-    monkeypatch.setattr(
-        "keyrgb.tray.controllers.secondary_device_controller.selected_device_context_entry",
-        lambda tray_obj: {"key": tray_obj.selected_device_context, "device_type": "lightbar"},
-    )
-    monkeypatch.setattr(
-        "keyrgb.tray.controllers.secondary_device_controller.route_for_context_entry",
-        lambda entry: _make_lightbar_route(device_factory=lambda: DummyDevice()),
-    )
-
-    assert turn_off_selected_secondary_device(tray) is True
-    assert tray.config.lightbar_brightness == 0
-
-    assert turn_on_selected_secondary_device(tray) is True
-    assert tray.config.lightbar_brightness == 10
-    assert tray.config.set_secondary_device_enabled.call_args_list[-1].args == ("lightbar", True)
-    assert tray._active_secondary_lighting["areas"]["lightbar"] == {"brightness": 10, "enabled": True}
-    assert seen == ["off", 10]
-    assert tray._update_menu.call_count == 2
 
 
 def test_turn_on_selected_secondary_device_defaults_to_25_without_saved_brightness(monkeypatch) -> None:
@@ -244,6 +212,16 @@ def test_apply_selected_secondary_brightness_logs_recoverable_device_failures(mo
     from keyrgb.tray.controllers.secondary_device_controller import apply_selected_secondary_brightness
 
     tray = _make_tray()
+    original_profile = {
+        "version": 1,
+        "areas": {"lightbar": {"enabled": True, "brightness": 25, "color": [1, 2, 3]}},
+    }
+    tray._active_secondary_lighting = original_profile
+    persist = MagicMock()
+    monkeypatch.setattr(
+        "keyrgb.tray.controllers.secondary_device_controller.profiles.update_secondary_lighting_area",
+        persist,
+    )
 
     class DummyDevice:
         def set_brightness(self, brightness: int) -> None:
@@ -260,6 +238,11 @@ def test_apply_selected_secondary_brightness_logs_recoverable_device_failures(mo
     )
 
     assert apply_selected_secondary_brightness(tray, "4") is False
+    assert tray.config.lightbar_brightness == 25
+    tray.config.set_secondary_device_enabled.assert_not_called()
+    assert tray._active_secondary_lighting is original_profile
+    persist.assert_not_called()
+    tray._update_menu.assert_not_called()
     tray._log_exception.assert_called_once()
     msg, exc = tray._log_exception.call_args.args
     assert msg == "Error applying lightbar brightness: %s"

@@ -3,7 +3,7 @@ from __future__ import annotations
 # @quality-exception file-size-analysis: cohesive secondary-device tray controller (select/apply/on/off); further split would add indirection without ownership clarity
 import logging
 from collections.abc import Callable
-from typing import Protocol, cast
+from typing import cast
 
 from keyrgb.core.config._lighting._coercion import normalize_secondary_brightness_value
 from keyrgb.core.profile import profiles
@@ -19,18 +19,20 @@ from keyrgb.tray.protocols import LightingTrayProtocol
 from keyrgb.tray.ui.menu_status import DeviceContextEntry, selected_device_context_entry
 
 from ._lighting_controller_helpers import parse_menu_int, try_log_event
+from ._secondary_device_color_restore import (
+    SecondaryColorDevice as _LightbarDeviceProtocol,
+    TurnOnProfileTrayView as _TurnOnProfileTrayView,
+    active_profile_route_brightness as _active_profile_route_brightness,
+    secondary_route_color as _secondary_route_color,
+    set_color_and_brightness as _set_secondary_color_and_brightness,
+    turn_on_profile_payload as _turn_on_profile_payload,
+)
 from .secondary_static_scene import apply_secondary_static_route
 
 logger = logging.getLogger(__name__)
 _RECOVERABLE_CONFIG_ATTR_WRITE_EXCEPTIONS = (OSError, OverflowError, RuntimeError, TypeError, ValueError)
 # Tray callback + secondary device seams; LookupError dropped (no map-key path).
 _RECOVERABLE_RUNTIME_BOUNDARY_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
-
-
-class _LightbarDeviceProtocol(Protocol):
-    def set_brightness(self, brightness: int) -> None: ...
-
-    def turn_off(self) -> None: ...
 
 
 def _secondary_current_brightness(tray: LightingTrayProtocol, route: SecondaryDeviceRoute) -> int:
@@ -41,6 +43,7 @@ def _secondary_restore_brightness(tray: LightingTrayProtocol, route: SecondaryDe
     return secondary_device_power.restore_brightness(
         tray,
         route,
+        profile_brightness_fn=lambda: _active_profile_route_brightness(tray, route),
         current_brightness_fn=lambda: _secondary_current_brightness(tray, route),
     )
 
@@ -113,6 +116,23 @@ def apply_selected_secondary_brightness(tray: LightingTrayProtocol, item: object
         return False
 
     brightness_hw = int(level) * 5
+    color = _secondary_route_color(tray, route)
+
+    def _apply(device: _LightbarDeviceProtocol) -> None:
+        if brightness_hw <= 0:
+            device.turn_off()
+            return
+        _set_secondary_color_and_brightness(device, color, brightness_hw)
+
+    ok = _with_secondary_device(
+        tray,
+        route,
+        _apply,
+        error_msg=f"Error applying {route.display_name.lower()} brightness: %s",
+    )
+    if not ok:
+        return False
+
     secondary_device_power.cache_restore_brightness(tray, route, brightness_hw)
     _set_secondary_brightness_best_effort(
         tray,
@@ -139,22 +159,8 @@ def apply_selected_secondary_brightness(tray: LightingTrayProtocol, item: object
         _persist_secondary_state_to_active_profile(tray, route, enabled=False)
 
     try_log_event(tray, "menu", f"set_{route.device_type}_brightness", new=int(brightness_hw))
-
-    def _apply(device: _LightbarDeviceProtocol) -> None:
-        if brightness_hw <= 0:
-            device.turn_off()
-            return
-        device.set_brightness(int(brightness_hw))
-
-    ok = _with_secondary_device(
-        tray,
-        route,
-        _apply,
-        error_msg=f"Error applying {route.display_name.lower()} brightness: %s",
-    )
-    if ok:
-        _refresh_menu_best_effort(tray)
-    return ok
+    _refresh_menu_best_effort(tray)
+    return True
 
 
 def turn_off_selected_secondary_device(tray: LightingTrayProtocol) -> bool:
@@ -162,8 +168,18 @@ def turn_off_selected_secondary_device(tray: LightingTrayProtocol) -> bool:
     if resolved is None:
         return False
     _entry, route = resolved
-    secondary_device_power.cache_restore_brightness(tray, route, _secondary_current_brightness(tray, route))
+    current_brightness = _secondary_current_brightness(tray, route)
 
+    ok = _with_secondary_device(
+        tray,
+        route,
+        lambda device: device.turn_off(),
+        error_msg=f"Error turning off {route.display_name.lower()}: %s",
+    )
+    if not ok:
+        return False
+
+    secondary_device_power.cache_restore_brightness(tray, route, current_brightness)
     _set_secondary_brightness_best_effort(
         tray,
         route,
@@ -179,16 +195,8 @@ def turn_off_selected_secondary_device(tray: LightingTrayProtocol) -> bool:
     _persist_secondary_state_to_active_profile(tray, route, enabled=False)
 
     try_log_event(tray, "menu", f"turn_off_{route.device_type}")
-
-    ok = _with_secondary_device(
-        tray,
-        route,
-        lambda device: device.turn_off(),
-        error_msg=f"Error turning off {route.display_name.lower()}: %s",
-    )
-    if ok:
-        _refresh_menu_best_effort(tray)
-    return ok
+    _refresh_menu_best_effort(tray)
+    return True
 
 
 def turn_on_selected_secondary_device(tray: LightingTrayProtocol) -> bool:
@@ -198,6 +206,23 @@ def turn_on_selected_secondary_device(tray: LightingTrayProtocol) -> bool:
     _entry, route = resolved
 
     restore_brightness = _secondary_restore_brightness(tray, route)
+    if getattr(route, "brightness_policy", None) == BRIGHTNESS_POLICY_INDEPENDENT:
+        color = _secondary_route_color(tray, route)
+        ok = _with_secondary_device(
+            tray,
+            route,
+            lambda device: _set_secondary_color_and_brightness(device, color, restore_brightness),
+            error_msg=f"Error turning on {route.display_name.lower()}: %s",
+        )
+    else:
+        # Shared zones still resume at the primary keyboard brightness. Apply an
+        # enabled profile view before committing desired state so failed I/O
+        # cannot make the persisted route claim that it is on.
+        payload = _turn_on_profile_payload(tray, route, restore_brightness)
+        ok = apply_secondary_static_route(_TurnOnProfileTrayView(tray, payload), route)
+    if not ok:
+        return False
+
     secondary_device_power.cache_restore_brightness(tray, route, restore_brightness)
     _set_secondary_brightness_best_effort(
         tray,
@@ -219,22 +244,8 @@ def turn_on_selected_secondary_device(tray: LightingTrayProtocol) -> bool:
     )
 
     try_log_event(tray, "menu", f"turn_on_{route.device_type}")
-
-    if getattr(route, "brightness_policy", None) == BRIGHTNESS_POLICY_INDEPENDENT:
-        ok = _with_secondary_device(
-            tray,
-            route,
-            lambda device: device.set_brightness(int(restore_brightness)),
-            error_msg=f"Error turning on {route.display_name.lower()}: %s",
-        )
-    else:
-        # Shared zones resume by reapplying their profile colour at the primary
-        # keyboard brightness. Sending set_brightness directly would change the
-        # shared controller brightness for every surface.
-        ok = apply_secondary_static_route(tray, route)
-    if ok:
-        _refresh_menu_best_effort(tray)
-    return ok
+    _refresh_menu_best_effort(tray)
+    return True
 
 
 def _with_secondary_device(

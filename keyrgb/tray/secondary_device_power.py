@@ -90,12 +90,17 @@ def restore_brightness(
     tray: object,
     route: SecondaryDeviceRoute,
     *,
+    profile_brightness_fn: Callable[[], int | None] | None = None,
     current_brightness_fn: Callable[[], int],
     default: int = 25,
 ) -> int:
     hint = restore_hints(tray).get(state_key(route))
     if hint is not None and int(hint) > 0:
         return int(hint)
+
+    profile_brightness = profile_brightness_fn() if profile_brightness_fn is not None else None
+    if profile_brightness is not None and int(profile_brightness) > 0:
+        return int(profile_brightness)
 
     current = int(current_brightness_fn())
     if current > 0:

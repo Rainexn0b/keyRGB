@@ -65,3 +65,51 @@ sudo usbhid-dump -d 048d:6005 -e descriptor
 ```
 
 Do not force either backend to the other controller's hidraw node.
+
+## v0.36.2 reporter feedback (2026-09-17)
+
+- Hardware effects: PASS (reporter wording; `ite8291_zones_clevo` advertises
+  `hardware_effects=False`, so this likely means static hardware output).
+- Software effects: PASS.
+- 4 keyboard zones: PASS.
+- Lightbar behaviour: PASS.
+- Brightness control: PASS.
+- Lighting off/on: FAIL.
+- Flicker occurs only after the laptop is unused for a while.
+- Screenshot shows Software Effects > Rainbow Wave active with
+  `Include enabled lighting areas` checked; reporter says
+  “I somehow cannot use 1 color anymore.”
+
+Triage:
+
+- A saved single lightbar color is temporarily owned by the running software
+  effect while `Include enabled lighting areas` is checked. Unchecking that
+  toggle (or stopping the software effect) restores the saved static color.
+  This is expected routing ownership, not a lightbar protocol failure.
+- Auxiliary Front Lightbar off/on/brightness had a verified fresh-device bug:
+  nonzero brightness and Turn On called `set_brightness()` on a newly acquired
+  device whose cached color defaults to white, losing the saved color. State
+  was also persisted before hardware success, and restore could fall back to
+  25 instead of preserved profile brightness. Fixed in the worktree by doing
+  hardware I/O first, applying the persisted route color with
+  `set_color(color, brightness=...)`, and preferring the active-profile
+  brightness on restore.
+- No deterministic failure was found in the explicit primary keyboard
+  Turn Off/On path. The generic `Lighting off/on: FAIL` remains ambiguous
+  (bottom Turn Off/On versus Turn Off/On Front Lightbar; keyboard versus
+  lightbar; Off fails versus On restores wrong color; static versus software
+  effect).
+- Idle-only flicker is separate from the immediate toggle. Candidates are
+  controller-native inactivity sleep (the 4-zone backend reports cached
+  brightness/off state and cannot observe autonomous firmware darkening),
+  desktop screen-idle sync issuing off/restore, or per-frame zone-enable
+  traffic (KeyRGB sends enable + colors + commit per frame; upstream TUXEDO
+  enables once at probe/resume, then sends colors + commit). No zone-protocol
+  change was made pending hardware evidence.
+- Both backends remain experimental; do not promote to validated yet.
+
+Next evidence needed: exact menu label clicked, affected device, active effect,
+static versus software-effect behavior, screen on/dimmed/blanked/locked state,
+delay after last keypress, whether keypress stops it, screen-idle sync and
+controller-sleep settings, competing RGB tools, `/sys/class/leds`, and a
+`keyrgb --diagnostic-session` capture spanning the event.
