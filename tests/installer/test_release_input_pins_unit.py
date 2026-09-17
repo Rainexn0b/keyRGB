@@ -33,6 +33,7 @@ def test_release_workflow_uploads_assets_with_gh_cli() -> None:
 
     assert "softprops/action-gh-release" not in release
     assert "gh release create" in release
+    assert "GH_TOKEN: ${{ github.token }}" in release
     assert "dist/keyrgb-x86_64.AppImage" in release
     assert "dist/keyrgb-x86_64.AppImage.sha256" in release
     assert "--generate-notes" in release

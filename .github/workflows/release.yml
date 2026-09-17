@@ -76,6 +76,8 @@ jobs:
           cat keyrgb-x86_64.AppImage.sha256
 
       - name: Upload AppImage to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
             dist/keyrgb-x86_64.AppImage \
