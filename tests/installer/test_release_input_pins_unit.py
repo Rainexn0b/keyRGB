@@ -26,7 +26,16 @@ def test_github_workflows_pin_actions_to_commit_shas() -> None:
     _assert_action_pinned(ci, action_prefix="actions/setup-python")
     _assert_action_pinned(release, action_prefix="actions/checkout")
     _assert_action_pinned(release, action_prefix="actions/setup-python")
-    _assert_action_pinned(release, action_prefix="softprops/action-gh-release")
+
+
+def test_release_workflow_uploads_assets_with_gh_cli() -> None:
+    release = _RELEASE.read_text(encoding="utf-8")
+
+    assert "softprops/action-gh-release" not in release
+    assert "gh release create" in release
+    assert "dist/keyrgb-x86_64.AppImage" in release
+    assert "dist/keyrgb-x86_64.AppImage.sha256" in release
+    assert "--generate-notes" in release
 
 
 def test_require_checksum_fails_closed_without_sidecar(tmp_path: Path) -> None:

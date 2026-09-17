@@ -265,7 +265,7 @@ def test_release_write_permission_is_job_local_and_audit_preserves_artifacts() -
     assert re.search(r"permissions:\s*\n\s+contents:\s*write", job_block) is not None
     assert "scripts/dependency_audit.py --project-dir ." in text
     assert text.index("scripts/dependency_audit.py") < text.index("python -m buildpython --profile=release")
-    assert "dist/*.AppImage" in text
+    assert "dist/keyrgb-x86_64.AppImage" in text
     assert "keyrgb-x86_64.AppImage.sha256" in text
 
 

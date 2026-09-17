@@ -9,6 +9,7 @@ Front Lightbar power/color reliability follow-up for issue #13's experimental To
 - Tray/Secondary: Preserve the saved Front Lightbar static color across Turn On and brightness changes by applying the persisted route color with `set_color` on fresh one-shot devices instead of brightness-only writes against a default-white cache.
 - Tray/Secondary: Perform secondary device I/O before persisting config/profile/menu state so failed acquisition or writes cannot claim success; restore prefers the same-process hint, then active-profile brightness, then config, then 25.
 - Docs/UX: Refresh UX screenshots to the current state and record v0.36.2 reporter feedback/triage in the issue-13 notes (software fan-out ownership versus lightbar protocol failure, ambiguous off/on FAIL, idle-only flicker evidence still needed).
+- Release/CI: Upload release assets with the preinstalled `gh` CLI instead of `softprops/action-gh-release`, whose large-asset staging repeatedly failed with `Error creating asset temp dir` while uploading the AppImage.
 
 ## 0.36.2 (2026-09-17)
 
