@@ -16,6 +16,7 @@ RUNTIME_LOG_NAME = _runtime_capture.RUNTIME_LOG_NAME
 RuntimeLogCaptureError = _runtime_capture.RuntimeLogCaptureError
 
 DIAGNOSTIC_SESSION_DIR_NAME = "diagnostic-sessions"
+_CANCELLED_EXIT_CODE = 130  # 128 + SIGINT: conventional status for a Ctrl-C cancellation.
 
 
 def _default_diagnostic_session_root() -> Path:
@@ -103,6 +104,9 @@ def run_diagnostic_session(
     containing the captured runtime log, before/after diagnostics snapshots, and
     best-effort user/kernel journal slices. The directory path is printed so callers
     and desktop actions can surface it to the user.
+
+    Returns 130 (128 + SIGINT) when the user cancels at the tray-close prompt
+    before the session starts.
     """
 
     appimage_active = bool(os.environ.get("APPIMAGE"))
@@ -112,7 +116,14 @@ def run_diagnostic_session(
 
     # The desktop action opens a terminal specifically so the user can close the
     # resident tray before the diagnostic child reaches the singleton lock.
-    _wait_for_existing_tray_to_close()
+    try:
+        _wait_for_existing_tray_to_close()
+    except KeyboardInterrupt:
+        # Ctrl-C at the prompt: nothing has been created yet, so report the
+        # cancellation with an informative message and the conventional exit
+        # status instead of a raw KeyboardInterrupt traceback.
+        print("\nDiagnostic session cancelled.")
+        return _CANCELLED_EXIT_CODE
 
     # One captured start time drives both the session directory timestamp and the
     # journal --since boundary so the collected slice matches the run exactly.

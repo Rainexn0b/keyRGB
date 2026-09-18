@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Diagnostics: Cancelling `keyrgb --diagnostic-session` with Ctrl-C at the tray-close prompt now prints "Diagnostic session cancelled." and exits 130 instead of dumping a KeyboardInterrupt traceback.
+
 ## 0.36.3 (2026-09-17)
 
 Front Lightbar power/color reliability follow-up for issue #13's experimental Tongfang path. Both affected backends remain experimental.

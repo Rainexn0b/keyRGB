@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins
 import json
 import sys
 from datetime import datetime, timezone
@@ -69,6 +70,42 @@ def _fake_session_popen(command, **kwargs):
     kwargs["stdout"].write("captured child output\n")
     kwargs["stdout"].flush()
     return _FakeProcess()
+
+
+class _TtyStdin:
+    """Fake ``sys.stdin`` that reports itself as an interactive terminal."""
+
+    def isatty(self) -> bool:
+        return True
+
+
+def test_wait_for_existing_tray_close_prompts_only_on_a_tty(monkeypatch, capsys) -> None:
+    prompts: list[str] = []
+    monkeypatch.setattr(sys, "stdin", _TtyStdin())
+    monkeypatch.setattr(builtins, "input", lambda prompt: prompts.append(prompt) or "")
+
+    diagnostic_session._wait_for_existing_tray_to_close()
+
+    assert len(prompts) == 1
+    assert "Press Enter to start logging" in prompts[0]
+
+
+def test_run_diagnostic_session_cancel_at_prompt_is_clean(tmp_path: Path, monkeypatch, capsys) -> None:
+    monkeypatch.setattr(sys, "stdin", _TtyStdin())
+    monkeypatch.setattr(diagnostic_session._runtime_capture, "discover_source_root", lambda: tmp_path)
+
+    def _cancel(_prompt: str) -> str:
+        raise KeyboardInterrupt()
+
+    monkeypatch.setattr(builtins, "input", _cancel)
+
+    exit_code = diagnostic_session.run_diagnostic_session(output_dir_root=tmp_path)
+
+    assert exit_code == 130
+    captured = capsys.readouterr()
+    assert "Diagnostic session cancelled." in captured.out
+    # Cancellation happens before the session directory is created.
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_run_diagnostic_session_creates_expected_files_and_prints_dir(tmp_path: Path, monkeypatch, capsys) -> None:
