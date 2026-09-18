@@ -122,7 +122,7 @@ def build_sw_effects_menu(
         ),
         pystray.Menu.SEPARATOR,
         item(
-            "None (static per-key)",
+            "None (static per-key)" if per_key_supported else "None (static per-key) (not supported)",
             menu_callbacks.effect_key_callback(tray, "perkey"),
             checked=menu_callbacks.checked_perkey(tray),
             radio=True,

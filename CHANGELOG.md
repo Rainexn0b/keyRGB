@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Diagnostics: Cancelling `keyrgb --diagnostic-session` with Ctrl-C at the tray-close prompt now prints "Diagnostic session cancelled." and exits 130 instead of dumping a KeyboardInterrupt traceback.
+- Tray/UI: The Software Effects entry "None (static per-key)" now reads "None (static per-key) (not supported)" when the active backend has no per-key support (e.g. 4-zone keyboards), so the greyed-out state no longer looks like a bug or like something the "Include enabled lighting areas" toggle controls.
 
 ## 0.36.3 (2026-09-17)
 

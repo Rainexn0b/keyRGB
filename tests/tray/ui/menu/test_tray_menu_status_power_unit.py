@@ -170,15 +170,35 @@ def test_zoned_backend_can_enter_software_effect_mode_from_hardware_mode() -> No
     effect_items = [
         entry
         for entry in submenu.items
-        if isinstance(entry, dict) and entry["text"] not in {"Reactive Typing Settings…", "None (static per-key)"}
+        if isinstance(entry, dict)
+        and entry["text"] not in {"Reactive Typing Settings…", "None (static per-key) (not supported)"}
     ]
 
     assert effect_items
     assert all(entry["enabled"] is True for entry in effect_items)
     per_key_item = next(
+        entry
+        for entry in submenu.items
+        if isinstance(entry, dict) and entry["text"] == "None (static per-key) (not supported)"
+    )
+    # Zoned hardware has no per-key static mode: the entry stays disabled and
+    # now explains itself instead of presenting a silently greyed-out option.
+    assert per_key_item["enabled"] is False
+
+
+def test_per_key_backend_shows_plain_enabled_none_entry() -> None:
+    tray = DummyTray(DummyCaps(per_key=True, hardware_effects=True))
+
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+    submenu = next(
+        entry["action"] for entry in items if isinstance(entry, dict) and entry["text"] == "Software Effects"
+    )
+    per_key_item = next(
         entry for entry in submenu.items if isinstance(entry, dict) and entry["text"] == "None (static per-key)"
     )
-    assert per_key_item["enabled"] is False
+
+    assert per_key_item["enabled"] is True
+    assert any(isinstance(entry, dict) and "(not supported)" in str(entry["text"]) for entry in submenu.items) is False
 
 
 def test_keyboard_status_badges_research_backed_experimental_backend(monkeypatch: pytest.MonkeyPatch) -> None:
