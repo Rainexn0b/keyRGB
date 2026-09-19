@@ -179,3 +179,86 @@ def test_get_keyboard_releases_hardware_lock_when_open_fails(monkeypatch: pytest
 
     assert hardware.get_keyboard() is None
     assert releases == [True]
+
+
+def test_backend_supports_per_key_from_tray_preflight_payload(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("KEYRGB_TRAY_MANAGED_GUI", "1")
+    monkeypatch.setenv("KEYRGB_PERKEY_PREFLIGHT", '{"per_key": true, "brightness": true}')
+
+    assert hardware.backend_supports_per_key() is True
+
+
+def test_backend_supports_per_key_false_for_zoned_tray_preflight_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("KEYRGB_TRAY_MANAGED_GUI", "1")
+    monkeypatch.setenv("KEYRGB_PERKEY_PREFLIGHT", '{"per_key": false, "brightness": true}')
+
+    assert hardware.backend_supports_per_key() is False
+
+
+def test_backend_supports_zoned_and_zone_count_from_tray_preflight(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("KEYRGB_TRAY_MANAGED_GUI", "1")
+    monkeypatch.setenv(
+        "KEYRGB_PERKEY_PREFLIGHT",
+        '{"per_key": false, "zoned": true, "color": true, "dimensions": [1, 4]}',
+    )
+
+    assert hardware.backend_supports_zoned() is True
+    assert hardware.backend_zone_count() == 4
+
+
+def test_backend_supports_per_key_fails_closed_when_tray_payload_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("KEYRGB_TRAY_MANAGED_GUI", "1")
+    monkeypatch.delenv("KEYRGB_PERKEY_PREFLIGHT", raising=False)
+
+    assert hardware.backend_supports_per_key() is False
+
+
+def test_backend_supports_per_key_fails_closed_on_invalid_tray_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("KEYRGB_TRAY_MANAGED_GUI", "1")
+    monkeypatch.setenv("KEYRGB_PERKEY_PREFLIGHT", "not json")
+
+    assert hardware.backend_supports_per_key() is False
+
+
+def test_backend_supports_per_key_fails_closed_on_non_mapping_tray_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("KEYRGB_TRAY_MANAGED_GUI", "1")
+    monkeypatch.setenv("KEYRGB_PERKEY_PREFLIGHT", "[true]")
+
+    assert hardware.backend_supports_per_key() is False
+
+
+def test_backend_supports_per_key_standalone_per_key_backend(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("KEYRGB_TRAY_MANAGED_GUI", raising=False)
+    monkeypatch.setattr(hardware, "_backend", _PerKeyBackend())
+
+    assert hardware.backend_supports_per_key() is True
+
+
+def test_backend_supports_per_key_standalone_zoned_backend(monkeypatch: pytest.MonkeyPatch) -> None:
+    zoned_backend = type(
+        "UniformBackend",
+        (),
+        {
+            "capabilities": lambda self: BackendCapabilities(
+                brightness=True,
+                per_key=False,
+                color=True,
+                hardware_effects=False,
+                palette=False,
+            ),
+        },
+    )()
+    monkeypatch.delenv("KEYRGB_TRAY_MANAGED_GUI", raising=False)
+    monkeypatch.setattr(hardware, "_backend", zoned_backend)
+
+    assert hardware.backend_supports_per_key() is False

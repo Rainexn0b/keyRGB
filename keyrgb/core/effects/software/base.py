@@ -13,6 +13,7 @@ from keyrgb.core.effects.matrix_layout import geometry_for_engine
 from keyrgb.core.effects.perkey_animation import build_full_color_grid, enable_user_mode_once
 from keyrgb.core.effects.software_targets import average_color_map, render_secondary_uniform_rgb
 from keyrgb.core.effects.transitions import avoid_full_black
+from keyrgb.core.lighting_layers import color_map_for_geometry
 from keyrgb.core.utils.exceptions import is_device_disconnected
 from keyrgb.core.utils.logging_utils import log_throttled
 
@@ -202,6 +203,8 @@ def base_color_map(engine: EffectsEngine) -> dict[Key, Color]:
     geometry = geometry_for_engine(engine)
 
     per_key = _per_key_colors_or_none(engine)
+    if per_key:
+        per_key = color_map_for_geometry(per_key, rows=geometry.rows, cols=geometry.cols)
     if not per_key:
         return {(r, c): base_color for r in range(geometry.rows) for c in range(geometry.cols)}
 

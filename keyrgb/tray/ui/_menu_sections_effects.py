@@ -99,8 +99,7 @@ def build_sw_effects_menu(
     pystray: _PystrayProtocol,
     item: _ItemFactoryProtocol,
     sw_mode: bool,
-    per_key_supported: bool,
-    zoned_effect_entry_supported: bool,
+    software_effect_entry_supported: bool,
 ) -> object:
     """Software-effects submenu (per-key static, animated SW effects, reactive).
 
@@ -122,11 +121,10 @@ def build_sw_effects_menu(
         ),
         pystray.Menu.SEPARATOR,
         item(
-            "None (static per-key)" if per_key_supported else "None (static per-key) (not supported)",
-            menu_callbacks.effect_key_callback(tray, "perkey"),
-            checked=menu_callbacks.checked_perkey(tray),
-            radio=True,
-            enabled=per_key_supported,
+            "Lighting profile" if software_effect_entry_supported else "Lighting profile (not supported)",
+            menu_callbacks.effect_key_callback(tray, "lighting_profile"),
+            checked=menu_callbacks.checked_lighting_profile(tray),
+            enabled=software_effect_entry_supported,
         ),
         pystray.Menu.SEPARATOR,
         *[
@@ -135,7 +133,7 @@ def build_sw_effects_menu(
                 menu_callbacks.effect_key_callback(tray, effect),
                 checked=menu_callbacks.checked_sw_effect(tray, effect, sw_mode=sw_mode),
                 radio=True,
-                enabled=sw_mode or zoned_effect_entry_supported,
+                enabled=sw_mode or software_effect_entry_supported,
             )
             for effect in effects_catalog.SOFTWARE_EFFECTS
         ],
@@ -146,7 +144,7 @@ def build_sw_effects_menu(
                 menu_callbacks.effect_key_callback(tray, effect),
                 checked=menu_callbacks.checked_sw_effect(tray, effect, sw_mode=sw_mode),
                 radio=True,
-                enabled=sw_mode or zoned_effect_entry_supported,
+                enabled=sw_mode or software_effect_entry_supported,
             )
             for effect in effects_catalog.REACTIVE_EFFECTS
         ],

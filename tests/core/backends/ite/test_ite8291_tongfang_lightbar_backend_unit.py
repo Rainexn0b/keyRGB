@@ -80,8 +80,8 @@ def test_tongfang_lightbar_probe_reports_missing_device_cleanly(monkeypatch: pyt
     monkeypatch.delenv(tongfang_protocol.HIDRAW_PATH_ENV, raising=False)
     monkeypatch.setattr(
         tongfang_backend_module,
-        "find_matching_ite8291_style_hidraw_device",
-        lambda *, product_ids, forced_path_env: None,
+        "_find_matching_supported_hidraw_device",
+        lambda: None,
     )
 
     probe = Ite8291TongfangLightbarBackend().probe()
@@ -157,12 +157,6 @@ def test_open_matching_transport_raises_when_no_supported_device(monkeypatch: py
     monkeypatch.setattr(
         "keyrgb.core.backends.ite8291_none_chassis_lightbar_tongfang.backend._find_matching_supported_hidraw_device",
         lambda: None,
-    )
-    monkeypatch.setattr(
-        "keyrgb.core.backends.ite8291_none_chassis_lightbar_tongfang.backend.open_matching_ite8291_style_hidraw_transport",
-        lambda **kwargs: (_ for _ in ()).throw(
-            FileNotFoundError("No hidraw device found for supported ITE 8291 Tongfang lightbar IDs: 0x048d:0x6005")
-        ),
     )
 
     with pytest.raises(FileNotFoundError, match="No hidraw device found"):
@@ -241,7 +235,7 @@ def test_tongfang_lightbar_get_device_returns_device_when_transport_opens(
     device = Ite8291TongfangLightbarBackend().get_device()
 
     assert isinstance(device, Ite8291TongfangLightbarDevice)
-    device.set_color((0x12, 0x34, 0x56), brightness=25)
+    device.set_color((0x12, 0x34, 0x56), brightness=50)
     assert seen_features[0] == bytes((0x00, 0x08, 0x02, 0x33, 0x00, 0x19, 0x08, 0x00, 0x00))
     assert len(seen_outputs[0]) == 65
 

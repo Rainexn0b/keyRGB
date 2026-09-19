@@ -72,6 +72,15 @@ def clamp_brightness(value: int) -> int:
     return max(BRIGHTNESS_MIN, min(BRIGHTNESS_MAX, int(value)))
 
 
+def stored_brightness_to_hardware(value: int) -> int:
+    """Map independent secondary storage (0..100) onto the 0..50 hardware field."""
+
+    stored = max(0, min(100, int(value)))
+    if stored <= 0:
+        return 0
+    return max(1, clamp_brightness(round(stored * BRIGHTNESS_MAX / 100.0)))
+
+
 def clamp_speed(value: int) -> int:
     return max(SPEED_MIN, min(SPEED_MAX, int(value)))
 

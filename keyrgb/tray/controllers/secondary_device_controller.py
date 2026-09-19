@@ -115,7 +115,7 @@ def apply_selected_secondary_brightness(tray: LightingTrayProtocol, item: object
     if level is None:
         return False
 
-    brightness_hw = int(level) * 5
+    brightness_hw = secondary_device_power.independent_brightness_from_menu_level(route, int(level))
     color = _secondary_route_color(tray, route)
 
     def _apply(device: _LightbarDeviceProtocol) -> None:

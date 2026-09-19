@@ -15,7 +15,11 @@ from typing import Protocol, cast
 
 from keyrgb.core.backends.base import normalize_backend_capabilities
 from keyrgb.core.effects import catalog as effects_catalog
-from keyrgb.core.lighting_layers import has_nonempty_per_key_base
+from keyrgb.core.lighting_layers import (
+    has_nonempty_per_key_base,
+    render_effect_from_selected_effect,
+    uniform_color_from_per_key_map,
+)
 from keyrgb.core.utils.exceptions import is_permission_denied
 from keyrgb.core.utils.safe_attrs import safe_int_attr
 from keyrgb.tray.controllers._effect_selection_defer import defer_effect_selection as _defer_effect_selection
@@ -39,6 +43,7 @@ _NOTIFY_CALLBACK_RUNTIME_EXCEPTIONS = (AttributeError, OSError, RuntimeError, Ty
 class _BackendCapsProtocol(Protocol):
     per_key: bool
     hardware_effects: bool
+    zoned: bool
 
 
 class _EffectSelectionTrayProtocol(LightingTrayProtocol, Protocol):
@@ -152,6 +157,51 @@ def _ensure_hardware_mode(tray) -> None:
     _set_attr_best_effort(tray.engine, "per_key_brightness", None)
 
 
+def _remember_software_effect(config, effect_name: object) -> None:
+    name = effects_catalog.strip_effect_namespace(str(effect_name or ""))
+    if name in effects_catalog.SW_EFFECTS_SET:
+        _set_attr_best_effort(config, "last_software_effect", name)
+
+
+def _configured_last_software_effect(config) -> str | None:
+    raw = getattr(config, "last_software_effect", None)
+    name = effects_catalog.strip_effect_namespace(str(raw or ""))
+    if name in effects_catalog.SW_EFFECTS_SET:
+        return name
+    return None
+
+
+def lighting_profile_is_active(tray: object) -> bool:
+    config = getattr(tray, "config", None)
+    effect = render_effect_from_selected_effect(
+        selected_effect=effects_catalog.normalize_effect_name(str(getattr(config, "effect", "none") or "none")),
+        per_key_colors=getattr(config, "per_key_colors", None),
+    )
+    return effect == "perkey" and not bool(getattr(tray, "is_off", False))
+
+
+def _resolve_lighting_profile_toggle(tray: object, effect_name: str) -> str:
+    if effect_name != "lighting_profile":
+        return effect_name
+    if lighting_profile_is_active(tray):
+        return _configured_last_software_effect(getattr(tray, "config", None)) or "hw_uniform"
+    _remember_software_effect(getattr(tray, "config", None), getattr(getattr(tray, "config", None), "effect", None))
+    return "perkey"
+
+
+def _sync_uniform_color_for_zoned(config) -> None:
+    """Sync ``config.color`` from the saved per-key map on zoned-only backends.
+
+    Zone devices render per-key maps by averaging them to one uniform color, so
+    the software-static render must derive the same color for the two paths to
+    agree.
+    """
+
+    uniform = uniform_color_from_per_key_map(getattr(config, "per_key_colors", None))
+    if uniform is not None:
+        _set_attr_best_effort(config, "color", uniform)
+
+
 def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> None:
     """Apply an effect selection coming from the tray menu.
 
@@ -167,12 +217,14 @@ def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> N
         caps = normalize_backend_capabilities(getattr(effect_tray, "backend_caps", None))
         per_key_supported = caps.per_key
         hw_effects_supported = caps.hardware_effects
+        zoned_supported = caps.zoned
 
         try:
             effect_name = effects_catalog.normalize_effect_name(effect_name)
         except (AttributeError, TypeError, ValueError):
             effect_name = "none"
 
+        effect_name = _resolve_lighting_profile_toggle(effect_tray, effect_name)
         base_effect_name = effects_catalog.strip_effect_namespace(effect_name)
 
         from keyrgb.tray.deck_pipeline import hardware_apply_deferred
@@ -183,6 +235,7 @@ def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> N
                 effect_name=effect_name,
                 per_key_supported=per_key_supported,
                 hw_effects_supported=hw_effects_supported,
+                zoned_supported=zoned_supported,
             )
             return
 
@@ -210,7 +263,9 @@ def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> N
 
             per_key = _config_per_key_colors_ref(tray.config)
             tray.config.effect = "none"
-            if has_nonempty_per_key_base(per_key) and per_key_supported:
+            if has_nonempty_per_key_base(per_key) and (per_key_supported or zoned_supported):
+                if zoned_supported and not per_key_supported:
+                    _sync_uniform_color_for_zoned(tray.config)
                 _ensure_software_mode(tray)
                 effect_tray._start_current_effect()
             else:
@@ -222,9 +277,15 @@ def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> N
             tray.is_off = False
             return
 
-        # "perkey" -> switch to software mode with static per-key colors
+        # "perkey" -> restore the last lighting-editor profile
         if effect_name == "perkey":
-            if not per_key_supported:
+            colors = _load_per_key_colors_from_profile(tray.config)
+            if colors:
+                tray.config.per_key_colors = colors
+            if (zoned_supported or caps.color) and not per_key_supported:
+                _sync_uniform_color_for_zoned(tray.config)
+
+            if not per_key_supported and not zoned_supported:
                 tray.engine.stop()
                 tray.config.effect = "none"
                 _ensure_hardware_mode(tray)
@@ -233,10 +294,6 @@ def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> N
                 apply_secondary_static_fallback(tray)
                 tray.is_off = False
                 return
-
-            colors = _load_per_key_colors_from_profile(tray.config)
-            if colors:
-                tray.config.per_key_colors = colors
 
             _ensure_software_mode(tray)
             tray.config.effect = "none"
@@ -269,6 +326,7 @@ def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> N
         if base_effect_name in effects_catalog.SW_EFFECTS_SET and not effects_catalog.is_forced_hardware_effect(
             effect_name
         ):
+            _remember_software_effect(tray.config, base_effect_name)
             _ensure_software_mode(tray)
             tray.config.effect = base_effect_name
             effect_tray._start_current_effect()

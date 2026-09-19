@@ -145,6 +145,23 @@ def test_engine_owns_backend_geometry_for_zoned_backend() -> None:
     assert software_base.base_color_map(engine).keys() == {(0, col) for col in range(4)}
 
 
+def test_zoned_base_color_map_buckets_keyboard_sized_profile() -> None:
+    engine = EffectsEngine(backend=_ZonedBackend())
+    engine.per_key_colors = {
+        (0, 0): (10, 0, 0),
+        (0, 5): (10, 0, 0),
+        (0, 10): (0, 10, 0),
+        (0, 16): (0, 0, 10),
+        (0, 20): (0, 0, 10),
+    }
+
+    color_map = software_base.base_color_map(engine)
+
+    assert color_map.keys() == {(0, col) for col in range(4)}
+    assert color_map[(0, 0)][0] > color_map[(0, 0)][1]
+    assert color_map[(0, 3)][2] > color_map[(0, 3)][0]
+
+
 def test_engine_geometry_refreshes_on_backend_change() -> None:
     engine = EffectsEngine(backend=_PerKeyBackend(name="ite8910_perkey", rows=6, cols=20))
     assert engine.effect_geometry.cols == 20

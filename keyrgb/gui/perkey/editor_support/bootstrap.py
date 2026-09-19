@@ -16,6 +16,11 @@ from . import bootstrap_protocols as _protocols, dirty_state
 PERKEY_WINDOW_ID = "perkey"
 PERKEY_SCREEN_RATIO_CAP = 0.92
 
+ZONED_UNIFORM_HINT_INITIAL = (
+    "This keyboard uses zone lighting — painting a key colors its whole zone. "
+    "Use 'Apply to all keys' for one color across every zone."
+)
+
 logger = logging.getLogger(__name__)
 
 LayoutTweaks = _protocols.LayoutTweaks
@@ -52,6 +57,9 @@ def initialize_editor(
     no_keymap_found_initial: Callable[[], str],
     num_rows: int,
     num_cols: int,
+    per_key_supported: bool = True,
+    zoned_supported: bool = False,
+    zone_count: int = 0,
 ) -> None:
     editor = cast(_PerKeyEditorBootstrapApp, app)
     tk_module = cast(_TkModuleProtocol, tk)
@@ -146,6 +154,9 @@ def initialize_editor(
     editor.layout_slot_overrides = editor._load_layout_slot_overrides()
 
     editor.overlay_scope = tk_module.StringVar(value="global")
+    editor.per_key_supported = bool(per_key_supported)
+    editor.zoned_supported = bool(zoned_supported) and not bool(per_key_supported)
+    editor.zone_count = int(zone_count) if editor.zoned_supported else 0
     editor.apply_all_keys = tk_module.BooleanVar(value=False)
     editor.sample_tool_enabled = tk_module.BooleanVar(value=False)
     editor._sample_tool_has_sampled = False
@@ -215,7 +226,9 @@ def initialize_editor(
     editor.root.after(60, geometry_tracker.start_tracking)
     editor.canvas.redraw()
 
-    if not editor.keymap:
+    if editor.zoned_supported:
+        set_status(editor, ZONED_UNIFORM_HINT_INITIAL)
+    elif not editor.keymap:
         set_status(editor, no_keymap_found_initial())
 
     for key_def in editor._get_visible_layout_keys():

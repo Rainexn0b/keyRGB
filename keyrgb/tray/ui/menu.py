@@ -95,6 +95,7 @@ def build_menu_items(
     # Zoned hardware has no per-key action, so it needs a direct route from
     # hardware mode into an animated software effect.
     zoned_effect_entry_supported = caps.zoned
+    software_effect_entry_supported = bool(caps.per_key or caps.zoned or caps.color)
     hw_effects_supported = caps.hardware_effects
     color_supported = caps.color
     brightness_supported = caps.brightness
@@ -133,8 +134,7 @@ def build_menu_items(
         pystray=pystray,
         item=item,
         sw_mode=sw_mode,
-        per_key_supported=per_key_supported,
-        zoned_effect_entry_supported=zoned_effect_entry_supported,
+        software_effect_entry_supported=software_effect_entry_supported,
     )
     speed_menu = menu_effects.build_speed_menu(tray_state, pystray=pystray, item=item)
     brightness_menu = menu_effects.build_brightness_menu(tray_state, pystray=pystray, item=item)
@@ -151,6 +151,7 @@ def build_menu_items(
         pystray=pystray,
         item=item,
         per_key_supported=per_key_supported,
+        zoned_supported=zoned_effect_entry_supported,
         secondary_lighting_supported=secondary_lighting_supported,
     )
     power_menu = system_power_menu

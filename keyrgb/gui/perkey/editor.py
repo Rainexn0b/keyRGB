@@ -118,6 +118,9 @@ class PerKeyEditor:
             no_keymap_found_initial=editor_actions.no_keymap_found_initial,
             num_rows=NUM_ROWS,
             num_cols=NUM_COLS,
+            per_key_supported=hardware.backend_supports_per_key(),
+            zoned_supported=hardware.backend_supports_zoned(),
+            zone_count=hardware.backend_zone_count(),
         )
 
     def _on_backdrop_transparency_changed(self, value: str) -> None:

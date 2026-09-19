@@ -33,6 +33,17 @@ def state_key(route: SecondaryDeviceRoute) -> str:
     return str(getattr(route, "state_key", getattr(route, "device_type", "device")) or "device")
 
 
+def independent_brightness_step(route: SecondaryDeviceRoute) -> int:
+    """Menu step for independent secondary brightness (ui_max / 10)."""
+
+    ui_max = int(getattr(route, "brightness_ui_max", 50) or 50)
+    return max(1, ui_max // 10)
+
+
+def independent_brightness_from_menu_level(route: SecondaryDeviceRoute, level: int) -> int:
+    return int(level) * independent_brightness_step(route)
+
+
 def current_brightness(
     config: object | None,
     route: SecondaryDeviceRoute | None,
@@ -92,7 +103,7 @@ def restore_brightness(
     *,
     profile_brightness_fn: Callable[[], int | None] | None = None,
     current_brightness_fn: Callable[[], int],
-    default: int = 25,
+    default: int | None = None,
 ) -> int:
     hint = restore_hints(tray).get(state_key(route))
     if hint is not None and int(hint) > 0:
@@ -105,7 +116,9 @@ def restore_brightness(
     current = int(current_brightness_fn())
     if current > 0:
         return current
-    return int(default)
+    if default is not None:
+        return int(default)
+    return max(1, int(getattr(route, "brightness_ui_max", 50) or 50) // 2)
 
 
 __all__ = [
@@ -113,6 +126,8 @@ __all__ = [
     "SecondaryBrightnessConfig",
     "cache_restore_brightness",
     "current_brightness",
+    "independent_brightness_from_menu_level",
+    "independent_brightness_step",
     "is_off",
     "restore_brightness",
     "restore_hints",

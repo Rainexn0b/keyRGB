@@ -84,7 +84,9 @@ Triage:
 
 - A saved single lightbar color is temporarily owned by the running software
   effect while `Include enabled lighting areas` is checked. Unchecking that
-  toggle (or stopping the software effect) restores the saved static color.
+  toggle restores the saved static color. Software Effects now also has a
+  **Lighting profile** toggle that restores the last lighting-editor profile
+  (and a second click restores the last software/reactive effect).
   This is expected routing ownership, not a lightbar protocol failure.
 - Auxiliary Front Lightbar off/on/brightness had a verified fresh-device bug:
   nonzero brightness and Turn On called `set_brightness()` on a newly acquired

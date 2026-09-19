@@ -130,10 +130,13 @@ def test_launch_perkey_gui_serializes_cached_snapshot_without_probing(monkeypatc
         "color": True,
         "hardware_effects": False,
         "palette": False,
+        "zoned": False,
         "backend_name": "ite8291r3_perkey",
         "dimensions": [6, 18],
     }
-    assert all(type(payload[key]) is bool for key in ("brightness", "per_key", "color", "hardware_effects", "palette"))
+    assert all(
+        type(payload[key]) is bool for key in ("brightness", "per_key", "color", "hardware_effects", "palette", "zoned")
+    )
 
 
 def test_launch_perkey_gui_normalizes_partial_caps_and_omits_invalid_dimensions(monkeypatch) -> None:

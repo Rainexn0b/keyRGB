@@ -59,6 +59,7 @@ class _ApplyColorFn(Protocol):
         color: Color,
         apply_all_keys: bool,
         selected_cells: KeyCells,
+        zone_count: int = 0,
     ) -> ColorMap: ...
 
 
@@ -132,6 +133,7 @@ def _apply_wheel_color(
         editor._last_non_black_color = color
 
     apply_all_keys = bool(editor.apply_all_keys.get())
+    zone_count = int(getattr(editor, "zone_count", 0) or 0)
     selected_slot_id = _selected_slot_id_or_none(editor)
     selected_key_id = _selected_key_id_for_slot(
         editor,
@@ -156,9 +158,10 @@ def _apply_wheel_color(
         color=color,
         apply_all_keys=apply_all_keys,
         selected_cells=selected_cells,
+        zone_count=zone_count,
     )
 
-    if apply_all_keys:
+    if apply_all_keys or zone_count > 1:
         editor.canvas.redraw()
     else:
         editor.canvas.update_key_visual(str(selected_identity), color)

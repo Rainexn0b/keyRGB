@@ -350,6 +350,9 @@ class Config(
     ) -> object | None: ...
 
     @overload
+    def _get_optional_scalar(self, key: Literal["last_software_effect"], default: None = None) -> object | None: ...
+
+    @overload
     def _get_optional_scalar(self, key: Literal["effect_speeds"], default: None = None) -> object | None: ...
 
     def _get_optional_scalar(self, key: str, default: object | None = None) -> object | None:
@@ -380,6 +383,18 @@ class Config(
             self._set_scalar("return_effect_after_effect", None)
         else:
             self._set_scalar("return_effect_after_effect", str(value).strip().lower() or None)
+        self._save()
+
+    @property
+    def last_software_effect(self) -> str | None:
+        return _normalized_optional_string(self._get_optional_scalar("last_software_effect"))
+
+    @last_software_effect.setter
+    def last_software_effect(self, value: str | None):
+        if value is None:
+            self._set_scalar("last_software_effect", None)
+        else:
+            self._set_scalar("last_software_effect", str(value).strip().lower() or None)
         self._save()
 
     @property

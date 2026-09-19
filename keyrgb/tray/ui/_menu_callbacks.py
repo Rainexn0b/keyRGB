@@ -140,3 +140,9 @@ def checked_perkey(tray: _HasMenuPowerState) -> _MenuChecked:
         return effect == "perkey" and not tray.is_off
 
     return _checked
+
+
+def checked_lighting_profile(tray: _HasMenuPowerState) -> _MenuChecked:
+    """Checked when the active lighting profile is driving static output."""
+
+    return checked_perkey(tray)

@@ -9,8 +9,13 @@ from keyrgb.core.effects.software_targets import (
     SOFTWARE_EFFECT_TARGET_KEYBOARD,
     normalize_software_effect_target,
 )
-from keyrgb.core.secondary_device_routes import SecondaryDeviceRoute, route_for_context_entry
+from keyrgb.core.secondary_device_routes import (
+    BRIGHTNESS_POLICY_INDEPENDENT,
+    SecondaryDeviceRoute,
+    route_for_context_entry,
+)
 from keyrgb.core.secondary_device_runtime import acquire_secondary_device
+from keyrgb.tray import secondary_device_power
 from keyrgb.tray.ui.menu_status import DeviceContextEntry
 
 _TrayT = TypeVar("_TrayT")
@@ -34,11 +39,12 @@ class _SecondarySoftwareTargetProtocol(Protocol):
 class _CachedSecondarySoftwareTarget:
     supports_per_key = False
 
-    def __init__(self, *, key: str, route: SecondaryDeviceRoute) -> None:
+    def __init__(self, *, key: str, route: SecondaryDeviceRoute, config: object | None = None) -> None:
         self.key = str(key or "lightbar")
         self.device_type = str(route.device_type)
         self.state_key = str(getattr(route, "state_key", route.device_type))
         self._route = route
+        self._config = config
         self._lock = RLock()
         self._device: _LightbarDeviceProtocol | None = None
 
@@ -47,8 +53,14 @@ class _CachedSecondarySoftwareTarget:
         return self
 
     def set_color(self, color: object, *, brightness: int) -> None:
-        def _apply(device: _LightbarDeviceProtocol) -> None:
-            device.set_color(color, brightness=int(brightness))
+        level = int(brightness)
+        if getattr(self._route, "brightness_policy", None) == BRIGHTNESS_POLICY_INDEPENDENT:
+            current = secondary_device_power.current_brightness(self._config, self._route)
+            if current > 0:
+                level = current
+
+        def _apply(device: _LightbarDeviceProtocol, brightness_hw: int = level) -> None:
+            device.set_color(color, brightness=int(brightness_hw))
 
         self._with_device(_apply)
 
@@ -194,7 +206,7 @@ def secondary_software_render_targets(
         key = str(entry.get("key") or route.device_type)
         target = cache.get(key)
         if target is None:
-            target = cached_secondary_target_cls(key=key, route=route)
+            target = cached_secondary_target_cls(key=key, route=route, config=getattr(tray, "config", None))
             cache[key] = target
         targets.append(target)
     return targets

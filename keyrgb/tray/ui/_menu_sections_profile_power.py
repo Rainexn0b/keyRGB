@@ -151,9 +151,10 @@ class ProfilePowerMenuBuilder:
         pystray: _PystrayProtocol,
         item: _ItemFactoryProtocol,
         per_key_supported: bool,
+        zoned_supported: bool = False,
         secondary_lighting_supported: bool = False,
     ) -> object | None:
-        if not per_key_supported and not secondary_lighting_supported:
+        if not per_key_supported and not zoned_supported and not secondary_lighting_supported:
             return None
 
         try:

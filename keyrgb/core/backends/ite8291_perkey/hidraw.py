@@ -117,25 +117,27 @@ def _forced_info(devnode: Path, *, product_id: int) -> HidrawDeviceInfo | None:
     )
 
 
-def find_matching_hidraw_device(
+def find_matching_hidraw_devices(
     *,
     root: Path | None = None,
     dev_root: Path | None = None,
     product_ids: tuple[int, ...] | None = None,
     forced_path_env: str | None = None,
-) -> HidrawDeviceInfo | None:
+) -> tuple[HidrawDeviceInfo, ...]:
+    """Return every hidraw node matching the requested ITE VID/PID set."""
+
     supported_product_ids = tuple(int(pid) for pid in (product_ids or protocol.SUPPORTED_PRODUCT_IDS))
     forced_path = os.environ.get(forced_path_env or protocol.HIDRAW_PATH_ENV)
     if forced_path:
         info = _forced_info(Path(forced_path), product_id=supported_product_ids[0])
-        if info is not None:
-            return info
+        return (info,) if info is not None else ()
 
     root_dir = Path(root) if root is not None else Path("/sys/class/hidraw")
     if not root_dir.exists():
-        return None
+        return ()
 
     device_root = Path(dev_root) if dev_root is not None else Path("/dev")
+    matches: list[HidrawDeviceInfo] = []
 
     for sysfs_dir in sorted(root_dir.glob("hidraw*"), key=lambda p: p.name.lower()):
         uevent_path = sysfs_dir / "device" / "uevent"
@@ -149,18 +151,36 @@ def find_matching_hidraw_device(
         if vendor_id != protocol.VENDOR_ID or product_id not in supported_product_ids:
             continue
 
-        return HidrawDeviceInfo(
-            hidraw_name=sysfs_dir.name,
-            devnode=device_root / sysfs_dir.name,
-            sysfs_dir=sysfs_dir,
-            vendor_id=vendor_id,
-            product_id=product_id,
-            hid_id=data.get("HID_ID", ""),
-            hid_name=data.get("HID_NAME", ""),
-            bcd_device=_find_usb_device_hex_attr(sysfs_dir, "bcdDevice"),
+        matches.append(
+            HidrawDeviceInfo(
+                hidraw_name=sysfs_dir.name,
+                devnode=device_root / sysfs_dir.name,
+                sysfs_dir=sysfs_dir,
+                vendor_id=vendor_id,
+                product_id=product_id,
+                hid_id=data.get("HID_ID", ""),
+                hid_name=data.get("HID_NAME", ""),
+                bcd_device=_find_usb_device_hex_attr(sysfs_dir, "bcdDevice"),
+            )
         )
 
-    return None
+    return tuple(matches)
+
+
+def find_matching_hidraw_device(
+    *,
+    root: Path | None = None,
+    dev_root: Path | None = None,
+    product_ids: tuple[int, ...] | None = None,
+    forced_path_env: str | None = None,
+) -> HidrawDeviceInfo | None:
+    matches = find_matching_hidraw_devices(
+        root=root,
+        dev_root=dev_root,
+        product_ids=product_ids,
+        forced_path_env=forced_path_env,
+    )
+    return matches[0] if matches else None
 
 
 def _os_cloexec_flag_or_zero() -> int:

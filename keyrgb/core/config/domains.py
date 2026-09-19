@@ -39,6 +39,7 @@ _DOMAIN_KEY_LISTS: dict[ConfigDomain, tuple[str, ...]] = {
         "reactive_trail_percent",
         "reactive_visual_mode",
         "return_effect_after_effect",
+        "last_software_effect",
         "per_key_colors",
         "effect_speeds",
         "software_effect_target",
@@ -46,6 +47,8 @@ _DOMAIN_KEY_LISTS: dict[ConfigDomain, tuple[str, ...]] = {
     ConfigDomain.SECONDARY: (
         "lightbar_brightness",
         "lightbar_color",
+        "ite8291_tongfang_lightbar_brightness",
+        "ite8291_tongfang_lightbar_color",
         "secondary_device_state",
         "ite8258_chassis_logo_brightness",
         "ite8258_chassis_logo_color",

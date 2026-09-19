@@ -221,8 +221,9 @@ def test_tongfang_front_lightbar_route_metadata() -> None:
     assert route.backend_name == "ite8291_none_chassis_lightbar_tongfang"
     assert route.display_name == "Front Lightbar"
     assert route.state_key == "ite8291_tongfang_lightbar"
-    assert route.config_brightness_attr == "lightbar_brightness"
-    assert route.config_color_attr == "lightbar_color"
+    assert route.config_brightness_attr == "ite8291_tongfang_lightbar_brightness"
+    assert route.config_color_attr == "ite8291_tongfang_lightbar_color"
+    assert route.brightness_ui_max == 100
     assert route.supports_uniform_color is True
     assert route.supports_software_target is True
     assert route.supports_profile_state is True

@@ -82,7 +82,8 @@ def build_selected_secondary_section(
                     str(level),
                     tray_state._on_selected_device_brightness_clicked,
                     checked=lambda _i, current=level, route=selected_route: (
-                        secondary_device_power.current_brightness(tray_state.config, route) == current * 5
+                        secondary_device_power.current_brightness(tray_state.config, route)
+                        == secondary_device_power.independent_brightness_from_menu_level(route, current)
                     ),
                     radio=True,
                     enabled=controls_available,

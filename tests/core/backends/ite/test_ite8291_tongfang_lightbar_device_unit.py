@@ -44,7 +44,7 @@ def test_tongfang_lightbar_device_set_color_sends_direct_sequence_in_order() -> 
     outputs: list[bytes] = []
     device = _make_device(features, outputs)
 
-    device.set_color((0x12, 0x34, 0x56), brightness=25)
+    device.set_color((0x12, 0x34, 0x56), brightness=50)
 
     assert features == [
         bytes((0x00, 0x08, 0x02, 0x33, 0x00, 0x19, 0x08, 0x00, 0x00)),
@@ -65,7 +65,7 @@ def test_tongfang_lightbar_device_preserves_raw_rgb_without_software_scaling() -
     outputs: list[bytes] = []
     device = _make_device(features, outputs)
 
-    device.set_color((0x20, 0x40, 0x60), brightness=25)
+    device.set_color((0x20, 0x40, 0x60), brightness=50)
 
     # Raw channels preserved (R,B,G order); brightness rides the mode report.
     assert outputs[0][1:4] == bytes((0x20, 0x60, 0x40))
@@ -77,8 +77,8 @@ def test_tongfang_lightbar_device_set_brightness_reuses_current_color() -> None:
     outputs: list[bytes] = []
     device = _make_device(features, outputs)
 
-    device.set_color((0x12, 0x34, 0x56), brightness=10)
-    device.set_brightness(40)
+    device.set_color((0x12, 0x34, 0x56), brightness=20)
+    device.set_brightness(80)
 
     assert len(outputs) == 2
     assert outputs[1][1:4] == bytes((0x12, 0x56, 0x34))
@@ -116,7 +116,7 @@ def test_tongfang_lightbar_device_set_key_colors_collapses_to_average() -> None:
     outputs: list[bytes] = []
     device = _make_device(features, outputs)
 
-    device.set_key_colors({(0, 0): (200, 100, 50), (0, 1): (100, 200, 150)}, brightness=20)
+    device.set_key_colors({(0, 0): (200, 100, 50), (0, 1): (100, 200, 150)}, brightness=40)
 
     # Average (150, 150, 100) preserved raw in R,B,G order.
     assert outputs[0][1:4] == bytes((150, 100, 150))
@@ -129,7 +129,7 @@ def test_tongfang_lightbar_device_breathing_effect_sends_mode_then_seven_slots()
     outputs: list[bytes] = []
     device = _make_device(features, outputs)
 
-    device.set_effect({"name": "breathing", "color": (0x12, 0x34, 0x56), "brightness": 25, "speed": 5})
+    device.set_effect({"name": "breathing", "color": (0x12, 0x34, 0x56), "brightness": 50, "speed": 5})
 
     assert len(features) == 8
     assert len(outputs) == 0
@@ -143,7 +143,7 @@ def test_tongfang_lightbar_device_wave_effect() -> None:
     outputs: list[bytes] = []
     device = _make_device(features, outputs)
 
-    device.set_effect({"name": "wave", "color": (0x01, 0x02, 0x03), "brightness": 50, "speed": 10})
+    device.set_effect({"name": "wave", "color": (0x01, 0x02, 0x03), "brightness": 100, "speed": 10})
 
     assert len(features) == 8
     assert features[0] == bytes((0x00, 0x08, 0x02, 0x20, 0x0A, 0x32, 0x08, 0x00, 0x00))
@@ -154,7 +154,7 @@ def test_tongfang_lightbar_device_raindrops_effect() -> None:
     outputs: list[bytes] = []
     device = _make_device(features, outputs)
 
-    device.set_effect({"name": "raindrops", "color": (0x01, 0x02, 0x03), "brightness": 30, "speed": 4})
+    device.set_effect({"name": "raindrops", "color": (0x01, 0x02, 0x03), "brightness": 60, "speed": 4})
 
     assert len(features) == 8
     assert features[0] == bytes((0x00, 0x08, 0x02, 0x0A, 0x04, 0x1E, 0x08, 0x00, 0x00))
@@ -172,9 +172,9 @@ def test_tongfang_lightbar_device_sends_no_save_report() -> None:
     outputs: list[bytes] = []
     device = _make_device(features, outputs)
 
-    device.set_color((0x12, 0x34, 0x56), brightness=25)
-    device.set_brightness(30)
-    device.set_effect({"name": "breathing", "color": (0x12, 0x34, 0x56), "brightness": 25, "speed": 5})
+    device.set_color((0x12, 0x34, 0x56), brightness=50)
+    device.set_brightness(60)
+    device.set_effect({"name": "breathing", "color": (0x12, 0x34, 0x56), "brightness": 50, "speed": 5})
     device.turn_off()
 
     # Direct uniform: 3 feature writes + 1 output write each; effects: 8

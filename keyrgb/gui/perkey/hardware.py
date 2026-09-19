@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import os
 from collections.abc import Callable
@@ -76,10 +77,77 @@ def _backend_supports_per_key(backend: KeyboardBackend | None) -> bool:
 
 
 _TRAY_MANAGED_GUI_ENV = "KEYRGB_TRAY_MANAGED_GUI"
+_PERKEY_PREFLIGHT_ENV = "KEYRGB_PERKEY_PREFLIGHT"
 
 
 def _tray_managed_config_only() -> bool:
     return os.environ.get(_TRAY_MANAGED_GUI_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _tray_preflight_payload() -> dict[str, object]:
+    """Parse the tray-launched ``KEYRGB_PERKEY_PREFLIGHT`` payload (fails closed)."""
+
+    raw = os.environ.get(_PERKEY_PREFLIGHT_ENV, "")
+    if not isinstance(raw, str) or not raw.strip():
+        return {}
+    try:
+        payload = json.loads(raw)
+    except (TypeError, ValueError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _tray_preflight_declares_per_key() -> bool:
+    return bool(_tray_preflight_payload().get("per_key"))
+
+
+def _tray_preflight_declares_zoned() -> bool:
+    return bool(_tray_preflight_payload().get("zoned"))
+
+
+def _backend_supports_zoned(backend: KeyboardBackend | None) -> bool:
+    if backend is None:
+        return False
+    return _recover_runtime_boundary(
+        lambda: normalize_backend_capabilities(backend.capabilities()).zoned,
+        fallback=False,
+        log_key="perkey.hardware.zoned_capabilities",
+        log_msg="Backend lacks zoned capability evidence; treating as non-zoned",
+    )
+
+
+def backend_supports_per_key() -> bool:
+    """Return True when the active backend (or tray preflight) supports per-key lighting."""
+
+    if _tray_managed_config_only():
+        return _tray_preflight_declares_per_key()
+    return _backend_supports_per_key(_backend)
+
+
+def backend_supports_zoned() -> bool:
+    """Return True when the active backend (or tray preflight) is zoned, not per-key."""
+
+    if backend_supports_per_key():
+        return False
+    if _tray_managed_config_only():
+        return _tray_preflight_declares_zoned()
+    return _backend_supports_zoned(_backend)
+
+
+def backend_zone_count() -> int:
+    """Hardware zone count for zoned editors; 0 when not in zone-paint mode."""
+
+    if not backend_supports_zoned():
+        return 0
+    if _tray_managed_config_only():
+        raw_dimensions = _tray_preflight_payload().get("dimensions")
+        try:
+            rows, cols = raw_dimensions  # type: ignore[misc]
+            return max(1, int(rows) * int(cols))
+        except (TypeError, ValueError):
+            return 4
+    rows, cols = _backend_dimensions_or_reference(_backend)
+    return max(1, int(rows) * int(cols))
 
 
 _backend = None if _tray_managed_config_only() else _select_backend()
@@ -93,7 +161,9 @@ NUM_ROWS, NUM_COLS = (
 def get_keyboard() -> KeyboardDevice | None:
     """Return a keyboard instance if the backend is available."""
 
-    if _tray_managed_config_only() or _backend is None or not _backend_supports_per_key(_backend):
+    if _tray_managed_config_only() or _backend is None:
+        return None
+    if not (_backend_supports_per_key(_backend) or _backend_supports_zoned(_backend)):
         return None
     if not acquire_hardware_control_lock():
         return None

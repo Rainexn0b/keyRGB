@@ -40,7 +40,13 @@ The persistence report is deliberately not sent automatically.
 - Requires the normal experimental-backend opt-in.
 - Matches only `048d:6005`; it does not share the unrelated Clevo lightbar PID
   table or the `ce00` keyboard path.
+- When multiple hidraw nodes share that VID/PID, prefer the OpenRGB application
+  collection `ff03:01`. A single unmatched node is still accepted; multiple
+  unmatched nodes fail closed.
 - Uses a dedicated hidraw uaccess rule.
+- Independent brightness is stored 0..100 on
+  `ite8291_tongfang_lightbar_brightness` and scaled onto the 0..50 hardware
+  field at write time.
 
 ## Known discrepancy
 

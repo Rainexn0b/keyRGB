@@ -130,7 +130,7 @@ class Ite8291TongfangLightbarDevice:
         return int(self._brightness)
 
     def set_brightness(self, brightness: int) -> None:
-        level = protocol.clamp_brightness(brightness)
+        level = protocol.stored_brightness_to_hardware(brightness)
         if level <= 0:
             self.turn_off()
             return
@@ -143,7 +143,7 @@ class Ite8291TongfangLightbarDevice:
         raw = tuple(_clamp_channel(channel) for channel in color)
         if len(raw) != 3:
             raise ValueError("color must be an RGB 3-tuple")
-        level = protocol.clamp_brightness(brightness)
+        level = protocol.stored_brightness_to_hardware(brightness)
         if level <= 0:
             self.turn_off()
             return
@@ -171,7 +171,10 @@ class Ite8291TongfangLightbarDevice:
             raise RuntimeError(f"Unsupported ITE 8291 Tongfang lightbar effect: {effect_name or effect_data!r}")
 
         effect_dict: dict[str, Any] = effect_data if isinstance(effect_data, dict) else {}
-        brightness = protocol.clamp_brightness(effect_dict.get("brightness", self._brightness))
+        if "brightness" in effect_dict:
+            brightness = protocol.stored_brightness_to_hardware(effect_dict.get("brightness", 0))
+        else:
+            brightness = protocol.clamp_brightness(self._brightness)
         speed = protocol.clamp_speed(effect_dict.get("speed", 5))
         if brightness <= 0:
             self.turn_off()

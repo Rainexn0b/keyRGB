@@ -18,6 +18,7 @@ def defer_effect_selection(
     effect_name: str,
     per_key_supported: bool,
     hw_effects_supported: bool,
+    zoned_supported: bool,
 ) -> bool:
     """Persist an effect choice without touching the dark deck.
 
@@ -38,20 +39,24 @@ def defer_effect_selection(
     if effect_name in {"none", "stop"}:
         tray.config.effect = "none"
         per_key = facade._config_per_key_colors_ref(tray.config)
-        if has_nonempty_per_key_base(per_key) and per_key_supported:
+        if has_nonempty_per_key_base(per_key) and (per_key_supported or zoned_supported):
+            if zoned_supported and not per_key_supported:
+                facade._sync_uniform_color_for_zoned(tray.config)
             facade._ensure_software_mode(tray)
         else:
             facade._ensure_hardware_mode(tray)
         return True
 
     if effect_name == "perkey":
-        if not per_key_supported:
-            tray.config.effect = "none"
-            facade._ensure_hardware_mode(tray)
-            return True
         colors = facade._load_per_key_colors_from_profile(tray.config)
         if colors:
             tray.config.per_key_colors = colors
+        if colors and not per_key_supported:
+            facade._sync_uniform_color_for_zoned(tray.config)
+        if not per_key_supported and not zoned_supported:
+            tray.config.effect = "none"
+            facade._ensure_hardware_mode(tray)
+            return True
         facade._ensure_software_mode(tray)
         # ``perkey`` is represented by the static per-key map and restored as
         # the normal ``none`` effect by the existing startup path.
@@ -70,6 +75,7 @@ def defer_effect_selection(
         return True
 
     if base_effect_name in SW_EFFECTS and not is_forced_hardware_effect(effect_name):
+        facade._remember_software_effect(tray.config, base_effect_name)
         facade._ensure_software_mode(tray)
         tray.config.effect = base_effect_name
         return True

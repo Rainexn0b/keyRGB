@@ -5,12 +5,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from .. import base
+from ..hid_report_descriptor import application_collection_usage
 from ..policies.backend_selection import experimental_backends_enabled
-from ..shared_hidraw_probe import (
-    find_matching_ite8291_style_hidraw_device,
-    identifiers_for_hidraw_match,
-    open_matching_ite8291_style_hidraw_transport,
-)
+from ..shared_hidraw_probe import identifiers_for_hidraw_match
 from . import protocol
 
 if TYPE_CHECKING:
@@ -19,21 +16,61 @@ if TYPE_CHECKING:
 BACKEND_NAME = "ite8291_none_chassis_lightbar_tongfang"
 
 
+def _read_sysfs_report_descriptor(match: hidraw.HidrawDeviceInfo) -> bytes | None:
+    descriptor_path = match.sysfs_dir / "device" / "report_descriptor"
+    try:
+        data = descriptor_path.read_bytes()
+    except OSError:
+        return None
+    return data or None
+
+
+def _match_has_expected_usage(match: hidraw.HidrawDeviceInfo) -> bool:
+    descriptor = _read_sysfs_report_descriptor(match)
+    if descriptor is None:
+        return False
+    usage = application_collection_usage(descriptor)
+    return usage == (protocol.USAGE_PAGE, protocol.USAGE)
+
+
+def _select_usage_matched_hidraw(
+    matches: tuple[hidraw.HidrawDeviceInfo, ...],
+) -> hidraw.HidrawDeviceInfo | None:
+    if not matches:
+        return None
+    if len(matches) == 1 and str(matches[0].hid_id).startswith("forced:"):
+        return matches[0]
+
+    usage_hits = tuple(match for match in matches if _match_has_expected_usage(match))
+    if usage_hits:
+        return usage_hits[0]
+    if len(matches) == 1:
+        return matches[0]
+    return None
+
+
 def _find_matching_supported_hidraw_device() -> hidraw.HidrawDeviceInfo | None:
-    return find_matching_ite8291_style_hidraw_device(
+    from ..ite8291_perkey import hidraw as hidraw_module
+
+    matches = hidraw_module.find_matching_hidraw_devices(
         product_ids=protocol.SUPPORTED_PRODUCT_IDS,
         forced_path_env=protocol.HIDRAW_PATH_ENV,
     )
+    return _select_usage_matched_hidraw(matches)
 
 
 def _open_matching_transport() -> tuple[hidraw.HidrawFeatureOutputTransport, hidraw.HidrawDeviceInfo]:
-    return open_matching_ite8291_style_hidraw_transport(
-        product_ids=protocol.SUPPORTED_PRODUCT_IDS,
-        forced_path_env=protocol.HIDRAW_PATH_ENV,
-        backend_name=BACKEND_NAME,
-        vendor_id=protocol.VENDOR_ID,
-        missing_label="ITE 8291 Tongfang lightbar",
-    )
+    from ..ite8291_perkey import hidraw as hidraw_module
+
+    info = _find_matching_supported_hidraw_device()
+    if info is None:
+        raise FileNotFoundError(
+            "No hidraw device found for supported ITE 8291 Tongfang lightbar IDs: "
+            + ", ".join(
+                f"0x{protocol.VENDOR_ID:04x}:0x{product_id:04x}" for product_id in protocol.SUPPORTED_PRODUCT_IDS
+            )
+        )
+    return hidraw_module.HidrawFeatureOutputTransport(info.devnode, backend_name=BACKEND_NAME), info
 
 
 @dataclass

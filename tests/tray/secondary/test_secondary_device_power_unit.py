@@ -78,6 +78,26 @@ def test_restore_brightness_uses_current_then_default_when_no_hint() -> None:
     )
 
 
+def test_independent_brightness_step_follows_route_ui_max() -> None:
+    assert secondary_device_power.independent_brightness_step(_route()) == 5
+    assert secondary_device_power.independent_brightness_from_menu_level(_route(), 6) == 30
+    tongfang = _route(brightness_ui_max=100)
+    assert secondary_device_power.independent_brightness_step(tongfang) == 10
+    assert secondary_device_power.independent_brightness_from_menu_level(tongfang, 5) == 50
+
+
+def test_restore_brightness_default_uses_half_of_route_ui_max() -> None:
+    tray = SimpleNamespace()
+    assert (
+        secondary_device_power.restore_brightness(
+            tray,
+            _route(brightness_ui_max=100),
+            current_brightness_fn=lambda: 0,
+        )
+        == 50
+    )
+
+
 def test_is_off_uses_current_brightness() -> None:
     assert secondary_device_power.is_off(SimpleNamespace(lightbar_brightness=0), _route()) is True
     assert secondary_device_power.is_off(SimpleNamespace(lightbar_brightness=5), _route()) is False

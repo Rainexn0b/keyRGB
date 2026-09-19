@@ -7,6 +7,7 @@ specific UI elements or hardware implementations.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -104,18 +105,62 @@ class TestApplyEffectSelection:
         assert mock_tray.config.effect == "none"
 
     def test_perkey_effect_blocked_when_not_supported(self):
-        """Per-key effects should fall back to 'none' if not supported."""
+        """Per-key effects should fall back to 'none' if neither per-key nor zoned output exists."""
         from keyrgb.tray.controllers.effect_selection import apply_effect_selection
 
         mock_tray = MagicMock()
-        mock_tray.backend_caps = MagicMock(per_key=False, hardware_effects=True)
+        mock_tray.backend_caps = SimpleNamespace(per_key=False, hardware_effects=True, zoned=False)
         mock_tray.engine.kb_lock = MagicMock(__enter__=lambda s: None, __exit__=lambda s, *a: None)
 
         apply_effect_selection(mock_tray, effect_name="perkey")
 
         # Should fall back to static color
         mock_tray.engine.stop.assert_called_once()
+        mock_tray.engine.kb.set_color.assert_called_once()
         assert mock_tray.config.effect == "none"
+
+    def test_perkey_effect_on_zoned_backend_goes_software_static_with_synced_color(self, monkeypatch):
+        """Zoned backends enter software-static mode and sync the averaged uniform color."""
+        from keyrgb.tray.controllers import effect_selection
+        from keyrgb.tray.controllers.effect_selection import apply_effect_selection
+
+        expected_colors = {(0, 0): (10, 20, 30), (0, 1): (30, 40, 50)}
+        load_spy = MagicMock(return_value=expected_colors)
+        monkeypatch.setattr(effect_selection, "_load_per_key_colors_from_profile", load_spy)
+
+        mock_tray = MagicMock()
+        mock_tray.backend_caps = SimpleNamespace(per_key=False, hardware_effects=False, zoned=True)
+        mock_tray.config.per_key_colors = {}
+
+        apply_effect_selection(mock_tray, effect_name="perkey")
+
+        assert mock_tray.config.effect == "none"
+        load_spy.assert_called_once()
+        assert mock_tray.config.per_key_colors == expected_colors
+        # Channel means of the profile map, so the uniform render agrees.
+        assert mock_tray.config.color == (20, 30, 40)
+        # Software mode keeps the per-key base map on the engine.
+        assert mock_tray.engine.per_key_colors is expected_colors
+        mock_tray._start_current_effect.assert_called_once()
+        mock_tray.engine.kb.set_color.assert_not_called()
+
+    def test_none_effect_on_zoned_backend_with_saved_map_goes_software_static(self):
+        """Zoned 'none' with a saved map stays in software mode and syncs the uniform color."""
+        from keyrgb.tray.controllers.effect_selection import apply_effect_selection
+
+        mock_tray = MagicMock()
+        mock_tray.backend_caps = SimpleNamespace(per_key=False, hardware_effects=False, zoned=True)
+        mock_tray.config.per_key_colors = {(0, 0): (10, 20, 30), (0, 1): (30, 40, 50)}
+        mock_tray.config.color = (255, 0, 0)
+
+        apply_effect_selection(mock_tray, effect_name="none")
+
+        mock_tray.engine.stop.assert_called_once()
+        assert mock_tray.config.effect == "none"
+        assert mock_tray.config.color == (20, 30, 40)
+        assert mock_tray.engine.per_key_colors is mock_tray.config.per_key_colors
+        mock_tray._start_current_effect.assert_called_once()
+        mock_tray.engine.kb.set_color.assert_not_called()
 
     def test_perkey_effect_loads_colors_when_supported(self, monkeypatch):
         """Per-key effect should explicitly load colors from profile when per-key is supported."""
@@ -391,3 +436,43 @@ class TestApplyEffectSelection:
 
         with pytest.raises(AssertionError, match="unexpected notify bug"):
             apply_effect_selection(mock_tray, effect_name="none")
+
+    def test_software_effect_remembers_last_software_effect(self):
+        from keyrgb.tray.controllers.effect_selection import apply_effect_selection
+
+        mock_tray = MagicMock()
+        mock_tray.is_off = False
+        mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True, zoned=False)
+        mock_tray.backend = self._backend("wave")
+
+        apply_effect_selection(mock_tray, effect_name="rainbow_wave")
+
+        assert mock_tray.config.effect == "rainbow_wave"
+        assert mock_tray.config.last_software_effect == "rainbow_wave"
+
+    def test_lighting_profile_toggle_applies_profile_then_restores_last_software_effect(self, monkeypatch):
+        from keyrgb.tray.controllers import effect_selection
+        from keyrgb.tray.controllers.effect_selection import apply_effect_selection
+
+        expected_colors = {(0, 0): (9, 8, 7)}
+        monkeypatch.setattr(effect_selection, "_load_per_key_colors_from_profile", lambda _config: expected_colors)
+
+        mock_tray = MagicMock()
+        mock_tray.is_off = False
+        mock_tray.backend_caps = SimpleNamespace(per_key=True, hardware_effects=False, zoned=False)
+        mock_tray.config.effect = "rainbow_wave"
+        mock_tray.config.last_software_effect = None
+        mock_tray.config.per_key_colors = {}
+
+        apply_effect_selection(mock_tray, effect_name="lighting_profile")
+
+        assert mock_tray.config.effect == "none"
+        assert mock_tray.config.last_software_effect == "rainbow_wave"
+        assert mock_tray.config.per_key_colors == expected_colors
+        mock_tray._start_current_effect.assert_called()
+
+        mock_tray._start_current_effect.reset_mock()
+        apply_effect_selection(mock_tray, effect_name="lighting_profile")
+
+        assert mock_tray.config.effect == "rainbow_wave"
+        mock_tray._start_current_effect.assert_called()

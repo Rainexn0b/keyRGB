@@ -10,6 +10,8 @@ import time
 from collections.abc import Callable, Mapping
 from typing import cast
 
+from keyrgb.core.backends.base import normalize_backend_capabilities
+from keyrgb.core.lighting_layers import uniform_color_from_per_key_map
 from keyrgb.core.profile import profiles as core_profiles, runtime_activation as profile_runtime_activation
 from keyrgb.tray.controllers.runtime_coordination import run_tray_transition
 from keyrgb.tray.deck_pipeline import hardware_apply_deferred
@@ -46,6 +48,38 @@ def _store_active_secondary_lighting(tray: object, payload: Mapping[str, object]
         vars(tray)["_active_secondary_lighting"] = payload
     except (AttributeError, TypeError):
         return
+
+
+def _sync_uniform_color_for_zoned_backend(tray: object, config: object, colors: object) -> None:
+    """Sync ``config.color`` from activated profile colors on zoned-only backends.
+
+    Zone devices render per-key maps by averaging them to one uniform color, so
+    the uniform software-static render must derive the same color. Runs inside
+    the apply hook, before any runtime effect start, and therefore also while
+    forced-off suppression holds the deck dark.
+    """
+
+    try:
+        caps = normalize_backend_capabilities(getattr(tray, "backend_caps", None))
+    except _PROFILE_ACTIVATION_STATE_ERRORS:
+        return
+    if not (caps.zoned and not caps.per_key):
+        return
+    uniform = uniform_color_from_per_key_map(colors)
+    if uniform is None:
+        return
+    try:
+        config.color = uniform  # type: ignore[attr-defined]
+    except _PROFILE_ACTIVATION_STATE_ERRORS:
+        return
+
+
+def _make_zoned_sync_apply_hook(tray: object) -> Callable[..., None]:
+    def _apply(config, colors, *, secondary_lighting: Mapping[str, object] | None = None) -> None:
+        core_profiles.apply_profile_to_config(config, colors, secondary_lighting=secondary_lighting)
+        _sync_uniform_color_for_zoned_backend(tray, config, colors)
+
+    return _apply
 
 
 def _mark_power_source_transition(tray: object, profile_name: str, changed_at: float) -> None:
@@ -100,7 +134,7 @@ def activate_perkey_profile_on_tray(
         profile_name,
         set_active_profile_fn=core_profiles.set_active_profile,
         load_per_key_colors_fn=core_profiles.load_per_key_colors,
-        apply_profile_to_config_fn=core_profiles.apply_profile_to_config,
+        apply_profile_to_config_fn=_make_zoned_sync_apply_hook(tray),
         load_secondary_lighting_fn=core_profiles.load_secondary_lighting,
         # Run-time suppression facade: suppress hardware/effect application while
         # ANY forced-off owner (user, power/suspend/lid, or idle/screen-off)

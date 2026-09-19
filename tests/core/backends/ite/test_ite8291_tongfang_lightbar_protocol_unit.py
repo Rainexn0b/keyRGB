@@ -120,3 +120,11 @@ def test_tongfang_lightbar_protocol_rejects_unknown_product_id() -> None:
 
 def test_tongfang_lightbar_protocol_exposes_no_save_builder() -> None:
     assert not hasattr(tongfang_protocol, "build_save_report")
+
+
+def test_tongfang_lightbar_protocol_scales_stored_brightness_to_hardware() -> None:
+    assert tongfang_protocol.stored_brightness_to_hardware(0) == 0
+    assert tongfang_protocol.stored_brightness_to_hardware(100) == 50
+    assert tongfang_protocol.stored_brightness_to_hardware(50) == 25
+    assert tongfang_protocol.stored_brightness_to_hardware(1) == 1
+    assert tongfang_protocol.stored_brightness_to_hardware(200) == 50

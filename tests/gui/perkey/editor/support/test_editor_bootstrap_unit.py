@@ -254,3 +254,94 @@ def test_initialize_editor_handles_missing_secondary_lighting_and_empty_keymap(
     assert app.kb is None
     assert statuses == ["no-map"]
     app.select_slot_id.assert_not_called()
+
+
+def test_initialize_editor_zoned_capability_defaults_apply_all_keys_and_hint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(bootstrap.dirty_state, "mark_saved", lambda _e: None)
+
+    class _RootBare:
+        def title(self, text: str) -> None:
+            pass
+
+        def update_idletasks(self) -> None:
+            pass
+
+        def bind(self, sequence: str, func: object, add: object = None) -> None:
+            pass
+
+        def after(self, delay_ms: int, callback: object) -> None:
+            pass
+
+    def run(
+        per_key_supported: bool | None,
+        *,
+        zoned_supported: bool = False,
+        zone_count: int = 0,
+    ) -> tuple[SimpleNamespace, list[str]]:
+        tk = _Tk()
+        tk.root = _RootBare()  # type: ignore[assignment]
+        tk.Tk = lambda: tk.root  # type: ignore[method-assign]
+        app = SimpleNamespace(
+            _detect_lightbar_device=lambda: False,
+            _load_keymap=dict,
+            _load_layout_tweaks=dict,
+            _load_per_key_layout_tweaks=dict,
+            _load_layout_slot_overrides=dict,
+            _get_visible_layout_keys=list,
+            select_slot_id=MagicMock(),
+            _on_close=MagicMock(),
+            _save_profile=MagicMock(),
+            canvas=SimpleNamespace(redraw=MagicMock()),
+        )
+        profiles = SimpleNamespace(
+            get_active_profile=lambda: "P",
+            load_lightbar_overlay=lambda _n: {},
+            load_backdrop_mode=lambda _n: "none",
+            load_backdrop_transparency=lambda _n: 0.0,
+        )
+        statuses: list[str] = []
+        kwargs: dict[str, object] = {
+            "tk": tk,
+            "config_cls": _Config,
+            "profiles": profiles,
+            "apply_keyrgb_window_icon": lambda _r: None,
+            "apply_perkey_editor_geometry": lambda _r, **_k: None,
+            "compute_perkey_editor_min_content_size": lambda **_k: (1, 1),
+            "fit_perkey_editor_geometry_to_content": lambda _r, **_k: None,
+            "apply_clam_theme": lambda _r, **_k: ("#000", "#fff"),
+            "normalize_layout_legend_pack_fn": lambda *_a: "auto",
+            "initial_last_non_black_color": lambda c: (1, 1, 1),
+            "load_profile_colors": lambda **_k: {},
+            "per_key_commit_pipeline_cls": lambda **_k: object(),
+            "get_keyboard": lambda: None,
+            "build_ui_fn": lambda: None,
+            "set_status": lambda _e, msg: statuses.append(msg),
+            "no_keymap_found_initial": lambda: "no-map",
+            "num_rows": 1,
+            "num_cols": 1,
+        }
+        if per_key_supported is not None:
+            kwargs["per_key_supported"] = per_key_supported
+        kwargs["zoned_supported"] = zoned_supported
+        kwargs["zone_count"] = zone_count
+        bootstrap.initialize_editor(app, **kwargs)
+        return app, statuses
+
+    zoned_app, zoned_statuses = run(False, zoned_supported=True, zone_count=4)
+    assert zoned_app.per_key_supported is False
+    assert zoned_app.zoned_supported is True
+    assert zoned_app.zone_count == 4
+    assert zoned_app.apply_all_keys.get() is False
+    assert zoned_statuses == [bootstrap.ZONED_UNIFORM_HINT_INITIAL]
+
+    perkey_app, perkey_statuses = run(True)
+    assert perkey_app.per_key_supported is True
+    assert perkey_app.apply_all_keys.get() is False
+    assert perkey_statuses == ["no-map"]
+
+    default_app, default_statuses = run(None)
+    assert default_app.per_key_supported is True
+    assert default_app.apply_all_keys.get() is False
+    assert default_statuses == ["no-map"]

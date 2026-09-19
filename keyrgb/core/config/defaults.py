@@ -17,6 +17,10 @@ DEFAULTS: dict = {
     # Secondary lightbar state for auxiliary single-zone controllers.
     "lightbar_brightness": 25,
     "lightbar_color": [255, 0, 0],
+    # Tongfang / Ionico front lightbar (048d:6005). Independent 0..100 storage;
+    # the device scales onto its native 0..50 hardware field.
+    "ite8291_tongfang_lightbar_brightness": 50,
+    "ite8291_tongfang_lightbar_color": [255, 0, 0],
     # Generic secondary-device state for auxiliary routes such as lightbars or
     # future mouse sysfs backends. Kept alongside the legacy lightbar fields so
     # older config consumers continue to work.
@@ -49,6 +53,9 @@ DEFAULTS: dict = {
     # which per-key mode to restore when the user stops the effect.
     # None | 'perkey'
     "return_effect_after_effect": None,
+    # Last software/reactive effect selected from the tray, used by the Lighting
+    # profile toggle to restore animated mode.
+    "last_software_effect": None,
     "autostart": True,
     # Experimental backends remain opt-in until they have broader hardware
     # validation and issue history.

@@ -26,6 +26,7 @@ def fake_item(text, _action, **kwargs):
         "action": _action,
         "checked": kwargs.get("checked"),
         "default": kwargs.get("default", False),
+        "radio": kwargs.get("radio", False),
     }
 
 
@@ -171,19 +172,16 @@ def test_zoned_backend_can_enter_software_effect_mode_from_hardware_mode() -> No
         entry
         for entry in submenu.items
         if isinstance(entry, dict)
-        and entry["text"] not in {"Reactive Typing Settings…", "None (static per-key) (not supported)"}
+        and entry["text"] not in {"Reactive Typing Settings…", "Lighting profile"}
     ]
 
     assert effect_items
     assert all(entry["enabled"] is True for entry in effect_items)
-    per_key_item = next(
-        entry
-        for entry in submenu.items
-        if isinstance(entry, dict) and entry["text"] == "None (static per-key) (not supported)"
+    profile_item = next(
+        entry for entry in submenu.items if isinstance(entry, dict) and entry["text"] == "Lighting profile"
     )
-    # Zoned hardware has no per-key static mode: the entry stays disabled and
-    # now explains itself instead of presenting a silently greyed-out option.
-    assert per_key_item["enabled"] is False
+    assert profile_item["enabled"] is True
+    assert profile_item["radio"] is False
 
 
 def test_per_key_backend_shows_plain_enabled_none_entry() -> None:
@@ -193,12 +191,53 @@ def test_per_key_backend_shows_plain_enabled_none_entry() -> None:
     submenu = next(
         entry["action"] for entry in items if isinstance(entry, dict) and entry["text"] == "Software Effects"
     )
-    per_key_item = next(
-        entry for entry in submenu.items if isinstance(entry, dict) and entry["text"] == "None (static per-key)"
+    profile_item = next(
+        entry for entry in submenu.items if isinstance(entry, dict) and entry["text"] == "Lighting profile"
     )
 
-    assert per_key_item["enabled"] is True
+    assert profile_item["enabled"] is True
+    assert profile_item["radio"] is False
     assert any(isinstance(entry, dict) and "(not supported)" in str(entry["text"]) for entry in submenu.items) is False
+
+
+def test_color_backend_enables_lighting_profile_toggle() -> None:
+    tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False, zoned=False, color=True))
+
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+    submenu = next(
+        entry["action"] for entry in items if isinstance(entry, dict) and entry["text"] == "Software Effects"
+    )
+    profile_item = next(
+        entry for entry in submenu.items if isinstance(entry, dict) and entry["text"] == "Lighting profile"
+    )
+
+    assert profile_item["enabled"] is True
+
+
+def test_brightness_only_backend_disables_lighting_profile_toggle() -> None:
+    tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False, zoned=False, color=False))
+
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+    submenu = next(
+        entry["action"] for entry in items if isinstance(entry, dict) and entry["text"] == "Software Effects"
+    )
+    profile_item = next(
+        entry
+        for entry in submenu.items
+        if isinstance(entry, dict) and str(entry["text"]).startswith("Lighting profile")
+    )
+
+    assert profile_item["enabled"] is False
+    assert profile_item["text"] == "Lighting profile (not supported)"
+
+
+def test_zoned_backend_shows_lighting_profiles_menu() -> None:
+    tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False, zoned=True, color=True))
+
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+    labels = [entry["text"] for entry in items if isinstance(entry, dict)]
+
+    assert "Lighting Profiles" in labels
 
 
 def test_keyboard_status_badges_research_backed_experimental_backend(monkeypatch: pytest.MonkeyPatch) -> None:

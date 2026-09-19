@@ -62,6 +62,10 @@ class SecondaryDeviceRoute:
     # child turn_off is not misused as transient shutdown after the primary has
     # already suspended output.
     primary_owns_global_off: bool = False
+    # Independent-route tray/storage brightness ceiling. Legacy Clevo lightbar
+    # and mouse paths keep the 0..50 keyboard-like grid; Tongfang stores 0..100
+    # and scales to its 0..50 hardware field at the device boundary.
+    brightness_ui_max: int = 50
 
 
 def _acquire_ite8233_lightbar() -> object:
@@ -131,12 +135,13 @@ _ROUTES: tuple[SecondaryDeviceRoute, ...] = (
         state_key="ite8291_tongfang_lightbar",
         get_backend=_get_ite8291_tongfang_lightbar_backend,
         get_device=_acquire_ite8291_tongfang_lightbar,
-        config_brightness_attr="lightbar_brightness",
-        config_color_attr="lightbar_color",
+        config_brightness_attr="ite8291_tongfang_lightbar_brightness",
+        config_color_attr="ite8291_tongfang_lightbar_color",
         supports_uniform_color=True,
         supports_software_target=True,
         supports_profile_state=True,
         brightness_policy=BRIGHTNESS_POLICY_INDEPENDENT,
+        brightness_ui_max=100,
     ),
     SecondaryDeviceRoute(
         device_type="mouse",

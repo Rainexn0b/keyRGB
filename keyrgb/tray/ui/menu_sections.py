@@ -116,16 +116,18 @@ def build_perkey_profiles_menu(
     pystray: _PystrayProtocol,
     item: _ItemFactoryProtocol,
     per_key_supported: bool,
+    zoned_supported: bool = False,
     secondary_lighting_supported: bool = False,
 ) -> object | None:
     """Build the whole-scene lighting profiles submenu.
 
-    Returns None when neither per-key nor secondary lighting is supported.
+    Returns None when neither per-key, zoned, nor secondary lighting is supported.
     """
     return _profile_power_menu_builder().build_perkey_profiles_menu(
         tray,
         pystray=pystray,
         item=item,
         per_key_supported=per_key_supported,
+        zoned_supported=zoned_supported,
         secondary_lighting_supported=secondary_lighting_supported,
     )

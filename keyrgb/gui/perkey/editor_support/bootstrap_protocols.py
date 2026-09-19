@@ -123,6 +123,9 @@ class _PerKeyEditorBootstrapApp(Protocol):  # noqa: PYI046 - re-exported via boo
     layout_slot_overrides: LayoutSlotOverrides
     overlay_scope: _TkVarProtocol
     apply_all_keys: _TkVarProtocol
+    per_key_supported: bool
+    zoned_supported: bool
+    zone_count: int
     sample_tool_enabled: _TkVarProtocol
     _sample_tool_has_sampled: bool
     _setup_panel_mode: str | None

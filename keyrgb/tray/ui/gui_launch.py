@@ -101,6 +101,7 @@ def build_perkey_preflight_payload(
         "color": bool(caps.color),
         "hardware_effects": bool(caps.hardware_effects),
         "palette": bool(caps.palette),
+        "zoned": bool(caps.zoned),
         "backend_name": name,
         "dimensions": [valid_dimensions[0], valid_dimensions[1]] if valid_dimensions is not None else None,
     }

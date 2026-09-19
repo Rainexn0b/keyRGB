@@ -42,3 +42,22 @@ def test_apply_color_to_map_apply_all_returns_full_grid() -> None:
     assert len(out) == 6
     assert out[(0, 0)] == (4, 5, 6)
     assert out[(1, 2)] == (4, 5, 6)
+
+
+def test_apply_color_to_map_expands_selected_cell_to_zone_band() -> None:
+    out = apply_color_to_map(
+        colors={},
+        num_rows=2,
+        num_cols=4,
+        color=(9, 8, 7),
+        apply_all_keys=False,
+        selected_cells=((0, 0),),
+        zone_count=2,
+    )
+
+    assert out[(0, 0)] == (9, 8, 7)
+    assert out[(0, 1)] == (9, 8, 7)
+    assert out[(1, 0)] == (9, 8, 7)
+    assert out[(1, 1)] == (9, 8, 7)
+    assert (0, 2) not in out
+    assert (0, 3) not in out
