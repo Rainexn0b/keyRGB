@@ -29,7 +29,7 @@ def test_activate_perkey_profile_uses_shared_in_place_transition_path() -> None:
 
     set_active.assert_called_once_with("gaming")
     load_colors.assert_called_once_with("gaming")
-    apply_profile.assert_called_once_with(tray.config, {(0, 0): (3, 4, 5)})
+    apply_profile.assert_called_once_with(tray.config, {(0, 0): (3, 4, 5)}, secondary_lighting=None)
     tray._apply_power_source_perkey_profile_transition.assert_called_once_with()
     tray._start_current_effect.assert_not_called()
     tray._update_icon.assert_called_once_with()

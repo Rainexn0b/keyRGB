@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Any
 
+from keyrgb.core.backends._registry_selection import BackendSelectionReport
 from keyrgb.core.backends.base import (
     BackendCapabilities,
     BackendStability,
@@ -66,10 +66,10 @@ class EmulatedPrimaryBackend:
     def dimensions(self) -> tuple[int, int]:
         return self._dimensions
 
-    def effects(self) -> dict[str, Any]:
+    def effects(self) -> dict[str, object]:
         return {}
 
-    def colors(self) -> dict[str, Any]:
+    def colors(self) -> dict[str, object]:
         return {}
 
 
@@ -104,8 +104,8 @@ def build_emulated_selection_report(
     requested_name: str,
     requested_effective: str,
     spec: EmulationSpec,
-) -> Any:
-    from keyrgb.core.backends._registry_selection import BackendProbeEvaluation, BackendSelectionReport
+) -> BackendSelectionReport:
+    from keyrgb.core.backends._registry_selection import BackendProbeEvaluation
 
     if spec.primary is None:
         raise EmulationError("internal: emulated selection requires a PRIMARY")
@@ -165,7 +165,7 @@ def emulated_selection_report_or_none(
     *,
     requested_name: str,
     requested_effective: str,
-) -> Any | None:
+) -> BackendSelectionReport | None:
     spec = get_emulation_spec()
     if spec is None or spec.primary is None:
         return None

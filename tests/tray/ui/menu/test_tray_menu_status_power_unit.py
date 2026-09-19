@@ -171,8 +171,7 @@ def test_zoned_backend_can_enter_software_effect_mode_from_hardware_mode() -> No
     effect_items = [
         entry
         for entry in submenu.items
-        if isinstance(entry, dict)
-        and entry["text"] not in {"Reactive Typing Settings…", "Lighting profile"}
+        if isinstance(entry, dict) and entry["text"] not in {"Reactive Typing Settings…", "Lighting profile"}
     ]
 
     assert effect_items

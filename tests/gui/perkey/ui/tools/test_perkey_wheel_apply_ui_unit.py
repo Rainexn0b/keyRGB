@@ -47,8 +47,8 @@ class DummyEditor:
     canvas: DummyCanvas
     status_label: DummyLabel
     _last_non_black_color: tuple[int, int, int]
-
     commit_calls: list[bool]
+    zone_count: int = 0
 
     def _commit(self, *, force: bool) -> None:
         self.commit_calls.append(bool(force))
@@ -104,11 +104,13 @@ def test_on_wheel_color_change_ui_updates_single_key_and_commits_soft() -> None:
         color,
         apply_all_keys: bool,
         selected_cells,
+        zone_count: int = 0,
     ):
         assert (num_rows, num_cols) == (3, 4)
         assert apply_all_keys is False
         assert selected_cells == ((0, 0),)
         assert color == (1, 2, 3)
+        assert zone_count == 0
         # ensure we were passed a copy
         assert colors == {(0, 0): (0, 0, 0)}
         return {(0, 0): (1, 2, 3)}

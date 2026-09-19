@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from typing import cast
 
 _LAYER_STATE_EXCEPTIONS = (AttributeError, LookupError, RuntimeError, TypeError, ValueError)
 
@@ -150,7 +151,7 @@ def color_map_for_geometry(
     rows: int,
     cols: int,
     source_cols: int | None = None,
-) -> Mapping[object, object] | None:
+) -> Mapping[tuple[int, int], tuple[int, int, int]] | None:
     """Return a color map that fits ``rows x cols``, bucketing a wider keyboard map."""
 
     if not isinstance(per_key_colors, Mapping) or not per_key_colors:
@@ -167,7 +168,7 @@ def color_map_for_geometry(
                 zone_count=int(cols),
                 source_cols=source_cols or widest,
             )
-    return per_key_colors
+    return cast(Mapping[tuple[int, int], tuple[int, int, int]], per_key_colors)
 
 
 def zone_cells_for_column(

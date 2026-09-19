@@ -42,11 +42,11 @@ def auxiliary_emulation_enabled() -> bool:
 
 
 def emulation_availability_source(spec: EmulationSpec) -> str:
-    return "simulation" if spec.source == "legacy_secondary_simulate" else "emulation"
+    return "simulation" if spec.source == "all_secondaries" else "emulation"
 
 
 def emulation_availability_reason(spec: EmulationSpec) -> str:
-    if spec.source == "legacy_secondary_simulate":
+    if spec.source == "all_secondaries":
         return "secondary-device simulation enabled"
     if spec.all_auxiliary:
         return "backend emulation enabled for all auxiliary routes"

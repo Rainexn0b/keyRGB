@@ -88,7 +88,7 @@ def test_legacy_secondary_flag_maps_to_all_auxiliary(monkeypatch: pytest.MonkeyP
     assert spec is not None
     assert spec.all_auxiliary is True
     assert spec.primary is None
-    assert spec.source == "legacy_secondary_simulate"
+    assert spec.source == "all_secondaries"
 
 
 def test_emulate_env_wins_over_legacy_flag(monkeypatch: pytest.MonkeyPatch) -> None:

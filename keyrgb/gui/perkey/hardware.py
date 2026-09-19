@@ -142,8 +142,11 @@ def backend_zone_count() -> int:
     if _tray_managed_config_only():
         raw_dimensions = _tray_preflight_payload().get("dimensions")
         try:
-            rows, cols = raw_dimensions  # type: ignore[misc]
-            return max(1, int(rows) * int(cols))
+            if not isinstance(raw_dimensions, (list, tuple)) or len(raw_dimensions) != 2:
+                return 4
+            rows = int(raw_dimensions[0])
+            cols = int(raw_dimensions[1])
+            return max(1, rows * cols)
         except (TypeError, ValueError):
             return 4
     rows, cols = _backend_dimensions_or_reference(_backend)

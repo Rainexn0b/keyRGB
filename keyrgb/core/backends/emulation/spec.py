@@ -12,10 +12,10 @@ from .compatibility import classify_emulated_names, expand_preset, known_emulati
 logger = logging.getLogger(__name__)
 
 EMULATE_ENVIRONMENT_VARIABLE = "KEYRGB_EMULATE"
-LEGACY_SIMULATION_ENVIRONMENT_VARIABLE = "KEYRGB_SIMULATE_SECONDARY_DEVICES"
+SECONDARY_SIMULATION_ENVIRONMENT_VARIABLE = "KEYRGB_SIMULATE_SECONDARY_DEVICES"
 ALL_AUXILIARY_TOKEN = "*"
 PRESET_PREFIX = "preset:"
-EmulationSource = Literal["emulate", "legacy_secondary_simulate"]
+EmulationSource = Literal["emulate", "all_secondaries"]
 
 _TRUTHY = frozenset({"1", "true", "yes", "on"})
 _FALSY = frozenset({"", "0", "false", "no", "off"})
@@ -64,9 +64,9 @@ def _warn_both_flags() -> None:
         return
     _WARNED_BOTH_FLAGS = True
     logger.warning(
-        "%s is set; ignoring legacy %s. Prefer KEYRGB_EMULATE only.",
+        "%s is set; ignoring %s. Prefer KEYRGB_EMULATE only.",
         EMULATE_ENVIRONMENT_VARIABLE,
-        LEGACY_SIMULATION_ENVIRONMENT_VARIABLE,
+        SECONDARY_SIMULATION_ENVIRONMENT_VARIABLE,
     )
 
 
@@ -152,13 +152,13 @@ def get_emulation_spec() -> EmulationSpec | None:
     """Return the process emulation spec, or ``None`` when emulation is off."""
 
     raw = os.environ.get(EMULATE_ENVIRONMENT_VARIABLE)
-    legacy_enabled = _flag_value(os.environ.get(LEGACY_SIMULATION_ENVIRONMENT_VARIABLE))
+    simulate_all_secondaries = _flag_value(os.environ.get(SECONDARY_SIMULATION_ENVIRONMENT_VARIABLE))
     if raw is not None and str(raw).strip():
-        if legacy_enabled:
+        if simulate_all_secondaries:
             _warn_both_flags()
         return parse_emulate_spec(raw, source="emulate")
-    if legacy_enabled:
-        return parse_emulate_spec(ALL_AUXILIARY_TOKEN, source="legacy_secondary_simulate")
+    if simulate_all_secondaries:
+        return parse_emulate_spec(ALL_AUXILIARY_TOKEN, source="all_secondaries")
     return None
 
 

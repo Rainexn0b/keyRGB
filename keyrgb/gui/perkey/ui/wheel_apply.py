@@ -25,6 +25,7 @@ class _WheelApplyEditorProtocol(Protocol):
     apply_all_keys: _BoolVarProtocol
     canvas: _CanvasProtocol
     _last_non_black_color: Color
+    zone_count: int
 
     def _commit(self, *, force: bool) -> None: ...
 
@@ -133,7 +134,7 @@ def _apply_wheel_color(
         editor._last_non_black_color = color
 
     apply_all_keys = bool(editor.apply_all_keys.get())
-    zone_count = int(getattr(editor, "zone_count", 0) or 0)
+    zone_count = max(0, int(editor.zone_count))
     selected_slot_id = _selected_slot_id_or_none(editor)
     selected_key_id = _selected_key_id_for_slot(
         editor,
