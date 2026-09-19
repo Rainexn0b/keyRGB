@@ -77,7 +77,7 @@ def _capabilities_for_backend(backend: object) -> dict[str, bool] | None:
         return None
 
     out: dict[str, bool] = {}
-    for name in ("brightness", "per_key", "color", "hardware_effects", "palette"):
+    for name in ("brightness", "per_key", "color", "hardware_effects", "palette", "zoned"):
         try:
             out[name] = bool(getattr(capabilities, name))
         except _BACKEND_METADATA_ERRORS:

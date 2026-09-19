@@ -141,6 +141,7 @@ def test_format_diagnostics_text_includes_backend_capabilities_dimensions_and_ma
                         "color": True,
                         "hardware_effects": True,
                         "palette": False,
+                        "zoned": False,
                     },
                     "dimensions": {"rows": 7, "cols": 20},
                     "diagnostics": {
@@ -161,9 +162,36 @@ def test_format_diagnostics_text_includes_backend_capabilities_dimensions_and_ma
 
     text = format_diagnostics_text(diag)
 
-    assert "capabilities: brightness=True per_key=True color=True hardware_effects=True palette=False" in text
+    assert (
+        "capabilities: brightness=True per_key=True color=True hardware_effects=True palette=False zoned=False" in text
+    )
     assert "dimensions: rows=7 cols=20" in text
     assert "keyboard_matrix: cells=140 mapped_leds=101 sparse_holes=39" in text
+
+
+def test_backend_capability_snapshot_includes_zoned() -> None:
+    from keyrgb.core.backends.base import BackendCapabilities
+    from keyrgb.core.diagnostics.collectors.backends import _capabilities_for_backend
+
+    class _ZonedBackend:
+        def capabilities(self) -> BackendCapabilities:
+            return BackendCapabilities(
+                brightness=True,
+                per_key=False,
+                color=True,
+                hardware_effects=False,
+                palette=False,
+                zoned=True,
+            )
+
+    assert _capabilities_for_backend(_ZonedBackend()) == {
+        "brightness": True,
+        "per_key": False,
+        "color": True,
+        "hardware_effects": False,
+        "palette": False,
+        "zoned": True,
+    }
 
 
 def test_diagnostics_typed_config_snapshot_serializes_without_shape_changes() -> None:

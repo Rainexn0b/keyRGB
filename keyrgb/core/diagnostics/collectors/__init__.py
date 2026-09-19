@@ -39,6 +39,11 @@ _CONFIG_SNAPSHOT_SETTINGS_WHITELIST = (
     "ac_lighting_brightness",
     "battery_lighting_enabled",
     "battery_lighting_brightness",
+    "experimental_backends_enabled",
+    "software_effect_target",
+    "controller_sleep_respect",
+    "screen_dim_sync_enabled",
+    "screen_dim_sync_mode",
 )
 
 

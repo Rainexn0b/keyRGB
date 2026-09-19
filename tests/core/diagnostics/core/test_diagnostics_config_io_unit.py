@@ -159,3 +159,26 @@ def test_config_snapshot_propagates_unexpected_boundary_failures(
 
     with pytest.raises(AssertionError, match="unexpected config snapshot bug"):
         diagnostics_collectors.config_snapshot()
+
+
+def test_config_snapshot_includes_idle_sleep_and_experimental_settings(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(
+        '{"controller_sleep_respect": true, "screen_dim_sync_enabled": true, '
+        '"screen_dim_sync_mode": "off", "experimental_backends_enabled": true, '
+        '"software_effect_target": "keyboard"}',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(diagnostics_collectors, "config_file_path", lambda: cfg_path)
+
+    snapshot = diagnostics_collectors.config_snapshot()
+
+    assert dict(snapshot.settings) == {
+        "controller_sleep_respect": True,
+        "screen_dim_sync_enabled": True,
+        "screen_dim_sync_mode": "off",
+        "experimental_backends_enabled": True,
+        "software_effect_target": "keyboard",
+    }
