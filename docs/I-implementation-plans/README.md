@@ -18,6 +18,10 @@ specs for larger changes.
 
 ### Active follow-up plans
 
+- `2026-09-19/backend-emulation-package-plan.md` — unified per-backend
+  emulation (`KEYRGB_EMULATE`) so one PRIMARY plus compatible AUXILIARY
+  backends can be exercised without hidraw; replaces all-or-nothing
+  `KEYRGB_SIMULATE_SECONDARY_DEVICES`
 - `2026-08-11/architecture-concerns-plan.md` — confirmation and remediation
   tracker for the 2026-08-11 architecture review; one finding per pass, with
   test-first contracts and explicit confirmed/rejected status
