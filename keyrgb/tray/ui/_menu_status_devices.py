@@ -55,6 +55,8 @@ def keyboard_status_text(
     status_suffix = _devstat.backend_status_suffix(backend)
 
     identifiers = probe_identifiers(tray_state)
+    emulated = str(identifiers.get("emulated") or "").strip().lower() in {"1", "true", "yes"}
+    emulated_suffix = " (emulated)" if emulated else ""
 
     usb_vid = identifiers.get("usb_vid")
     usb_pid = identifiers.get("usb_pid")
@@ -62,17 +64,17 @@ def keyboard_status_text(
         vid = _devstat.format_hex_id(str(usb_vid))
         pid = _devstat.format_hex_id(str(usb_pid))
         if vid and pid:
-            return f"Keyboard: {display_name} ({vid}:{pid}){status_suffix}"
+            return f"Keyboard: {display_name} ({vid}:{pid}){emulated_suffix}{status_suffix}"
 
     led_name = str(identifiers.get("led") or "").strip()
     if led_name:
-        return f"Keyboard: {display_name} ({led_name}){status_suffix}"
+        return f"Keyboard: {display_name} ({led_name}){emulated_suffix}{status_suffix}"
 
     brightness_path = str(identifiers.get("brightness") or "").strip()
     if brightness_path:
-        return f"Keyboard: {display_name} ({brightness_path}){status_suffix}"
+        return f"Keyboard: {display_name} ({brightness_path}){emulated_suffix}{status_suffix}"
 
-    return f"Keyboard: {display_name}{status_suffix}"
+    return f"Keyboard: {display_name}{emulated_suffix}{status_suffix}"
 
 
 def _effective_device_context_entry(
@@ -82,7 +84,8 @@ def _effective_device_context_entry(
 ) -> DeviceContextEntry:
     label = effective.display_name
     if effective.simulated:
-        label = f"{label} (simulated)"
+        tag = "simulated" if effective.availability_source == "simulation" else "emulated"
+        label = f"{label} ({tag})"
     elif effective.route.parent_backend_name is not None:
         vid = _devstat.format_hex_id(str(primary_identifiers.get("usb_vid") or ""))
         pid = _devstat.format_hex_id(str(primary_identifiers.get("usb_pid") or ""))
@@ -95,7 +98,7 @@ def _effective_device_context_entry(
         "connected": True,
         "is_virtual_area": effective.route.parent_backend_name is not None,
         "simulated": effective.simulated,
-        "source": "simulation" if effective.simulated else "effective_route",
+        "source": effective.availability_source if effective.simulated else "effective_route",
         "status": "supported",
         "text": label,
     }

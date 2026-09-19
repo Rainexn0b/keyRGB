@@ -169,6 +169,28 @@ Aliases are resolved in `registry.py::_BACKEND_NAME_ALIASES`. When a user
 sets `KEYRGB_BACKEND=<old_name>`, `select_backend()` transparently resolves
 to the canonical backend.
 
+## Hardware-free emulation
+
+`KEYRGB_EMULATE` intercepts primary selection and secondary-route acquisition
+so tray/editor UX can be exercised without hidraw or sysfs. It is **not**
+hardware detection.
+
+```bash
+KEYRGB_EMULATE=preset:beast-x30 \
+KEYRGB_CONFIG_DIR=/tmp/keyrgb-ux-sim \
+./keyrgb.sh
+```
+
+Rules:
+
+- At most one `PRIMARY` backend, plus zero or more compatible `AUXILIARY`
+  backends or virtual children of that primary.
+- Names may be canonical identifiers, documented aliases, or `preset:<id>`.
+- First presets: `beast-x30`, `legion-gen10`, `perkey-clevo-bar`, `uniform`.
+- `KEYRGB_SIMULATE_SECONDARY_DEVICES=1` remains a one-release alias for
+  `KEYRGB_EMULATE=*` (every secondary route, no emulated keyboard).
+- Probe identifiers and support bundles are labeled `emulated`.
+
 ### Adding a new alias
 
 1. Change the backend's `name` attribute to the canonical name.

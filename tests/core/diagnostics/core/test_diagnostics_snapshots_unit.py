@@ -111,6 +111,12 @@ def test_env_snapshot_includes_secondary_simulation_flag(monkeypatch: pytest.Mon
     assert snapshots.env_snapshot()["KEYRGB_SIMULATE_SECONDARY_DEVICES"] == "1"
 
 
+def test_env_snapshot_includes_emulate_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("KEYRGB_EMULATE", "preset:beast-x30")
+
+    assert snapshots.env_snapshot()["KEYRGB_EMULATE"] == "preset:beast-x30"
+
+
 def test_env_snapshot_includes_all_present_keyrgb_policy_variables(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
     monkeypatch.setenv("KEYRGB_DEBUG_REACTIVE_INPUT", "1")

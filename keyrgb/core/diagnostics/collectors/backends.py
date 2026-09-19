@@ -314,10 +314,19 @@ def backend_probe_snapshot() -> dict[str, Any]:
     available_candidates = _collect_available_candidates(probes_by_name, candidate_names)
     guided_speed_probes = build_backend_speed_probe_plans(backends_snapshot={"selected": selected, "probes": probes})
 
+    emulation: dict[str, Any] = {"active": False}
+    try:
+        from ...backends.emulation import emulation_snapshot
+
+        emulation = emulation_snapshot()
+    except _BACKEND_PROBE_ERRORS as exc:
+        _log_snapshot_boundary("Failed to snapshot backend emulation during diagnostics collection", exc)
+
     return {
         "selected": selected,
         "requested": requested,
         "probes": probes,
+        "emulation": emulation,
         "selection": {
             "policy": "kernel/sysfs safety tier, then confidence, then priority",
             "requested_effective": (

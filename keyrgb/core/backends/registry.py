@@ -65,11 +65,24 @@ def _spec_from_registration(reg: BackendRegistration) -> BackendSpec:
     )
 
 
+def backend_name_aliases() -> dict[str, str]:
+    """Return the deprecated-name to canonical-name alias map."""
+
+    return dict(_BACKEND_NAME_ALIASES)
+
+
+def resolve_backend_name(name: str) -> str:
+    """Resolve a backend name or documented alias to its canonical identifier."""
+
+    normalized = (name or "").strip().lower()
+    return _BACKEND_NAME_ALIASES.get(normalized, normalized)
+
+
 # ---------------------------------------------------------------------------
 # Deterministic discovery of backend packages exposing BACKEND_REGISTRATION
 # ---------------------------------------------------------------------------
 
-_DISCOVERY_SKIP_NAMES = frozenset({"policies"})
+_DISCOVERY_SKIP_NAMES = frozenset({"policies", "emulation"})
 _discovered_registrations_cache: list[BackendRegistration] | None = None
 
 
@@ -229,12 +242,19 @@ def select_backend(
     # Safety: under pytest, never auto-select real hardware backends by default.
     # Unit tests that want to exercise selection logic should pass explicit `specs`.
     # Hardware smoke tests should opt-in via KEYRGB_ALLOW_HARDWARE=1 or KEYRGB_HW_TESTS=1.
-    if specs is None and os.environ.get("PYTEST_CURRENT_TEST"):
+    # KEYRGB_EMULATE is not hardware: an emulated PRIMARY may be selected in tests.
+    emulate_primary = False
+    if specs is None:
+        from .emulation import get_emulation_spec
+
+        spec = get_emulation_spec()
+        emulate_primary = spec is not None and spec.primary is not None
+    if specs is None and os.environ.get("PYTEST_CURRENT_TEST") and not emulate_primary:
         allow_hardware = os.environ.get("KEYRGB_ALLOW_HARDWARE") == "1" or os.environ.get("KEYRGB_HW_TESTS") == "1"
         if not allow_hardware:
             return None
 
-    backends = iter_backends(specs=specs)
+    backends = () if emulate_primary else iter_backends(specs=specs)
     report = build_backend_selection_report(backends, requested=requested)
     if report.selected is not None:
         logger.debug("Backend '%s' selected (%s).", report.selected.name, report.requested_effective)

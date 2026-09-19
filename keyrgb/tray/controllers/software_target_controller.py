@@ -187,7 +187,10 @@ def _compatible_secondary_target_entries(tray: object) -> list[DeviceContextEntr
                 "backend_name": effective.backend_name,
                 "device_type": effective.device_type,
                 "status": "supported",
-                "text": f"{effective.display_name} (simulated)",
+                "text": (
+                    f"{effective.display_name} "
+                    f"({'simulated' if effective.availability_source == 'simulation' else 'emulated'})"
+                ),
             }
             for effective in iter_effective_secondary_routes()
             if effective.available

@@ -138,13 +138,33 @@ def environment_text(diagnostics: dict[str, Any] | None) -> str:
     desktop = str(env.get("XDG_CURRENT_DESKTOP") or env.get("DESKTOP_SESSION") or "")  # type: ignore[union-attr]
     kernel = str(system.get("kernel_release") or "")  # type: ignore[union-attr]
     version = version_text(diagnostics)
-    return "\n".join(
-        [
-            f"- Distro: {distro}",
-            f"- Desktop session: {desktop}",
-            f"- Kernel: {kernel}",
-            f"- KeyRGB version / install method: {version}",
-        ]
+    lines = [
+        f"- Distro: {distro}",
+        f"- Desktop session: {desktop}",
+        f"- Kernel: {kernel}",
+        f"- KeyRGB version / install method: {version}",
+    ]
+    warning = emulation_warning_text(diagnostics)
+    if warning:
+        lines.append(f"- {warning}")
+    return "\n".join(lines)
+
+
+def emulation_warning_text(diagnostics: dict[str, Any] | None) -> str:
+    if not isinstance(diagnostics, dict):
+        return ""
+    backends = diagnostics.get("backends")
+    if not isinstance(backends, dict):
+        return ""
+    emulation = backends.get("emulation")
+    if not isinstance(emulation, dict) or emulation.get("active") is not True:
+        return ""
+    raw = str(emulation.get("raw") or "").strip()
+    suffix = f" ({raw})" if raw else ""
+    return (
+        "EMULATION ACTIVE: KEYRGB_EMULATE is set"
+        f"{suffix}. Probe results are in-memory fakes, not hardware detection. "
+        "Do not use this bundle as evidence to promote an experimental backend."
     )
 
 

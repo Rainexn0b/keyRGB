@@ -240,6 +240,30 @@ def test_zoned_backend_shows_lighting_profiles_menu() -> None:
     assert "Lighting Profiles" in labels
 
 
+def test_emulated_zoned_contract_enables_lighting_profile_toggle() -> None:
+    from keyrgb.core.backends.emulation import make_emulated_primary_backend
+
+    backend = make_emulated_primary_backend("ite8291_zones_clevo")
+    tray = DummyTray(backend.capabilities())
+    tray.backend = backend
+    tray.backend_probe = backend.probe()
+
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+    labels = [entry["text"] for entry in items if isinstance(entry, dict)]
+    submenu = next(
+        entry["action"] for entry in items if isinstance(entry, dict) and entry["text"] == "Software Effects"
+    )
+    profile_item = next(
+        entry
+        for entry in submenu.items
+        if isinstance(entry, dict) and str(entry["text"]).startswith("Lighting profile")
+    )
+
+    assert "Lighting Profiles" in labels
+    assert profile_item["enabled"] is True
+    assert "(emulated)" in str(items[0]["text"])
+
+
 def test_keyboard_status_badges_research_backed_experimental_backend(monkeypatch: pytest.MonkeyPatch) -> None:
     class DummyBackend:
         name = "ite8910_perkey"

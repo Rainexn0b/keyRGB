@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Backends/Testing: Add `KEYRGB_EMULATE` so one PRIMARY plus compatible AUXILIARY backends can be exercised in-memory without hidraw. `KEYRGB_SIMULATE_SECONDARY_DEVICES=1` still exposes every secondary route as `KEYRGB_EMULATE=*`. Diagnostics label emulation so it cannot be mistaken for hardware detection.
 - Diagnostics: Cancelling `keyrgb --diagnostic-session` with Ctrl-C at the tray-close prompt now prints "Diagnostic session cancelled." and exits 130 instead of dumping a KeyboardInterrupt traceback.
 - Tray/UI: Replace the greyed-out "None (static per-key)" radio with a Lighting profile toggle that switches between software/reactive effects and the last used lighting-editor profile. The toggle and software effects are available on every color-capable backend, not only per-key hardware.
 - GUI/Per-Key: 4-zone keyboards can open the Lighting Profile Editor to change profiles and AC/battery automation. Painting a key colors its whole zone; "Apply to all keys" still sets one color across the deck.

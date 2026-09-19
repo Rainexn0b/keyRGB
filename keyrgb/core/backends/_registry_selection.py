@@ -65,10 +65,18 @@ def build_backend_selection_report(
     visible without independently reimplementing selection or probing.
     """
 
-    from .registry import _BACKEND_NAME_ALIASES, _probe_backend
+    from .emulation.primary import emulated_selection_report_or_none
+    from .registry import _probe_backend, resolve_backend_name
 
     requested_name = (requested or os.environ.get("KEYRGB_BACKEND") or "auto").strip().lower()
-    requested_effective = _BACKEND_NAME_ALIASES.get(requested_name, requested_name)
+    requested_effective = resolve_backend_name(requested_name)
+    emulated_report = emulated_selection_report_or_none(
+        backends,
+        requested_name=requested_name,
+        requested_effective=requested_effective,
+    )
+    if emulated_report is not None:
+        return emulated_report
     evaluations: list[BackendProbeEvaluation] = []
 
     for backend in backends:

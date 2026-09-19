@@ -251,6 +251,8 @@ installs the matching KeyRGB udev rules for supported USB / hidraw access.
 | Variable | Usage |
 | --- | --- |
 | `KEYRGB_BACKEND` | Force a backend (`auto` default). Canonical names are listed above; old short names still work as aliases. |
+| `KEYRGB_EMULATE` | Hardware-free UX/testing: comma-separated backend names or `preset:beast-x30` / `preset:legion-gen10` / `preset:perkey-clevo-bar` / `preset:uniform`. At most one PRIMARY plus compatible AUXILIARY backends. Not hardware evidence. |
+| `KEYRGB_SIMULATE_SECONDARY_DEVICES=1` | Legacy alias for `KEYRGB_EMULATE=*` (all secondary routes, no emulated keyboard). Prefer `KEYRGB_EMULATE`. |
 | `KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1` | Opt in to experimental backends without using the Settings window. |
 | `KEYRGB_ITE8295_ZONES_HIDRAW_PATH` | Override `/dev/hidraw*` for `ite8295_zones_lenovo_ideapad`. |
 | `KEYRGB_ITE8297_HIDRAW_PATH` | Override `/dev/hidraw*` for `ite8297_uniform`. |

@@ -64,7 +64,7 @@ def test_every_backend_package_exports_a_registration_marker() -> None:
     backend_dir = Path(importlib.import_module("keyrgb.core.backends").__file__).resolve().parent
     missing: list[str] = []
     for child in sorted(backend_dir.iterdir()):
-        if not child.is_dir() or child.name.startswith("_") or child.name == "policies":
+        if not child.is_dir() or child.name.startswith("_") or child.name in {"policies", "emulation"}:
             continue
         if not (child / "__init__.py").exists():
             continue

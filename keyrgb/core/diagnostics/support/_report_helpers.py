@@ -129,6 +129,7 @@ def experimental_confirmation_fields(
             "from a successful `keyrgb --diagnostic-session` run."
         ),
         "extra_notes": report_text.join_non_empty_sections(
+            report_text.emulation_warning_text(diagnostics),
             report_text.discovery_summary_text(discovery),
             report_text.optional_capture_commands_text(discovery, prefix="Optional deeper-evidence commands:"),
             report_text.supplemental_evidence_text(

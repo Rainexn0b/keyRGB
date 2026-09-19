@@ -27,6 +27,7 @@ from keyrgb.core.secondary_device_runtime import (
 @pytest.fixture(autouse=True)
 def _reset_simulation_state(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv(SIMULATION_ENVIRONMENT_VARIABLE, raising=False)
+    monkeypatch.delenv("KEYRGB_EMULATE", raising=False)
     reset_simulated_secondary_devices()
     yield
     reset_simulated_secondary_devices()

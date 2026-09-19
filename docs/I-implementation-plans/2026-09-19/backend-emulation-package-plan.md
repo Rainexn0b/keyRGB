@@ -1,16 +1,16 @@
 # Backend emulation package
 
 Date: 2026-09-19  
-Status: planned  
+Status: implemented (phase 1–3); phase 4 inspector deferred   
 Owner: `keyrgb/core/backends/` (emulation seam) with consumers in tray, editor, diagnostics  
 Related: issue #13 4-zone + Tongfang lightbar UX; existing `KEYRGB_SIMULATE_SECONDARY_DEVICES`
 
 ## Status
 
-Design only. No emulation package exists yet. Secondary-device simulation remains
-the all-or-nothing overlay in `keyrgb/core/secondary_device_runtime.py`. This
-plan replaces that boolean with a unified, per-backend emulator that can run
-one PRIMARY keyboard plus compatible AUXILIARY backends in one process.
+Phases 1–3 implemented. `KEYRGB_EMULATE` intercepts primary selection and
+secondary-route acquisition. Local UX confirmation: 4-zone Lighting Profile
+Editor and named auxiliary simulation work without hidraw
+(`preset:beast-x30`). Phase 4 inspector remains deferred.
 
 This is UX and automated-test validation only. Emulation must never be reported
 as hardware detection and must never be used as evidence to promote an

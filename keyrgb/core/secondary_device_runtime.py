@@ -2,8 +2,9 @@
 
 The route table describes production backends.  This module is the only place
 where callers should turn those descriptions into effective routes or devices.
-It also owns the opt-in, hardware-free secondary-device simulation used by
-tests and manual UX validation.
+Named hardware-free emulation lives in ``keyrgb.core.backends.emulation``;
+this module still owns in-memory uniform devices and the legacy
+``KEYRGB_SIMULATE_SECONDARY_DEVICES`` shim.
 """
 
 from __future__ import annotations
@@ -16,36 +17,25 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 from keyrgb.core.backends.base import BackendCapabilities
+from keyrgb.core.backends.emulation.auxiliary import (
+    auxiliary_emulation_enabled,
+    emulation_availability_reason,
+    emulation_availability_source,
+    route_is_emulated,
+)
+from keyrgb.core.backends.emulation.spec import get_emulation_spec
 from keyrgb.core.config._lighting._coercion import normalize_secondary_brightness_value
 from keyrgb.core.secondary_device_routes import SecondaryDeviceRoute, iter_secondary_routes
 
 logger = logging.getLogger(__name__)
 
 SIMULATION_ENVIRONMENT_VARIABLE = "KEYRGB_SIMULATE_SECONDARY_DEVICES"
-_SIMULATION_TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
-_SIMULATION_FALSE_VALUES = frozenset({"", "0", "false", "no", "off"})
 _ROUTE_RUNTIME_ERRORS = (AttributeError, ImportError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
-def _simulation_flag_value(value: object) -> bool:
-    if isinstance(value, bool):
-        return value
-    if value is None:
-        return False
-    try:
-        normalized = str(value).strip().lower()
-    except (AttributeError, TypeError, ValueError):
-        return False
-    if normalized in _SIMULATION_TRUE_VALUES:
-        return True
-    if normalized in _SIMULATION_FALSE_VALUES:
-        return False
-    return False
-
-
 def secondary_device_simulation_enabled() -> bool:
-    """Return whether secondary-device simulation is explicitly enabled."""
-    return _simulation_flag_value(os.environ.get(SIMULATION_ENVIRONMENT_VARIABLE))
+    """Return whether secondary-device simulation or named emulation is enabled."""
+    return auxiliary_emulation_enabled()
 
 
 @dataclass(frozen=True)
@@ -127,7 +117,7 @@ class SimulatedUniformDevice:
             raise RuntimeError(f"Simulated secondary device is closed: {self.route.state_key}")
 
     def _log_state_change(self, action: str, **fields: object) -> None:
-        if _simulation_flag_value(os.environ.get("KEYRGB_DEBUG")):
+        if os.environ.get("KEYRGB_DEBUG") == "1":
             logger.debug(
                 "Simulated secondary route state changed: route=%s action=%s fields=%s",
                 self.route.state_key,
@@ -279,21 +269,27 @@ def iter_effective_secondary_routes(
 ) -> tuple[EffectiveSecondaryRoute, ...]:
     """Return the stable effective secondary-route snapshot.
 
-    Simulation deliberately bypasses every production backend probe and exposes
-    all registered routes as available. In real mode, each parent backend is
-    probed once per snapshot and unavailable routes are omitted by default.
+    Simulation and named emulation bypass production backend probes. The legacy
+    all-secondary flag still exposes every registered route; ``KEYRGB_EMULATE``
+    exposes only the listed auxiliary names plus virtual children of an
+    emulated PRIMARY. In real mode, each parent backend is probed once per
+    snapshot and unavailable routes are omitted by default.
     """
     registered = _deduplicated_routes(iter_secondary_routes() if routes is None else routes)
-    if secondary_device_simulation_enabled():
+    spec = get_emulation_spec()
+    if spec is not None and spec.includes_secondary_emulation():
+        source = emulation_availability_source(spec)
+        reason = emulation_availability_reason(spec)
         return tuple(
             EffectiveSecondaryRoute(
                 route=route,
                 available=True,
                 simulated=True,
-                availability_source="simulation",
-                availability_reason="secondary-device simulation enabled",
+                availability_source=source,
+                availability_reason=reason,
             )
             for route in registered
+            if route_is_emulated(route, spec)
         )
 
     parent_availability: dict[str, tuple[bool, str]] = {}
@@ -315,7 +311,7 @@ def iter_effective_secondary_routes(
 
 def route_is_available(route: SecondaryDeviceRoute) -> bool:
     """Return effective availability for one route without acquiring a device."""
-    if secondary_device_simulation_enabled():
+    if route_is_emulated(route):
         return True
     available, _source, _reason = _route_availability(route, parent_availability={})
     return available
@@ -334,14 +330,14 @@ def has_available_secondary_profile_routes(
 
 def acquire_secondary_device(route: SecondaryDeviceRoute) -> object:
     """Acquire one effective uniform device, honoring simulation precedence."""
-    if secondary_device_simulation_enabled():
+    if route_is_emulated(route):
         return _simulated_device_for_route(route)
     return route.get_device()
 
 
 def backend_for_secondary_route(route: SecondaryDeviceRoute) -> object:
     """Return the effective backend facade for one route."""
-    if secondary_device_simulation_enabled():
+    if route_is_emulated(route):
         return _SimulatedSecondaryBackend(route)
     return route.get_backend()
 
