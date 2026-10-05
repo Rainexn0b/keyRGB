@@ -94,3 +94,13 @@ def test_ci_doc_states_tested_matrix_and_mypy_floor() -> None:
         assert version in text, f"CI doc is missing tested Python {version}"
     assert "Quality Gate" in text and _QUALITY_GATE_PYTHON in text
     assert "3.10" in text and "mypy" in text, "CI doc must state the 3.10 mypy floor"
+
+
+def test_release_build_pins_appimage_abi_floor_and_matching_gi_python() -> None:
+    workflow = _RELEASE_WORKFLOW.read_text(encoding="utf-8")
+    assert "runs-on: ubuntu-22.04" in workflow
+    assert 'python-version: "3.10"' in workflow
+    assert "binutils" in workflow
+    text = _CI_DOC.read_text(encoding="utf-8")
+    assert "glibc 2.35" in text
+    assert "Ubuntu 22.04" in text

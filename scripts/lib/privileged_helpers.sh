@@ -4,6 +4,10 @@
 
 set -euo pipefail
 
+_KEYRGB_PRIVILEGED_HELPERS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$_KEYRGB_PRIVILEGED_HELPERS_DIR/hardware_access.sh"
+
 should_install_power_helper() {
   is_truthy "${KEYRGB_INSTALL_POWER_HELPER:-y}"
 }
@@ -36,9 +40,9 @@ install_privileged_helpers_local() {
       && [ -f "$repo_dir/system/polkit/90-keyrgb-power-helper.rules" ] \
       && [ -f "$repo_dir/system/polkit/org.keyrgb.power-helper.policy" ]; then
       log_info "Installing Power Mode helper from local repo (requires sudo)..."
-      sudo install -D -m 0755 "$repo_dir/system/bin/keyrgb-power-helper" /usr/local/bin/keyrgb-power-helper
-      sudo install -D -m 0644 "$repo_dir/system/polkit/90-keyrgb-power-helper.rules" "$polkit_dir/90-keyrgb-power-helper.rules"
-      sudo install -D -m 0644 "$repo_dir/system/polkit/org.keyrgb.power-helper.policy" "$polkit_action_dir/org.keyrgb.power-helper.policy"
+      hardware_access_place_file_privileged "$repo_dir/system/bin/keyrgb-power-helper" /usr/local/bin/keyrgb-power-helper 0755 helper
+      hardware_access_place_file_privileged "$repo_dir/system/polkit/90-keyrgb-power-helper.rules" "$polkit_dir/90-keyrgb-power-helper.rules" 0644 polkit-rule
+      hardware_access_place_file_privileged "$repo_dir/system/polkit/org.keyrgb.power-helper.policy" "$polkit_action_dir/org.keyrgb.power-helper.policy" 0644 polkit-action
       did_any=1
     else
       log_warn "Local Power Mode helper/rule/action not found; skipping local install."
@@ -134,13 +138,13 @@ install_privileged_helpers_from_ref() {
     fi
 
     log_info "Installing helper (requires sudo): /usr/local/bin/${helper_name}"
-    sudo install -D -m 0755 "$helper_tmp" "/usr/local/bin/${helper_name}"
+    hardware_access_place_file_privileged "$helper_tmp" "/usr/local/bin/${helper_name}" 0755 helper
 
     log_info "Installing polkit rule (requires sudo): ${polkit_dir}/${rule_name}"
-    sudo install -D -m 0644 "$rule_tmp" "${polkit_dir}/${rule_name}"
+    hardware_access_place_file_privileged "$rule_tmp" "${polkit_dir}/${rule_name}" 0644 polkit-rule
 
     log_info "Installing polkit action (requires sudo): ${polkit_action_dir}/${action_name}"
-    sudo install -D -m 0644 "$action_tmp" "${polkit_action_dir}/${action_name}"
+    hardware_access_place_file_privileged "$action_tmp" "${polkit_action_dir}/${action_name}" 0644 polkit-action
   done
 
   log_ok "Privileged helpers installed (best-effort)"

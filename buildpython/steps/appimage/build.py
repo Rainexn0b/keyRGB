@@ -18,6 +18,8 @@ from . import (
     run_checked,
     write_text,
 )
+from .compatibility import validate_appdir_glibc
+from .hardware_access_bundle import bundle_hardware_access
 from .tkinter_bundle import runtime_script_env_exports
 
 # Pin appimagetool to a versioned upstream release with an immutable digest.
@@ -128,6 +130,8 @@ def build_appimage() -> Path:
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dst)
 
+    bundle_hardware_access(appdir=appdir, root=root)
+
     site_packages.mkdir(parents=True, exist_ok=True)
 
     if not skip_deps:
@@ -179,6 +183,8 @@ def build_appimage() -> Path:
     if staging_only:
         print(f"Prepared AppDir (staging-only): {appdir}")
         return appdir
+
+    validate_appdir_glibc(appdir)
 
     if out.exists():
         out.unlink()

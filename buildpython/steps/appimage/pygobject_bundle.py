@@ -83,20 +83,9 @@ print(json.dumps({
     typelib_dst = appdir / "usr" / "lib" / "girepository-1.0"
     typelib_dst.mkdir(parents=True, exist_ok=True)
 
+    # Typelibs reference other namespaces transitively (Gtk -> Gdk -> xlib,
+    # Gtk -> Atk, Pango -> HarfBuzz, etc.). A top-level namespace allowlist
+    # leaves GI unusable on desktops without system introspection packages.
+    # Copy the build environment's small metadata set, not the host GTK stack.
     for name in typelib_src.glob("*.typelib"):
-        if name.name.startswith(
-            (
-                "Gtk-",
-                "Gdk-",
-                "GdkPixbuf-",
-                "Gio-",
-                "GLib-",
-                "GObject-",
-                "Pango-",
-                "PangoCairo-",
-                "cairo-",
-                "AppIndicator3-",
-                "AyatanaAppIndicator3-",
-            )
-        ):
-            shutil.copy2(name, typelib_dst / name.name)
+        shutil.copy2(name, typelib_dst / name.name)

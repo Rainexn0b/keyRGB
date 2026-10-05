@@ -57,10 +57,34 @@ def appimage_smoke_runner() -> RunResult:
             skip_reason="KEYRGB_SKIP_APPIMAGE_SMOKE is enabled",
         )
 
-    image = os.environ.get("KEYRGB_APPIMAGE_SMOKE_IMAGE", "ubuntu:24.04")
+    images = (
+        (os.environ["KEYRGB_APPIMAGE_SMOKE_IMAGE"],)
+        if os.environ.get("KEYRGB_APPIMAGE_SMOKE_IMAGE")
+        else ("ubuntu:22.04", "ubuntu:24.04")
+    )
 
+    results: list[RunResult] = []
+    for image in images:
+        result = run(
+            [docker, "run", "--rm", "-v", f"{dist}:/dist:ro", "-w", "/work", image, "bash", "-lc", _smoke_script()],
+            cwd=str(root),
+            env_overrides={"KEYRGB_HW_TESTS": "0"},
+        )
+        results.append(result)
+        if result.exit_code != 0:
+            break
+    return RunResult(
+        command_str="; ".join(result.command_str for result in results),
+        stdout="".join(f"=== {image} ===\n{result.stdout}" for image, result in zip(images, results, strict=False)),
+        stderr="".join(f"=== {image} ===\n{result.stderr}" for image, result in zip(images, results, strict=False)),
+        exit_code=results[-1].exit_code,
+    )
+
+
+def _smoke_script() -> str:
+    """Exercise minimal imports, then desktop startup without host GI/indicator packages."""
     tcl_export, tk_export = runtime_script_env_exports("$HERE")
-    script = "\n".join(
+    return "\n".join(
         [
             "set -euo pipefail",
             "export DEBIAN_FRONTEND=noninteractive",
@@ -74,6 +98,7 @@ def appimage_smoke_runner() -> RunResult:
             'export PYTHONNOUSERSITE="1"',
             'export PYTHONPATH="$HERE/usr/lib/keyrgb:$HERE/usr/lib/keyrgb/site-packages"',
             'export LD_LIBRARY_PATH="$HERE/usr/lib:$HERE/usr/lib64:$HERE/usr/lib/x86_64-linux-gnu:$HERE/usr/lib64/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"',
+            'export GI_TYPELIB_PATH="$HERE/usr/lib/girepository-1.0"',
             tcl_export,
             tk_export,
             'PY="$HERE/usr/bin/python3"',
@@ -82,24 +107,19 @@ def appimage_smoke_runner() -> RunResult:
             '"$PY" -c "import keyrgb.tray.ui.icon; print(\'tray-icon-import-ok\')"',
             '"$PY" -m keyrgb.core.diagnostics > diag.json',
             "\"$PY\" -c \"import json; json.load(open('diag.json')); print('diagnostics-json-ok')\"",
+            # GTK/GLib and font rendering are the host desktop stack, deliberately
+            # not bundled. Do NOT install python3-gi or any indicator/dbusmenu libs:
+            # that would mask a broken bundle (the old smoke never imported GI).
+            "apt-get install -y --no-install-recommends libgtk-3-0 libgirepository-1.0-1 xvfb xauth dbus-x11 >/dev/null",
+            'export PYSTRAY_BACKEND="appindicator"',
+            'export GDK_BACKEND="x11"',
+            (
+                'xvfb-run -a dbus-run-session -- "$PY" -c "import tkinter as tk; r=tk.Tk(); r.update(); r.destroy(); '
+                "import pystray; from PIL import Image; assert pystray.Icon.__module__ == 'pystray._appindicator'; "
+                "i=pystray.Icon('smoke', Image.new('RGB', (16,16))); print('desktop-tray-ok')\""
+            ),
+            'xvfb-run -a dbus-run-session -- "$HERE/AppRun" --diagnostics --no-usb > apprun-diag.json',
+            "\"$PY\" -c \"import json; json.load(open('apprun-diag.json')); print('apprun-ok')\"",
             "echo 'appimage-smoke-ok'",
         ]
-    )
-
-    return run(
-        [
-            docker,
-            "run",
-            "--rm",
-            "-v",
-            f"{dist}:/dist:ro",
-            "-w",
-            "/work",
-            image,
-            "bash",
-            "-lc",
-            script,
-        ],
-        cwd=str(root),
-        env_overrides={"KEYRGB_HW_TESTS": "0"},
     )

@@ -240,6 +240,16 @@ class KeyRGBTray(KeyRGBTrayDelegateMixin):
             subprocess_module=subprocess,
         )
 
+    def offer_hardware_access_setup(self, *, permission_denied: bool = False) -> None:
+        """Offer bundled hardware setup when evidence already exists. Best-effort."""
+
+        from keyrgb.tray.ui.gui_launch import maybe_launch_hardware_access_setup
+
+        try:
+            maybe_launch_hardware_access_setup(permission_denied=permission_denied)
+        except OSError:
+            logger.warning("Could not offer hardware-access setup", exc_info=True)
+
     def _notify_permission_issue(self, exc: Exception | None = None) -> None:
         """Show a one-time notification for missing permissions."""
 
@@ -253,6 +263,9 @@ class KeyRGBTray(KeyRGBTrayDelegateMixin):
             format_backend_error=format_backend_error,
             safe_str_attr=safe_str_attr,
         )
+        offer = getattr(self, "offer_hardware_access_setup", None)
+        if callable(offer):
+            offer(permission_denied=True)
 
     # ---- logging helpers
 
@@ -278,6 +291,9 @@ class KeyRGBTray(KeyRGBTrayDelegateMixin):
     # ---- run
 
     def run(self):
+        offer = getattr(self, "offer_hardware_access_setup", None)
+        if callable(offer):
+            offer()
         application_bindings.run_tray(
             self,
             bindings=_run_bindings(),

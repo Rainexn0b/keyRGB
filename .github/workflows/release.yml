@@ -11,7 +11,9 @@ permissions:
 jobs:
   appimage:
     name: Build + Upload AppImage
-    runs-on: ubuntu-latest
+    # Keep the bundled native runtime compatible with Ubuntu 22.04 (glibc 2.35).
+    # Do not float this to ubuntu-latest: the catalog tests on this baseline.
+    runs-on: ubuntu-22.04
     timeout-minutes: 30
     permissions:
       contents: write
@@ -25,7 +27,8 @@ jobs:
         # Pin major tag v7 to immutable commit SHA.
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.12"
+          # Match Jammy's python3-gi CPython ABI; the AppImage bundles Python.
+          python-version: "3.10"
           cache: pip
 
       - name: Install system deps
@@ -33,6 +36,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             shellcheck \
+            binutils \
+            build-essential \
+            file \
             squashfs-tools \
             python3-gi \
             gir1.2-gtk-3.0 \

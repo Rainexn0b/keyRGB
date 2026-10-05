@@ -177,7 +177,7 @@ def steps() -> list[Step]:
         Step(
             number=15,
             name="AppImage Smoke",
-            description="Smoke-test AppImage in minimal container (no system deps)",
+            description="Smoke-test AppImage on minimal and desktop Ubuntu LTS containers",
             log_file=_log("step-15-appimage-smoke.log"),
             runner=appimage_smoke_runner,
         ),

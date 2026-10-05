@@ -248,6 +248,15 @@ class Ite8291r3KeyboardDevice:
         self._send_control(protocol.build_get_effect_report())
         return self._read_control(8)[1] == 0x01
 
+    def is_user_mode(self) -> bool:
+        """Verify active per-key mode separately from explicit-off/sleep state."""
+
+        self._send_control(protocol.build_get_effect_report())
+        response = self._read_control(8)
+        active = protocol.is_active_user_mode_response(response)
+        _logger.debug("ITE user-mode status: response=%s active=%s", response.hex(), active)
+        return active
+
     def get_brightness(self) -> int:
         # Some TongFang EC/firmware combinations briefly leave the normal
         # user-mode contract during AC unplug/replug.  In that window the

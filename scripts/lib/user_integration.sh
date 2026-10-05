@@ -4,6 +4,10 @@
 
 set -euo pipefail
 
+_KEYRGB_USER_INTEGRATION_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$_KEYRGB_USER_INTEGRATION_DIR/hardware_access.sh"
+
 is_appimage_file() {
   local path="$1"
   [ -f "$path" ] || return 1
@@ -227,7 +231,7 @@ install_udev_rule_from_ref() {
   fi
 
   _install_rule() {
-    local filename="$1" dst="$2"
+    local filename="$1" dst="$2" kind="$3"
 
     local tmp_rule
     tmp_rule="$(mktemp)"
@@ -251,14 +255,14 @@ install_udev_rule_from_ref() {
     fi
 
     log_info "Installing udev rule (requires sudo): $dst"
-    sudo install -D -m 0644 "$tmp_rule" "$dst"
+    hardware_access_place_file_privileged "$tmp_rule" "$dst" 0644 "$kind"
     rm -f "$tmp_rule" 2>/dev/null || true
   }
 
   # 1) USB direct backends (ITE 8291r3) permissions
-  _install_rule "99-ite8291-wootbook.rules" "$dst_usb_rule"
+  _install_rule "99-ite8291-wootbook.rules" "$dst_usb_rule" usb
   # 2) Sysfs LED backends (kernel drivers) permissions
-  _install_rule "99-keyrgb-sysfs-leds.rules" "$dst_sysfs_rule"
+  _install_rule "99-keyrgb-sysfs-leds.rules" "$dst_sysfs_rule" sysfs
 
   reload_udev_rules_best_effort
 }
@@ -279,7 +283,7 @@ install_input_udev_rule_local() {
   fi
 
   log_info "Installing input udev rule (requires sudo): $dst_rule"
-  sudo install -D -m 0644 "$src_rule" "$dst_rule"
+  hardware_access_place_file_privileged "$src_rule" "$dst_rule" 0644 input
   reload_udev_rules_best_effort
 }
 
@@ -315,7 +319,7 @@ install_input_udev_rule_from_ref() {
   fi
 
   log_info "Installing input udev rule (requires sudo): $dst_rule"
-  sudo install -D -m 0644 "$tmp_rule" "$dst_rule"
+  hardware_access_place_file_privileged "$tmp_rule" "$dst_rule" 0644 input
   rm -f "$tmp_rule" 2>/dev/null || true
   reload_udev_rules_best_effort
 }

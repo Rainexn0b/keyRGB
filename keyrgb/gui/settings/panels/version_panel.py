@@ -95,6 +95,13 @@ class VersionPanel:
         self.btn_support_tools = ttk.Button(btn_row, text="Support Tools…", command=self._open_support_tools)
         self.btn_support_tools.pack(side="left", padx=(8, 0))
 
+        self.btn_hardware_access = ttk.Button(
+            btn_row,
+            text="Set up hardware access…",
+            command=self._open_hardware_access,
+        )
+        self.btn_hardware_access.pack(side="left", padx=(8, 0))
+
         self._installed_version = self._installed_version_text()
         self.lbl_installed_version.configure(text=self._installed_version)
         self.lbl_latest_stable_version.configure(text="Checking…")
@@ -298,4 +305,22 @@ class VersionPanel:
 
         if status is not None:
             status.configure(text="Opened Support Tools" if ok else "Couldn't open Support Tools")
+            self._root.after(2000, lambda: status.configure(text=""))
+
+    def _open_hardware_access(self) -> None:
+        """Open hardware-access setup. Always available; dismissal does not hide it."""
+
+        try:
+            launch_module_subprocess("keyrgb.gui.hardware_access_window", anchor=__file__)
+            ok = True
+        except _SUPPORT_LAUNCH_ERRORS:
+            ok = False
+
+        try:
+            status = self._get_status_label()
+        except _STATUS_LABEL_ERRORS:
+            status = None
+
+        if status is not None:
+            status.configure(text="Opened hardware-access setup" if ok else "Couldn't open hardware-access setup")
             self._root.after(2000, lambda: status.configure(text=""))

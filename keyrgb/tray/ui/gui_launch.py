@@ -191,6 +191,40 @@ def launch_power_mode_settings_gui() -> None:
     launch_module_subprocess("keyrgb.gui.windows.power_mode", anchor=__file__)
 
 
+def launch_hardware_access_setup() -> None:
+    """Open hardware-access setup. Always available from Settings."""
+
+    launch_module_subprocess("keyrgb.gui.hardware_access_window", anchor=__file__)
+
+
+_hardware_access_offer_started = False
+
+
+def maybe_launch_hardware_access_setup(*, permission_denied: bool = False) -> bool:
+    """Launch setup only when existing evidence justifies an automatic offer."""
+
+    global _hardware_access_offer_started
+    from keyrgb.gui.hardware_access import resolve_hardware_access_bundle
+    from keyrgb.gui.hardware_access_offer import compare_installed_rules, offer_dismissed, should_auto_offer
+
+    if _hardware_access_offer_started:
+        return False
+    try:
+        bundle = resolve_hardware_access_bundle(anchor=__file__)
+        compared = compare_installed_rules(bundle.payload_dir)
+    except OSError:
+        return False
+    if not should_auto_offer(
+        permission_denied=permission_denied,
+        compare=compared,
+        dismissed=offer_dismissed(),
+    ):
+        return False
+    launch_hardware_access_setup()
+    _hardware_access_offer_started = True
+    return True
+
+
 def launch_support_gui(*, focus: str = "debug") -> None:
     """Launch the support tools window as a subprocess."""
 

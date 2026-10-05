@@ -18,6 +18,9 @@ specs for larger changes.
 
 ### Active follow-up plans
 
+- [2026-10-05/hardware-access-first-run-setup-plan.md](2026-10-05/hardware-access-first-run-setup-plan.md) —
+  planned first-run/Settings hardware-access setup through a narrow hardware-only
+  installer mode; reuse existing scripts and keep GUI/privilege wiring thin
 - `2026-09-19/backend-emulation-package-plan.md` — unified per-backend
   emulation (`KEYRGB_EMULATE`) so one PRIMARY plus compatible AUXILIARY
   backends can be exercised without hidraw; replaces all-or-nothing

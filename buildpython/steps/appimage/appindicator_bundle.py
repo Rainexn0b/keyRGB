@@ -4,12 +4,17 @@ import os
 import shutil
 from pathlib import Path
 
+from .indicator_baseline import host_indicator_stack_exceeds_baseline, install_ubuntu_2204_indicator_stack
+
 
 def bundle_libappindicator(*, appdir: Path) -> None:
     """Bundle libappindicator native library + dependencies into the AppImage.
 
     libappindicator provides native tray icon support on Ubuntu/GNOME systems.
-    We bundle it so the AppImage works without requiring system packages.
+    We bundle it so users do not need indicator/dbusmenu system packages.
+    GTK/GLib and font rendering deliberately remain part of the host desktop.
+    Host copies that need a newer glibc than Ubuntu 22.04 are replaced with the
+    pinned Jammy indicator stack. Other bundled ELFs are not substituted.
     """
 
     usr_lib = appdir / "usr" / "lib"
@@ -34,6 +39,7 @@ def bundle_libappindicator(*, appdir: Path) -> None:
         "libindicator3.so*",
         "libayatana-ido3-0.4.so*",
         "libdbusmenu-gtk3.so*",
+        "libdbusmenu-glib.so*",
     ]
 
     def find_and_bundle_lib(patterns: list[str]) -> bool:
@@ -80,6 +86,11 @@ def bundle_libappindicator(*, appdir: Path) -> None:
     for pattern in lib_patterns:
         if find_and_bundle_lib([pattern]):
             bundled_any = True
+
+    if host_indicator_stack_exceeds_baseline(usr_lib):
+        print("Host indicator libraries exceed GLIBC_2.35; installing pinned Ubuntu 22.04 copies.")
+        install_ubuntu_2204_indicator_stack(usr_lib)
+        return
 
     if not bundled_any:
         # No indicator libraries found; AppImage will fall back to basic tray icon.

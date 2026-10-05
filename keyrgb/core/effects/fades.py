@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import Mapping
 from threading import RLock
@@ -18,6 +19,8 @@ from keyrgb.core.effects.transitions import (
 
 _FADE_SETUP_ERRORS = (IndexError, OverflowError, TypeError, ValueError)
 _FADE_RUNTIME_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+
+logger = logging.getLogger(__name__)
 
 Color = tuple[int, int, int]
 Key = tuple[int, int]
@@ -104,8 +107,10 @@ def prime_per_key_frame(
     switched out of user mode (``turn_off`` effect command): row and
     brightness writes alone leave the deck dark until a mode command
     re-enables user mode.  A fresh process cannot know whether firmware
-    retained that off mode, so an ordinary prime verifies the resulting state
-    and re-enables user mode only when the controller is still off.
+    retained that off mode, so an ordinary prime verifies the resulting state.
+    Backends with an optional ``is_user_mode`` probe additionally verify active
+    software mode: positive brightness and not-off alone need not mean rows
+    are visible. Reassert only when needed, after the hidden rows land.
     """
 
     if not per_key_colors:
@@ -134,6 +139,8 @@ def prime_per_key_frame(
             set_brightness = getattr(kb, "set_brightness", None)
             if callable(set_brightness):
                 set_brightness(brightness_hw)
+            is_user_mode = getattr(kb, "is_user_mode", None)
+            mode_active = bool(is_user_mode()) if callable(is_user_mode) else None
             if not reassert_user_mode:
                 # Explicit off mode (is_off) *or* firmware sleep signature
                 # (brightness still 0 with is_off=False) — both need a mode
@@ -146,12 +153,24 @@ def prime_per_key_frame(
                             still_dark = int(get_brightness()) <= 0
                         except _FADE_RUNTIME_ERRORS:
                             still_dark = False
+                still_dark = still_dark or mode_active is False
                 if still_dark:
                     enable_user_mode = getattr(kb, "enable_user_mode", None)
                     if not callable(enable_user_mode):
                         return False
+                    logger.info(
+                        "perkey_startup: reassert_user_mode brightness=%d mode_active=%s",
+                        brightness_hw,
+                        mode_active,
+                    )
                     enable_user_mode(brightness=brightness_hw, save=False)
+                    if callable(is_user_mode):
+                        mode_active = bool(is_user_mode())
+            if mode_active is False:
+                logger.warning("Per-key startup prime did not activate user mode")
+                return False
     except _FADE_RUNTIME_ERRORS:
+        logger.debug("Failed to prime per-key frame", exc_info=True)
         return False
     return True
 

@@ -13,19 +13,22 @@ set -euo pipefail
 
 KEYRGB_REPO_OWNER="${KEYRGB_REPO_OWNER:-Rainexn0b}"
 KEYRGB_REPO_NAME="${KEYRGB_REPO_NAME:-keyRGB}"
-KEYRGB_BOOTSTRAP_REF="${KEYRGB_BOOTSTRAP_REF:-v0.37.1}"
+KEYRGB_BOOTSTRAP_REF="${KEYRGB_BOOTSTRAP_REF:-v0.38.0}"
 
 usage() {
     cat <<'EOF'
 Usage:
-    install.sh [--dev] [--ref <git-ref>] [--help] [...module args]
+    install.sh [--dev] [--hardware-access-only] [--ref <git-ref>] [--help] [...module args]
 
 Modes:
     (default)  User install: AppImage + udev + desktop integration
     --dev      Dev install: build deps + pip editable install
+    --hardware-access-only
+               Install keyboard access rules only. Optional module args:
+               --reactive-input, --power-controls. Does not download an AppImage.
 
 Bootstrap (curl installs):
-    --ref <git-ref>    Git ref for downloading scripts/ from GitHub raw (default: v0.37.1)
+    --ref <git-ref>    Git ref for downloading scripts/ from GitHub raw (default: v0.38.0)
     KEYRGB_BOOTSTRAP_REF can also be used.
 
 Examples:
@@ -37,6 +40,8 @@ EOF
 MODE="user"
 REF_OVERRIDE=""
 NEED_DEV_CLONE=0
+SEEN_DEV=0
+SEEN_HARDWARE=0
 
 # Legacy parity: when run interactively with no args, offer a mode selection.
 # This keeps the dispatcher small and forwards to the modular scripts.
@@ -80,25 +85,37 @@ if [ "$#" -eq 0 ] && [ -t 0 ]; then
 fi
 
 args=("$@")
+arg_count=${#args[@]}
 i=0
-while [ $i -lt ${#args[@]} ]; do
+# Snapshot the original length. Unset removes an element and would otherwise
+# shrink ${#args[@]} enough to skip the next flag.
+while [ "$i" -lt "$arg_count" ]; do
     case "${args[$i]}" in
         --dev)
             MODE="dev"
+            SEEN_DEV=1
+            unset 'args[$i]'
+            ;;
+        --hardware-access-only)
+            MODE="hardware"
+            SEEN_HARDWARE=1
             unset 'args[$i]'
             ;;
         --clone|--source)
             MODE="dev"
+            SEEN_DEV=1
             NEED_DEV_CLONE=1
             unset 'args[$i]'
             ;;
         --clone-dir)
             MODE="dev"
+            SEEN_DEV=1
             NEED_DEV_CLONE=1
             # keep --clone-dir and its value for install_dev.sh to consume
             ;;
         --pip|--repo)
             MODE="dev"
+            SEEN_DEV=1
             # install_dev.sh doesn't accept --pip; it's implicit (editable install)
             unset 'args[$i]'
             ;;
@@ -192,7 +209,7 @@ bootstrap_and_run() {
     case "$KEYRGB_BOOTSTRAP_REF" in
         main|master|HEAD|develop)
             echo "⚠️  Bootstrap ref is '${KEYRGB_BOOTSTRAP_REF}' (mutable branch). For reproducible and safer installs, use a tagged release URL, e.g.:" >&2
-            echo "   curl -fsSL https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/v0.37.1/install.sh | bash" >&2
+            echo "   curl -fsSL https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/v0.38.0/install.sh | bash" >&2
             ;;
     esac
 
@@ -213,10 +230,27 @@ bootstrap_and_run() {
     curl -fsSL "$base/scripts/lib/user_prompts.sh" -o "$tmp/scripts/lib/user_prompts.sh"
     curl -fsSL "$base/scripts/install_user.sh" -o "$tmp/scripts/install_user.sh"
     curl -fsSL "$base/scripts/install_dev.sh" -o "$tmp/scripts/install_dev.sh"
+    curl -fsSL "$base/scripts/install_hardware_access.sh" -o "$tmp/scripts/install_hardware_access.sh"
+    curl -fsSL "$base/scripts/lib/hardware_access.sh" -o "$tmp/scripts/lib/hardware_access.sh"
+    curl -fsSL "$base/scripts/lib/uninstall_match.sh" -o "$tmp/scripts/lib/uninstall_match.sh"
     curl -fsSL "$base/scripts/uninstall.sh" -o "$tmp/scripts/uninstall.sh"
 
     exec bash "$tmp/$target_rel" "$@"
 }
+
+if [ "$SEEN_DEV" -eq 1 ] && [ "$SEEN_HARDWARE" -eq 1 ]; then
+    echo "❌ --hardware-access-only cannot be combined with --dev" >&2
+    exit 1
+fi
+
+if [ "$MODE" = "hardware" ]; then
+    export KEYRGB_BOOTSTRAP_REF
+    if [ -n "$SCRIPT_DIR" ] && [ -f "$SCRIPT_DIR/scripts/install_hardware_access.sh" ]; then
+        run_local "$SCRIPT_DIR/scripts/install_hardware_access.sh" "${NEW_ARGS[@]}"
+    else
+        bootstrap_and_run "scripts/install_hardware_access.sh" "${NEW_ARGS[@]}"
+    fi
+fi
 
 if [ -n "$SCRIPT_DIR" ] && [ -f "$SCRIPT_DIR/scripts/common.sh" ]; then
     if [ "$MODE" = "dev" ]; then

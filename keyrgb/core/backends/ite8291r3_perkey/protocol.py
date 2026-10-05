@@ -165,6 +165,19 @@ def build_get_effect_report() -> bytes:
     return build_control_report(Commands.GET_EFFECT)
 
 
+def is_active_user_mode_response(response: bytes | bytearray) -> bool:
+    """Return whether a GET_EFFECT response is active per-key user mode.
+
+    A dark controller can retain effect 0x33 and positive brightness with
+    control 0x00. Neither explicit-off nor brightness alone proves that
+    software rows will be displayed.
+    """
+
+    if len(response) != 8 or response[0] != Commands.GET_EFFECT:
+        raise OSError(f"Invalid ITE user-mode status response: {bytes(response).hex()}")
+    return response[1] == 0x02 and response[2] == USER_MODE_EFFECT
+
+
 def build_row_data_report(colors_for_row: Sequence[object]) -> bytes:
     """Build a 65-byte row data output report for all 21 columns in one row.
 
