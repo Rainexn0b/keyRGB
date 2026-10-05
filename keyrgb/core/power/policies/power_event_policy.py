@@ -46,6 +46,12 @@ class PowerEventPolicy:
         self._saved_was_off = None
         self._restore_pending = False
 
+    @property
+    def restore_pending(self) -> bool:
+        """Whether a received wake still needs its current restore to execute."""
+
+        return self._restore_pending
+
     def handle_power_off_event(self, inputs: PowerEventInputs) -> PowerEventResult:
         # Even if the action is disabled ("don't turn off on suspend"), we still
         # want to remember whether the keyboard was already off so we can decide

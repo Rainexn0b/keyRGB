@@ -137,13 +137,16 @@ def test_restore_intent_survives_a_stale_unexecuted_restore_plan() -> None:
     inputs = PowerEventInputs(enabled=True, action_enabled=True, is_off=False)
 
     policy.handle_power_off_event(inputs)
+    assert policy.restore_pending is False
     delayed_resume = policy.handle_power_restore_event(inputs)
+    assert policy.restore_pending is True
     replacement_lid_open = policy.handle_power_restore_event(inputs)
 
     assert delayed_resume.actions == (RestoreKeyboard(),)
     assert replacement_lid_open.actions == (RestoreKeyboard(),)
 
     policy.record_power_restore_executed()
+    assert policy.restore_pending is False
     duplicate_lid_open = policy.handle_power_restore_event(inputs)
     assert duplicate_lid_open.actions == ()
 

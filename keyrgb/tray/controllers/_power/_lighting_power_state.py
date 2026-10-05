@@ -127,6 +127,9 @@ def turn_on_impl(
         _set_last_resume_at(tray, time.monotonic())
         _set_user_forced_off(tray, False)
         _set_idle_forced_off(tray, False)
+        # Manual On supersedes a stranded suspend/lid-off owner too. Leaving
+        # this latch set lights the deck but keeps source/profile polling paused.
+        _set_power_forced_off(tray, False)
         # A manual turn-on is an explicit relight intent: keep the deck from being
         # re-latched into native sleep by a firmware zero read until hardware proves
         # it is actually awake.

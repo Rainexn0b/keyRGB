@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.37.1 (2026-10-05)
+
+Suspend/wake recovery and stale AC/battery lighting-state fix.
+
+- Core/Power: Retry a received lid-open/resume restore on the next serialized power-source poll when a queued polling revision supersedes it, preventing the keyboard from remaining dark with AC/battery policy paused. Preserve the original action flag, event generation, user-off precedence, and closed-lid policy without repeating the wake delay.
+- Tray/Power: Clear stale suspend/lid-off ownership on manual Turn On so relighting the keyboard also unblocks AC/battery brightness and lighting-profile updates.
+- Tests/Docs: Add deterministic wake-cancellation, manual recovery, and battery-to-AC profile regressions, and record the host evidence and root-cause investigation.
+
 ## 0.37.0 (2026-09-19)
 
 4-zone lighting-profile UX, Tongfang lightbar isolation, and hardware-free backend emulation. The issue #13 4-zone keyboard and Front Lightbar paths remain experimental.
