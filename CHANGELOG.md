@@ -8,7 +8,7 @@ Dark keyboard after restart, Ubuntu 22.04 AppImage compatibility, and in-app har
 
 - Effects/ITE8291R3: Verify active user mode during hidden per-key startup priming and reassert it once when the controller reports positive brightness but remains inactive. Preserve no-reassert startup for an already-active deck and keep explicit-off/native-sleep policy unchanged; add regressions from the captured dark-state response.
 - Packaging: Build release AppImages on Ubuntu 22.04 with matching Python/GI bindings, reject bundled ELF requirements newer than glibc 2.35, and smoke-test both Ubuntu 22.04 and 24.04 including desktop imports and the actual launcher. Bundle the missing indicator `libdbusmenu-glib` dependency and transitive GI typelibs. On a newer build host, replace indicator libraries that exceed that ceiling with pinned Ubuntu 22.04 packages instead of shipping the host copies.
-- Installer/GUI: Add Settings → Set up hardware access and `install.sh --hardware-access-only` so an AppImage can install its bundled keyboard udev rules without downloading the full installer. Reactive input and power controls stay explicit opt-ins. The GUI uses the bundled payload and one `pkexec` authorization; it does not run the GitHub installer.
+- Installer/GUI: Add Settings → Set up hardware access and `install.sh --hardware-access-only` so an AppImage can install its bundled keyboard udev rules without downloading the full installer. Reactive input and power controls stay explicit opt-ins. The GUI uses the bundled payload and one `pkexec` authorization; it does not run the GitHub installer. The verifier's mode check is POSIX, so Ubuntu dash rejects symlinks, world-writable files, and setuid/setgid bits without bash arithmetic.
 
 ## 0.37.1 (2026-10-05)
 

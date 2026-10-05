@@ -21,9 +21,16 @@ copy_verified() {
     reject unsafe-code
   fi
   mode=$(stat -c '%a' -- "$src")
-  if [ "$((8#$mode & 8#002))" -ne 0 ] || [ "$((8#$mode & 8#6000))" -ne 0 ]; then
-    reject unsafe-code
-  fi
+  # Other-write is the last mode digit 2/3/6/7. Setuid/setgid is a four-digit
+  # mode starting with 2-7, not sticky-only 1. Keep this as case matches:
+  # dash arithmetic cannot express an octal base prefix.
+  last=${mode#"${mode%?}"}
+  case $last in
+    2|3|6|7) reject unsafe-code ;;
+  esac
+  case $mode in
+    [234567]???) reject unsafe-code ;;
+  esac
   mkdir -p -- "$(dirname -- "$dest")"
   tmp=$(mktemp)
   cp -- "$src" "$tmp"

@@ -63,6 +63,7 @@ def test_module_has_no_network_url() -> None:
     executable = "\n".join(line for line in text.splitlines() if not line.strip().startswith("#"))
     assert "raw.githubusercontent.com" not in executable
     assert "github.com" not in executable
+    assert "8#" not in setup.VERIFIER
     assert "sudo" not in setup.VERIFIER
     assert "curl" not in setup.VERIFIER
     assert "--keep-cwd" not in setup.VERIFIER
@@ -259,6 +260,13 @@ def test_verifier_rejects_symlink_and_world_writable_code(tmp_path: Path) -> Non
     world = _run_verifier(writable, library, match, payload, reactive="0", power="0")
     assert world.returncode == 12
     assert "unsafe-code" in world.stdout
+
+    setuid = tmp_path / "setuid.sh"
+    setuid.write_text("#!/bin/bash\nexit 0\n", encoding="utf-8")
+    setuid.chmod(0o4755)
+    privileged = _run_verifier(setuid, library, match, payload, reactive="0", power="0")
+    assert privileged.returncode == 12
+    assert "unsafe-code" in privileged.stdout
 
 
 def _run_verifier(
