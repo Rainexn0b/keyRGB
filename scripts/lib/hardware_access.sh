@@ -338,6 +338,86 @@ hardware_access_reload() {
   udevadm settle
 }
 
+# The authenticated caller. pkexec sets PKEXEC_UID; sudo sets SUDO_USER.
+# Prints the name or returns 1. Never returns root.
+hardware_access_invoking_user() {
+  local name
+  if [ -n "${PKEXEC_UID:-}" ]; then
+    case "$PKEXEC_UID" in
+      ''|*[!0-9]*) return 1 ;;
+    esac
+    name="$(id -nu "$PKEXEC_UID")" || return 1
+  elif [ -n "${SUDO_USER:-}" ]; then
+    name="$SUDO_USER"
+  else
+    return 1
+  fi
+  hardware_access_user_is_safe "$name" || return 1
+  printf '%s\n' "$name"
+}
+
+hardware_access_user_is_safe() {
+  local user="$1"
+  [ -n "$user" ] || return 1
+  [ "$user" != "root" ] || return 1
+  printf '%s' "$user" | grep -Eq '^[a-zA-Z_][a-zA-Z0-9._-]{0,31}$'
+}
+
+# Add the invoking user to video when missing. Prints "added" or "already".
+# Already-root caller. Does not create the video group.
+hardware_access_ensure_video_group() {
+  local user="$1"
+  local groups
+  if [ "$(id -u)" -ne 0 ]; then
+    printf 'not-root\n' >&2
+    return 1
+  fi
+  hardware_access_user_is_safe "$user" || {
+    printf 'unsafe-user\n' >&2
+    return 1
+  }
+  if ! getent passwd "$user" >/dev/null; then
+    printf 'unknown-user\n' >&2
+    return 1
+  fi
+  if ! getent group video >/dev/null; then
+    printf 'missing-video-group\n' >&2
+    return 1
+  fi
+  groups="$(id -nG "$user")"
+  case " $groups " in
+    *" video "*)
+      printf 'already\n'
+      return 0
+      ;;
+  esac
+  if ! command -v usermod >/dev/null 2>&1; then
+    printf 'missing-usermod\n' >&2
+    return 1
+  fi
+  if ! usermod -a -G video "$user"; then
+    printf 'usermod-failed\n' >&2
+    return 1
+  fi
+  printf 'added\n'
+}
+
+# User-install entry. Uses sudo when the caller is not already root.
+hardware_access_ensure_invoking_video_group() {
+  local user lib
+  if [ "$(id -u)" -eq 0 ]; then
+    user="$(hardware_access_invoking_user)" || {
+      printf 'missing-invoking-user\n' >&2
+      return 1
+    }
+    hardware_access_ensure_video_group "$user"
+    return
+  fi
+  user="$(id -un)"
+  lib="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/hardware_access.sh"
+  sudo /bin/bash -c 'source "$1" && hardware_access_ensure_video_group "$2"' _ "$lib" "$user"
+}
+
 # Install selected payloads under dest_root. Already-root caller. No sudo.
 # hash_file empty means CLI checkout: hashes are not required.
 hardware_access_apply() {
@@ -347,6 +427,7 @@ hardware_access_apply() {
   local power="$4"
   local hash_file="${5:-}"
   local row kind rel dest_rel mode src dest parent expected actual key known action old_ifs
+  local target_user video_state video_err video_reason
   local -a written=()
   local written_csv=""
 
@@ -370,6 +451,12 @@ hardware_access_apply() {
   fi
   if [ "$power" = 1 ] && ! command -v python3 >/dev/null 2>&1; then
     hardware_access_finish "$HARDWARE_ACCESS_EXIT_PREREQUISITE" prerequisite missing-python3
+  fi
+  if ! target_user="$(hardware_access_invoking_user)"; then
+    hardware_access_finish "$HARDWARE_ACCESS_EXIT_PREREQUISITE" prerequisite missing-invoking-user
+  fi
+  if ! getent group video >/dev/null; then
+    hardware_access_finish "$HARDWARE_ACCESS_EXIT_PREREQUISITE" prerequisite missing-video-group
   fi
   if ! hardware_access_load_hashes "$hash_file"; then
     hardware_access_finish "$HARDWARE_ACCESS_EXIT_FAILED" failed "bad-hash written=none"
@@ -450,5 +537,16 @@ hardware_access_apply() {
     fi
     hardware_access_finish "$HARDWARE_ACCESS_EXIT_FAILED" failed "reload written=${written_csv}"
   fi
-  hardware_access_finish "$HARDWARE_ACCESS_EXIT_OK" installed
+  video_err="$(mktemp)"
+  if ! video_state="$(hardware_access_ensure_video_group "$target_user" 2>"$video_err")"; then
+    video_reason="$(head -n 1 "$video_err" 2>/dev/null || true)"
+    rm -f -- "$video_err"
+    written_csv="none"
+    if [ "${#written[@]}" -gt 0 ]; then
+      written_csv="$(IFS=','; printf '%s' "${written[*]}")"
+    fi
+    hardware_access_finish "$HARDWARE_ACCESS_EXIT_FAILED" failed "video-group ${video_reason:-group-add} written=${written_csv}"
+  fi
+  rm -f -- "$video_err"
+  hardware_access_finish "$HARDWARE_ACCESS_EXIT_OK" installed "video-group=${video_state}"
 }

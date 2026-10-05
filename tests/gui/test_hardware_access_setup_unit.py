@@ -96,7 +96,7 @@ def test_pkexec_argv_keeps_paths_out_of_the_script(tmp_path: Path) -> None:
     argv = setup.build_pkexec_argv(
         staged,
         payload_dir=stage / "system",
-        request=_request(),
+        request=_request(power_controls=False),
         pkexec="/usr/bin/pkexec",
     )
 

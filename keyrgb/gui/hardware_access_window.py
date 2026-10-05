@@ -85,8 +85,9 @@ def build_hardware_access_window(
     )
     explanation.pack(anchor="w", fill="x", padx=12, pady=(12, 8))
 
-    reactive = tk.BooleanVar(master=root, value=False)
-    power = tk.BooleanVar(master=root, value=False)
+    defaults = HardwareAccessRequest()
+    reactive = tk.BooleanVar(master=root, value=defaults.reactive_input)
+    power = tk.BooleanVar(master=root, value=defaults.power_controls)
     ttk.Checkbutton(
         root,
         text="Reactive input (allows observing keypresses)",
@@ -94,7 +95,7 @@ def build_hardware_access_window(
     ).pack(anchor="w", padx=12)
     ttk.Checkbutton(
         root,
-        text="Power controls (optional, not required for keyboard color)",
+        text="Power controls (included by default; not required for keyboard color)",
         variable=power,
     ).pack(anchor="w", padx=12, pady=(0, 8))
 

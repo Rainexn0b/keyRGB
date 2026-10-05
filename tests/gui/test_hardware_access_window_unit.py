@@ -32,7 +32,8 @@ def test_explanation_states_optional_access_and_removal() -> None:
     text = setup_explanation()
     assert "observing keypresses" in text
     assert "video group" in text
-    assert "will not fix that" in text
+    assert "Log out and back in" in text
+    assert "Power controls are included" in text
     assert "Skipping setup does not remove" in text
     assert "manual deletion of the managed filenames" in text
     assert "does not uninstall" in text
@@ -77,9 +78,13 @@ def test_installed_result_does_not_claim_usable_hardware() -> None:
     assert "not mean the keyboard is usable" in text
 
     blocked = format_setup_result(_outcome("installed"), in_video=False)
-    assert "incomplete" in blocked
-    assert "will not fix that" in blocked
-    assert "video group" in blocked
+    assert "not in the video group" in blocked
+    assert "Log out and back in" in blocked
+    assert "usable yet" in blocked
+
+    added = format_setup_result(_outcome("installed", "video-group=added"), in_video=False)
+    assert "added to the video group" in added
+    assert "does not add" not in added
 
 
 def test_unknown_write_state_is_not_reported_as_clean() -> None:

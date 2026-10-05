@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.38.1 (2026-10-05)
+
+Hardware-access setup parity with the one-line installer.
+
+- Installer/GUI: Make hardware-access setup match the user installer's default hardware set. Power controls are included unless turned off, and the same privileged step adds the user to the video group when needed. A new membership still needs a logout before sysfs backlight access works. Reactive input stays opt-in. The AppImage is not moved.
+
 ## 0.38.0 (2026-10-05)
 
 Dark keyboard after restart, Ubuntu 22.04 AppImage compatibility, and in-app hardware-access setup.

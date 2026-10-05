@@ -60,14 +60,14 @@ class RuleCompare:
 
 
 def setup_explanation() -> str:
-    """Text shown before authorization. Optional access stays unchecked in the UI."""
+    """Text shown before authorization. Reactive input stays unchecked."""
 
     return (
-        "KeyRGB can install the keyboard USB and sysfs access rules already bundled with this version. "
-        "The sysfs rule assigns keyboard backlight files to the video group. "
-        "Your user needs to be in video; logging out and back in will not fix that by itself if you are not in the group. "
-        "Reactive input is separate and allows observing keypresses, not just lighting changes. "
-        "Power controls are also separate. "
+        "KeyRGB installs the keyboard USB and sysfs rules bundled with this version, "
+        "and adds your user to the video group when needed. "
+        "Log out and back in before sysfs backlight access works. "
+        "Power controls are included unless you turn them off. "
+        "Reactive input stays off unless you select it, and allows observing keypresses, not just lighting changes. "
         "Skipping setup does not remove files already installed. "
         "Removal is the existing uninstaller or manual deletion of the managed filenames. "
         "This window does not uninstall."
@@ -143,10 +143,15 @@ def format_setup_result(
     lines = [f"{outcome.outcome}: {outcome.detail}".strip()]
     if outcome.outcome == "installed":
         lines = ["Hardware-access files were installed or already current."]
-        if in_video is False:
+        if "video-group=added" in outcome.detail:
             lines.append(
-                "Activation is incomplete. The sysfs rule needs your user to be in the video group. "
-                "Logging out and back in will not fix that, because this setup does not add the group."
+                "You were added to the video group. Log out and back in before sysfs keyboard backlight access works. "
+                "This does not mean the keyboard is usable yet."
+            )
+        elif in_video is False:
+            lines.append(
+                "This session is not in the video group. Log out and back in before sysfs keyboard backlight access works. "
+                "This does not mean the keyboard is usable yet."
             )
         else:
             lines.append(

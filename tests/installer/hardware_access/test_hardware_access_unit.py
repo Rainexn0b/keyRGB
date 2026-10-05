@@ -82,6 +82,7 @@ def _tool_path(tmp_path: Path, *, udevadm: str | None, include_python: bool, ins
         "basename",
         "curl",
         "sudo",
+        "head",
     ):
         if shutil.which(name):
             _link_tool(bin_dir, name)
@@ -93,6 +94,37 @@ def _tool_path(tmp_path: Path, *, udevadm: str | None, include_python: bool, ins
         _write_executable(bin_dir / "udevadm", udevadm)
     if include_python:
         _link_tool(bin_dir, "python3")
+    _write_executable(
+        bin_dir / "id",
+        """#!/bin/bash
+if [ "$1" = "-u" ]; then printf '0\\n'; exit 0; fi
+if [ "$1" = "-nG" ]; then printf '%s\\n' "${KEYRGB_TEST_GROUPS:-testuser video}"; exit 0; fi
+if [ "$1" = "-nu" ] || [ "$1" = "-un" ]; then printf 'testuser\\n'; exit 0; fi
+printf '0\\n'
+""",
+    )
+    _write_executable(
+        bin_dir / "getent",
+        """#!/bin/bash
+if [ "$1" = "group" ] && [ "$2" = "video" ]; then
+  if [ "${KEYRGB_TEST_NO_VIDEO_GROUP:-0}" = 1 ]; then exit 2; fi
+  printf '%s\\n' "video:x:39:"
+  exit 0
+fi
+if [ "$1" = "passwd" ]; then
+  printf '%s\\n' "testuser:x:1000:1000::/home/testuser:/bin/bash"
+  exit 0
+fi
+exit 2
+""",
+    )
+    _write_executable(
+        bin_dir / "usermod",
+        """#!/bin/bash
+printf '%s\\n' "$*" >> "${KEYRGB_TEST_USERMOD_LOG:-/dev/null}"
+exit 0
+""",
+    )
     return bin_dir
 
 
@@ -118,6 +150,7 @@ def _apply(
     install_text: str | None = None,
     include_python: bool = True,
     include_udevadm: bool = True,
+    extra_env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     log = tmp_path / "udevadm.log"
     if include_udevadm:
@@ -137,7 +170,10 @@ def _apply(
     source "{_LIB}"
     hardware_access_apply "{payload_dir}" "{dest}" "{reactive}" "{power}" "{hash_arg}"
     """
-    return _run(script, env={"PATH": str(bin_dir)})
+    env = {"PATH": str(bin_dir), "SUDO_USER": "testuser"}
+    if extra_env:
+        env.update(extra_env)
+    return _run(script, env=env)
 
 
 def _result_line(completed: subprocess.CompletedProcess[str]) -> str:
@@ -151,7 +187,7 @@ def test_keyboard_only_installs_shipped_rules_and_reloads(tmp_path: Path) -> Non
     completed = _apply(tmp_path, dest)
 
     assert completed.returncode == 0, completed.stderr
-    assert _result_line(completed) == "keyrgb-hardware-access: installed"
+    assert _result_line(completed) == "keyrgb-hardware-access: installed video-group=already"
     usb = dest / "etc/udev/rules.d/99-ite8291-wootbook.rules"
     sysfs = dest / "etc/udev/rules.d/99-keyrgb-sysfs-leds.rules"
     assert usb.read_bytes() == (_SYSTEM / _USB_REL).read_bytes()
@@ -200,16 +236,41 @@ def test_environment_defaults_do_not_select_optional_components(tmp_path: Path) 
         f"'{_ENTRY}' --payload-dir '{_SYSTEM}'",
         env={
             "PATH": f"{bin_dir}:/usr/bin:/bin",
-            "KEYRGB_INSTALL_POWER_HELPER": "y",
+            "KEYRGB_INSTALL_POWER_HELPER": "n",
             "KEYRGB_INSTALL_INPUT_UDEV": "y",
         },
     )
     assert completed.returncode == 0, completed.stderr
     sudo_text = sudo_log.read_text(encoding="utf-8")
     assert "--payload-dir" in sudo_text
-    assert "--power-controls" not in sudo_text
+    assert "--power-controls" in sudo_text
+    assert "--no-power-controls" not in sudo_text
     assert "--reactive-input" not in sudo_text
     assert "/etc/udev" not in completed.stdout
+
+
+def test_default_setup_adds_missing_video_group_after_rules(tmp_path: Path) -> None:
+    dest = _dest_tree(tmp_path)
+    usermod_log = tmp_path / "usermod.log"
+    completed = _apply(
+        tmp_path,
+        dest,
+        extra_env={"KEYRGB_TEST_GROUPS": "testuser", "KEYRGB_TEST_USERMOD_LOG": str(usermod_log)},
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert _result_line(completed) == "keyrgb-hardware-access: installed video-group=added"
+    assert usermod_log.read_text(encoding="utf-8").strip() == "-a -G video testuser"
+    assert (dest / "etc/udev/rules.d/99-ite8291-wootbook.rules").is_file()
+
+
+def test_missing_video_group_writes_nothing(tmp_path: Path) -> None:
+    dest = _dest_tree(tmp_path)
+    completed = _apply(tmp_path, dest, extra_env={"KEYRGB_TEST_NO_VIDEO_GROUP": "1"})
+
+    assert completed.returncode == 10, completed.stderr
+    assert "missing-video-group" in _result_line(completed)
+    assert not (dest / "etc/udev/rules.d/99-ite8291-wootbook.rules").exists()
 
 
 def test_missing_udevadm_writes_nothing(tmp_path: Path) -> None:

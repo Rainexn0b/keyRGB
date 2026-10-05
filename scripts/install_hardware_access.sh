@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# Hardware-access entrypoint. Keyboard USB/sysfs rules are the default.
-# Reactive input and power controls are explicit opt-in flags. This script does
-# not source the installer loader and does not fall back to the main branch.
+# Hardware-access entrypoint. Keyboard USB/sysfs rules and the power helper are
+# the default, matching the user installer. Reactive input stays opt-in. This
+# script does not source the installer loader and does not fall back to main.
 
 set -euo pipefail
 
@@ -14,19 +14,22 @@ source "$SCRIPT_DIR/lib/hardware_access.sh"
 usage() {
   cat <<'EOF'
 Usage:
-  install_hardware_access.sh [--reactive-input] [--power-controls]
+  install_hardware_access.sh [--reactive-input] [--power-controls] [--no-power-controls]
                              [--payload-dir <dir>] [--ref <git-ref>] [--hash <rel>=<sha256>]
 
 Installs KeyRGB hardware-access files only. Does not download an AppImage,
 change desktop integration, or install packages.
 
 Default:
-  USB/hidraw and sysfs keyboard rules.
+  USB/hidraw and sysfs keyboard rules, the power helper and its polkit files,
+  and membership in the video group when the caller is not already a member.
+  A new group membership needs a logout before sysfs backlight access works.
 
 Optional:
-  --reactive-input    Also install the keyboard input-event uaccess rule.
-  --power-controls    Also install the power helper and its polkit files.
-                      Requires host python3. Not selected by environment defaults.
+  --reactive-input     Also install the keyboard input-event uaccess rule.
+  --power-controls     Install the power helper. This is the default.
+  --no-power-controls  Skip the power helper and its polkit files.
+                       Environment defaults are ignored. Power files need host python3.
 
 Payload:
   --payload-dir <dir> Internal. Directory shaped like system/ (udev/, bin/, polkit/).
@@ -45,7 +48,7 @@ EOF
 PAYLOAD_DIR=""
 REF=""
 REACTIVE=0
-POWER=0
+POWER=1
 HASH_ARGS=()
 
 while [ "$#" -gt 0 ]; do
@@ -56,6 +59,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --power-controls)
       POWER=1
+      shift
+      ;;
+    --no-power-controls)
+      POWER=0
       shift
       ;;
     --payload-dir)
@@ -91,6 +98,8 @@ if [ "$REACTIVE" -eq 1 ]; then
 fi
 if [ "$POWER" -eq 1 ]; then
   forward_flags+=(--power-controls)
+else
+  forward_flags+=(--no-power-controls)
 fi
 if [ "${#HASH_ARGS[@]}" -gt 0 ]; then
   for hash_arg in "${HASH_ARGS[@]}"; do

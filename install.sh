@@ -13,7 +13,7 @@ set -euo pipefail
 
 KEYRGB_REPO_OWNER="${KEYRGB_REPO_OWNER:-Rainexn0b}"
 KEYRGB_REPO_NAME="${KEYRGB_REPO_NAME:-keyRGB}"
-KEYRGB_BOOTSTRAP_REF="${KEYRGB_BOOTSTRAP_REF:-v0.38.0}"
+KEYRGB_BOOTSTRAP_REF="${KEYRGB_BOOTSTRAP_REF:-v0.38.1}"
 
 usage() {
     cat <<'EOF'
@@ -24,11 +24,12 @@ Modes:
     (default)  User install: AppImage + udev + desktop integration
     --dev      Dev install: build deps + pip editable install
     --hardware-access-only
-               Install keyboard access rules only. Optional module args:
-               --reactive-input, --power-controls. Does not download an AppImage.
+               Install the same hardware set as the user installer, without
+               moving an AppImage. Defaults: keyboard rules, video group, and
+               the power helper. Optional: --reactive-input, --no-power-controls.
 
 Bootstrap (curl installs):
-    --ref <git-ref>    Git ref for downloading scripts/ from GitHub raw (default: v0.38.0)
+    --ref <git-ref>    Git ref for downloading scripts/ from GitHub raw (default: v0.38.1)
     KEYRGB_BOOTSTRAP_REF can also be used.
 
 Examples:
@@ -209,7 +210,7 @@ bootstrap_and_run() {
     case "$KEYRGB_BOOTSTRAP_REF" in
         main|master|HEAD|develop)
             echo "⚠️  Bootstrap ref is '${KEYRGB_BOOTSTRAP_REF}' (mutable branch). For reproducible and safer installs, use a tagged release URL, e.g.:" >&2
-            echo "   curl -fsSL https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/v0.38.0/install.sh | bash" >&2
+            echo "   curl -fsSL https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/v0.38.1/install.sh | bash" >&2
             ;;
     esac
 

@@ -75,6 +75,8 @@ if [ "$reactive" = 1 ]; then
 fi
 if [ "$power" = 1 ]; then
   set -- "$@" --power-controls
+else
+  set -- "$@" --no-power-controls
 fi
 while IFS= read -r hash_line; do
   set -- "$@" --hash "$hash_line"

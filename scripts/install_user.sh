@@ -234,6 +234,23 @@ RAW_REF="${resolved_ref:-main}"
 # explicit reinstall concern because they live under /etc and require sudo.
 if [ "$UPDATE_ONLY" -ne 1 ]; then
   install_udev_rule_from_ref "$RAW_REF"
+  video_err="$(mktemp)"
+  if video_state="$(hardware_access_ensure_invoking_video_group 2>"$video_err")"; then
+    case "$video_state" in
+      added)
+        log_ok "Added ${USER:-the user} to the video group. Log out and back in before sysfs backlight access works."
+        ;;
+      already)
+        log_info "User is already in the video group."
+        ;;
+      *)
+        log_info "Video group step finished (${video_state})."
+        ;;
+    esac
+  else
+    log_warn "Could not add the user to the video group ($(head -n 1 "$video_err" 2>/dev/null || true)). Sysfs keyboard backlight may stay inaccessible until that membership exists and you log in again."
+  fi
+  rm -f -- "$video_err"
 else
   log_info "Skipping udev rule installation (update-only)."
 fi

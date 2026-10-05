@@ -37,10 +37,14 @@ _POWER_FILES = (_HELPER, _POLKIT_RULE, _POLKIT_ACTION)
 
 @dataclass(frozen=True, slots=True)
 class HardwareAccessRequest:
-    """Explicit component selection. Environment defaults are ignored."""
+    """Component selection. Environment defaults are ignored.
+
+    Power controls default on, matching the user installer. Reactive input stays
+    off unless selected.
+    """
 
     reactive_input: bool = False
-    power_controls: bool = False
+    power_controls: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,8 +76,8 @@ def terminal_command(request: HardwareAccessRequest) -> str:
     parts = ["install.sh", "--hardware-access-only"]
     if request.reactive_input:
         parts.append("--reactive-input")
-    if request.power_controls:
-        parts.append("--power-controls")
+    if not request.power_controls:
+        parts.append("--no-power-controls")
     return " ".join(parts)
 
 
