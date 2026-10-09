@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.38.2 (2026-10-09)
+
+Dark-theme polish and AppImage update metadata.
+
+- GUI: Polish the shared dark theme with flat buttons, dark notebook tabs, muted field borders and dividers, borderless section headings, and themed checkboxes, sliders, and preview defaults. Preserve visible keyboard focus, disabled states, native control spacing, and the light theme; leave keyboard artwork and layout unchanged.
+- GUI: Add a thin full-width divider beneath the editor's Profiles, Setup, and Advanced tabs. Remove the extra square focus outline around dark notebook tabs while retaining the native label-level keyboard focus cue.
+- Packaging/Release: Embed latest-stable AppImage update metadata, require `zsyncmake`, and validate the embedded information plus zsync length, SHA-1, filename, URL, and block checksum table. Publish `keyrgb-x86_64.AppImage.zsync` alongside the AppImage and existing SHA-256 sidecar for opt-in delta updates with external AppImageUpdate. No updater, automatic update checks, or update-related network access are bundled; the installer update flow is unchanged.
+- Docs: Refresh the README screenshot gallery for the current Profiles, Setup, Advanced, Settings, uniform color, and reactive color interfaces, including the renamed editor assets.
+
+Controller-sleep and fade behavior is unchanged; the investigated temporary-dim and power-policy follow-ups are not included in this release. Existing commands, settings, profile formats, and hardware IDs are unchanged.
+
 ## 0.38.1 (2026-10-05)
 
 Hardware-access setup parity with the one-line installer.

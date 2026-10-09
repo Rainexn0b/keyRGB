@@ -40,6 +40,7 @@ jobs:
             build-essential \
             file \
             squashfs-tools \
+            zsync \
             python3-gi \
             gir1.2-gtk-3.0 \
             gir1.2-ayatanaappindicator3-0.1 \
@@ -60,10 +61,11 @@ jobs:
         run: |
           python -m buildpython --profile=release
 
-      - name: Verify AppImage output
+      - name: Verify AppImage and zsync output
         run: |
           ls -la dist || true
-          test -f dist/keyrgb-x86_64.AppImage
+          test -s dist/keyrgb-x86_64.AppImage
+          test -s dist/keyrgb-x86_64.AppImage.zsync
 
       - name: Upload release build logs on failure
         if: failure()
@@ -87,5 +89,6 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" \
             dist/keyrgb-x86_64.AppImage \
+            dist/keyrgb-x86_64.AppImage.zsync \
             dist/keyrgb-x86_64.AppImage.sha256 \
             --generate-notes

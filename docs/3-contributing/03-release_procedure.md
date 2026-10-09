@@ -32,6 +32,10 @@ runtime requirements declared in pyproject rather than arbitrary ambient package
 
 Then run the safe release flow:
 
+AppImage builds require `zsyncmake` (the `zsync` package on Debian/Ubuntu).
+Buildpython validates the embedded update information and the `.zsync` sidecar's
+length, SHA-1, filename, URL, and block checksum table before release upload.
+
 ```bash
 .venv/bin/python -m buildpython --profile=release
 git add -A
@@ -40,6 +44,20 @@ git push origin main
 git tag -a vX.Y.Z -m "vX.Y.Z"
 git push origin vX.Y.Z
 ```
+
+After the release workflow succeeds, verify that the GitHub Release contains all
+three nonempty assets:
+
+- `keyrgb-x86_64.AppImage`
+- `keyrgb-x86_64.AppImage.zsync`
+- `keyrgb-x86_64.AppImage.sha256`
+
+The embedded update information is
+`gh-releases-zsync|Rainexn0b|keyRGB|latest|keyrgb-x86_64.AppImage.zsync`.
+It enables opt-in delta updates with external AppImageUpdate to the latest stable
+release only; it is not a pinned-version or prerelease channel. No updater,
+automatic update checks, or update-related network access are bundled in KeyRGB.
+The installer's `--update-appimage` flow is unchanged.
 
 Release notes:
 

@@ -21,6 +21,7 @@ from . import (
 from .compatibility import validate_appdir_glibc
 from .hardware_access_bundle import bundle_hardware_access
 from .tkinter_bundle import runtime_script_env_exports
+from .update_metadata import packaging_args, require_zsyncmake, validate_update_artifacts
 
 # Pin appimagetool to a versioned upstream release with an immutable digest.
 # Do not use AppImageKit/continuous: that asset is mutable and unsigned by URL alone.
@@ -92,6 +93,9 @@ def build_appimage() -> Path:
 
     staging_only = env_flag("KEYRGB_APPIMAGE_STAGING_ONLY")
     skip_deps = staging_only or env_flag("KEYRGB_APPIMAGE_SKIP_DEPS")
+
+    if not staging_only:
+        require_zsyncmake()
 
     if appdir.exists():
         shutil.rmtree(appdir)
@@ -188,16 +192,21 @@ def build_appimage() -> Path:
 
     if out.exists():
         out.unlink()
+    Path(f"{out}.zsync").unlink(missing_ok=True)
 
     env = {"APPIMAGE_EXTRACT_AND_RUN": "1", "ARCH": "x86_64"}
     run_checked(
-        [str(appimagetool), "--appimage-extract-and-run", str(appdir), str(out)],
-        cwd=root,
+        packaging_args(appimagetool, appdir, out),
+        # zsyncmake emits its sidecar in the working directory, not beside an
+        # absolute destination passed to appimagetool.
+        cwd=dist,
         env=env,
     )
 
     if not out.exists():
         raise SystemExit(f"AppImage build did not produce: {out}")
+
+    validate_update_artifacts(out)
 
     print(f"Built AppImage: {out}")
     return out

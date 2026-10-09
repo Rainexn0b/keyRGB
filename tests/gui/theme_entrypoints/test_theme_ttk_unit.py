@@ -17,14 +17,32 @@ class _FakeStyle:
     def theme_use(self, name: str) -> None:
         self.theme_calls.append(name)
 
+    def layout(self, name: str, layout: list) -> None:
+        assert name == "TSeparator"
+
+    def theme_names(self) -> tuple[str, ...]:
+        return ("clam",)
+
+    def theme_create(self, name: str, *, parent: str, settings: dict) -> None:
+        assert name == ttk_theme.DARK_THEME_NAME and parent == "clam"
+        assert "TButton" in settings
+
     def lookup(self, style_name: str, option: str) -> str:
         return self._lookups.get((style_name, option), "")
 
-    def configure(self, style_name: str, **kwargs: object) -> None:
+    def configure(self, style_name: str, **kwargs: object) -> object:
+        if not kwargs:
+            return _configured_calls(self).get(style_name, {})
         self.configure_calls.append((style_name, kwargs))
+        return None
 
-    def map(self, style_name: str, **kwargs: object) -> None:
+    def map(self, style_name: str, option: str | None = None, **kwargs: object) -> object:
+        if option is not None:
+            return _mapped_calls(self)[style_name][option]
+        if not kwargs:
+            return _mapped_calls(self).get(style_name, {})
         self.map_calls.append((style_name, kwargs))
+        return None
 
 
 class _FakeRoot:
@@ -39,6 +57,10 @@ class _FakeRoot:
         self.configure_calls: list[dict[str, object]] = []
         self.tk_calls: list[tuple[object, ...]] = []
         self.tk = SimpleNamespace(call=self._tk_call)
+        self.option_calls: list[tuple[str, str, str]] = []
+
+    def option_add(self, pattern: str, value: str, priority: str) -> None:
+        self.option_calls.append((pattern, value, priority))
 
     def configure(self, **kwargs: object) -> None:
         self.configure_calls.append(kwargs)
@@ -66,7 +88,10 @@ def _headless_fonts(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _configured_calls(style: _FakeStyle) -> dict[str, dict[str, object]]:
-    return {style_name: kwargs for style_name, kwargs in style.configure_calls}
+    merged: dict[str, dict[str, object]] = {}
+    for style_name, kwargs in style.configure_calls:
+        merged.setdefault(style_name, {}).update(kwargs)
+    return merged
 
 
 def _mapped_calls(style: _FakeStyle) -> dict[str, dict[str, object]]:
@@ -187,26 +212,40 @@ def test_apply_clam_dark_theme_configures_dark_palette_and_centralized_checkbutt
     bg_color, fg_color = ttk_theme.apply_clam_dark_theme(root)
 
     assert (bg_color, fg_color) == ("#2b2b2b", "#e0e0e0")
-    assert style.theme_calls == ["clam"]
+    assert style.theme_calls == ["clam", ttk_theme.DARK_THEME_NAME]
     assert root.configure_calls == [{"bg": "#2b2b2b"}]
 
     configured = _configured_calls(style)
     assert configured["TFrame"] == {"background": "#2b2b2b"}
     assert configured["TLabel"] == {"background": "#2b2b2b", "foreground": "#e0e0e0"}
-    assert configured["TButton"] == {"background": "#404040", "foreground": "#e0e0e0"}
-    assert configured["TLabelframe"] == {"background": "#2b2b2b", "foreground": "#e0e0e0"}
+    assert configured["TButton"]["background"] == "#404040"
+    assert configured["TButton"]["foreground"] == "#e0e0e0"
+    assert configured["TButton"]["relief"] == "flat"
+    assert configured["TLabelframe"] == {
+        "background": "#2b2b2b",
+        "foreground": "#e0e0e0",
+        "borderwidth": 0,
+        "relief": "flat",
+    }
     assert configured["TLabelframe.Label"] == {"background": "#2b2b2b", "foreground": "#e0e0e0"}
-    assert configured["TRadiobutton"] == {"background": "#2b2b2b", "foreground": "#e0e0e0"}
-    assert configured["TEntry"] == {"fieldbackground": "#3a3a3a", "foreground": "#e0e0e0"}
-    assert configured["TCombobox"] == {"fieldbackground": "#3a3a3a", "foreground": "#e0e0e0"}
-    assert configured["TSpinbox"] == {"fieldbackground": "#3a3a3a", "foreground": "#e0e0e0"}
-    assert configured["TScale"] == {"background": "#2b2b2b", "troughcolor": "#3a3a3a"}
-    assert configured["TScrollbar"] == {"background": "#2b2b2b", "troughcolor": "#3a3a3a"}
-    assert configured["TCheckbutton"] == {"background": "#2b2b2b", "foreground": "#e0e0e0"}
+    for name in ("TEntry", "TCombobox", "TSpinbox"):
+        assert configured[name]["fieldbackground"] == "#3a3a3a"
+        assert configured[name]["foreground"] == "#e0e0e0"
+        assert configured[name]["bordercolor"] == ttk_theme.DARK_BORDER
+    for name in ("TScale", "TScrollbar"):
+        assert configured[name]["background"] == (
+            ttk_theme.DARK_FOCUS if name == "TScale" else ttk_theme.DARK_BUTTON_BG
+        )
+        assert configured[name]["troughcolor"] == "#3a3a3a"
+    for name in ("TCheckbutton", "TRadiobutton"):
+        assert configured[name]["background"] == "#2b2b2b"
+        assert configured[name]["foreground"] == "#e0e0e0"
+        assert configured[name]["indicatorbackground"] == "#3a3a3a"
 
     mapped = _mapped_calls(style)
     assert mapped["TButton"]["background"] == [
         ("disabled", "#2b2b2b"),
+        ("pressed", "#3a3a3a"),
         ("active", "#505050"),
         ("focus", "#505050"),
     ]
@@ -228,6 +267,34 @@ def test_apply_clam_dark_theme_configures_dark_palette_and_centralized_checkbutt
         ("disabled", ttk_theme.DARK_DISABLED_FG),
         ("!disabled", "#e0e0e0"),
     ]
+
+
+def test_dark_surfaces_override_stock_bevels_tabs_and_indicators(monkeypatch: pytest.MonkeyPatch) -> None:
+    style = _FakeStyle()
+    root = _FakeRoot()
+    _patch_style(monkeypatch, style)
+    ttk_theme.apply_clam_dark_theme(root)
+    configured = _configured_calls(style)
+    mapped = _mapped_calls(style)
+    for name in ("TButton", *metrics.SEMANTIC_BUTTON_STYLES):
+        assert configured[name]["relief"] == "flat"
+        assert mapped[name]["bordercolor"][0:2] == [("disabled", ttk_theme.DARK_BG), ("focus", ttk_theme.DARK_FOCUS)]
+        assert mapped[name]["background"][1] == ("pressed", ttk_theme.DARK_FIELD_BG)
+        assert "lightcolor" in mapped[name] and "darkcolor" in mapped[name]
+    assert configured["TNotebook"]["borderwidth"] == 0
+    assert mapped["TNotebook.Tab"]["background"][1] == ("selected", ttk_theme.DARK_FIELD_BG)
+    assert mapped["TNotebook.Tab"]["bordercolor"] == [
+        ("disabled", ttk_theme.DARK_BG),
+        ("selected", ttk_theme.DARK_FIELD_BG),
+        ("!selected", ttk_theme.DARK_BG),
+    ]
+    assert configured["TNotebook.Tab"]["focuscolor"] == ttk_theme.DARK_FOCUS
+    for name in ("TCheckbutton", "TRadiobutton"):
+        assert configured[name]["indicatorbackground"] == ttk_theme.DARK_FIELD_BG
+        assert mapped[name]["indicatorbackground"][0] == ("disabled", ttk_theme.DARK_BG)
+        assert mapped[name]["upperbordercolor"][0] == ("focus", ttk_theme.DARK_FOCUS)
+    assert configured["TScale"]["gripsize"] == 0
+    assert ("*Canvas.highlightBackground", ttk_theme.DARK_BORDER, "widgetDefault") in root.option_calls
 
 
 def test_apply_clam_dark_theme_tolerates_scaling_and_root_configure_failures(

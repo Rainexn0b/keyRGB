@@ -21,6 +21,7 @@ class _FakeWidget:
         self.configure_calls = []
         self.pack_calls = []
         self.grid_calls = []
+        self.place_calls = []
         self.bind_calls = []
         self.columnconfigure_calls = []
         self.rowconfigure_calls = []
@@ -44,6 +45,9 @@ class _FakeWidget:
 
     def grid(self, **kwargs) -> None:
         self.grid_calls.append(dict(kwargs))
+
+    def place(self, **kwargs) -> None:
+        self.place_calls.append(dict(kwargs))
 
     def bind(self, event, callback, add=None) -> None:
         self.bind_calls.append((event, callback, add))

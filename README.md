@@ -24,9 +24,9 @@ ASUS Aura paths are supported when the hardware exposes them.
 |---|---|
 | ![Tray menu effects](assets/screenshots/trayeffects.png) | ![Tray power menu](assets/screenshots/traypp.png) |
 
-| **Per-Key Editor** | **Settings** |
+| **Per-Key Editor — Profiles** | **Settings** |
 |---|---|
-| ![Per-key editor](assets/screenshots/perkeyux.png) | ![Settings UI](assets/screenshots/settings.png) |
+| ![Per-key editor Profiles tab](assets/screenshots/perkeyprofiles.png) | ![Settings UI](assets/screenshots/settings.png) |
 
 | **Tray Menu (Brightness)** | **RAM / CPU Usage** |
 |---|---|
@@ -35,17 +35,21 @@ ASUS Aura paths are supported when the hardware exposes them.
 <details>
 <summary><b>More screenshots</b></summary>
 
+| **Per-Key Editor — Setup** | **Per-Key Editor — Advanced** |
+|---|---|
+| ![Per-key editor Setup tab](assets/screenshots/perkeysetup.png) | ![Per-key editor Advanced tab](assets/screenshots/perkeyadvanced.png) |
+
 | **Tray Menu (Software Effects)** | **Tray Menu (Keyboard / Profiles)** |
 |---|---|
 | ![Tray menu software effects](assets/screenshots/trayeffectssw.png) | ![Tray menu keyboard and profiles](assets/screenshots/traykbp.png) |
 
-| **Uniform Color UI** | **Per-Key Calibrator** |
+| **Uniform Color UI** | **Reactive Typing** |
 |---|---|
-| ![Uniform color UI](assets/screenshots/uniformcolorux.png) | ![Per-key calibrator](assets/screenshots/perkeycalux.png) |
+| ![Uniform color UI](assets/screenshots/uniformcolorux.png) | ![Reactive typing](assets/screenshots/reactivekb.png) |
 
-| **Keymap Calibration** | **Reactive Typing** |
-|---|---|
-| ![Keymap calibration](assets/screenshots/keymapcalux.png) | ![Reactive typing](assets/screenshots/reactivekb.png) |
+**Keymap Calibration**
+
+![Keymap calibration](assets/screenshots/keymapcalux.png)
 
 </details>
 
@@ -91,6 +95,14 @@ Notes:
 - On Arch/CachyOS, install `fuse2` for native AppImage/FUSE launching: `sudo pacman -S --needed fuse2`. KeyRGB also installs a launcher wrapper that falls back to `--appimage-extract-and-run` when `libfuse.so.2` is unavailable.
 - On Debian/Ubuntu/Linux Mint, the AppImage path is usually enough for a first install. Optional kernel-driver installs are best-effort and may require TUXEDO package sources; KeyRGB does not add third-party apt repos automatically.
 - The installer bootstraps sub-scripts from the pinned release tag by default. To override, pass `--ref <git-ref>` or set `KEYRGB_BOOTSTRAP_REF=<git-ref>`.
+
+Optional delta updates (starting with 0.38.2): AppImages embed update metadata for external
+[AppImageUpdate](https://github.com/AppImageCommunity/AppImageUpdate), using the
+published `keyrgb-x86_64.AppImage.zsync` sidecar. This is opt-in and targets the
+latest stable release only, not pinned versions or prereleases. KeyRGB bundles
+no updater and performs no automatic update checks or update-related network
+access. The installer's `--update-appimage` flow above is unchanged; releases
+still include the existing `.sha256` checksum sidecar.
 
 ### Uninstall
 

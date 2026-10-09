@@ -233,6 +233,12 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
     assert editor._profiles_tab.parent is notebook
     assert editor._setup_tab.parent is notebook
     assert editor._advanced_tab.parent is notebook
+    for tab in (editor._profiles_tab, editor._setup_tab, editor._advanced_tab):
+        assert tab.options["padding"] == (0, 6, 0, 0)
+        divider = next(
+            child for child in tab.children if child.options.get("style") == theme_metrics.TAB_DIVIDER_FRAME_STYLE
+        )
+        assert divider.place_calls == [{"x": 0, "y": 0, "relwidth": 1, "height": 1, "bordermode": "outside"}]
     # Default build has no secondaries: Advanced still uses two columns
     # (backdrop left, overlay right) instead of full-width spans.
     assert editor._profiles_tab.columnconfigure_calls == [

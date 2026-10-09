@@ -7,15 +7,25 @@ from keyrgb.gui.theme import metrics as theme_metrics
 from .ui_common import _STATUS_WRAP_SYNC_ERRORS, _TK_CALLBACK_SETUP_ERRORS
 
 
+def _make_editor_tab(notebook, *, ttk):
+    # Reserve a small gap so the one-pixel rule cannot overlap panel headings.
+    # Place keeps it full-width without disturbing the responsive grid rows.
+    tab = ttk.Frame(notebook, padding=(0, 6, 0, 0))
+    ttk.Frame(tab, style=theme_metrics.TAB_DIVIDER_FRAME_STYLE, height=1).place(
+        x=0, y=0, relwidth=1, height=1, bordermode="outside"
+    )
+    return tab
+
+
 def build_tabs(editor, main, *, ttk, LayoutSetupControls, OptionalKeysControls) -> None:
     # UX-03 editor shell: notebook below the top content spans canvas+rail
     # full width. Tabs are Profiles, Setup, Advanced in that order.
     editor._editor_notebook = ttk.Notebook(main)
     editor._editor_notebook.pack(fill="x", pady=(12, 0))
 
-    editor._profiles_tab = ttk.Frame(editor._editor_notebook)
-    editor._setup_tab = ttk.Frame(editor._editor_notebook)
-    editor._advanced_tab = ttk.Frame(editor._editor_notebook)
+    editor._profiles_tab = _make_editor_tab(editor._editor_notebook, ttk=ttk)
+    editor._setup_tab = _make_editor_tab(editor._editor_notebook, ttk=ttk)
+    editor._advanced_tab = _make_editor_tab(editor._editor_notebook, ttk=ttk)
     editor._editor_notebook.add(editor._profiles_tab, text="Profiles")
     editor._editor_notebook.add(editor._setup_tab, text="Setup")
     editor._editor_notebook.add(editor._advanced_tab, text="Advanced")

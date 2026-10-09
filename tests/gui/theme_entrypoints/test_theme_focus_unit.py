@@ -16,14 +16,31 @@ class _FakeStyle:
     def theme_use(self, name: str) -> None:
         pass
 
+    def layout(self, name: str, layout: list) -> None:
+        assert name == "TSeparator"
+
+    def theme_names(self) -> tuple[str, ...]:
+        return ("clam",)
+
+    def theme_create(self, name: str, *, parent: str, settings: dict) -> None:
+        assert name == ttk_theme.DARK_THEME_NAME and parent == "clam"
+
     def lookup(self, style_name: str, option: str) -> str:
         return self._lookups.get((style_name, option), "")
 
-    def configure(self, style_name: str, **kwargs: object) -> None:
+    def configure(self, style_name: str, **kwargs: object) -> object:
+        if not kwargs:
+            return {}
         self.configure_calls.append((style_name, kwargs))
+        return None
 
-    def map(self, style_name: str, **kwargs: object) -> None:
+    def map(self, style_name: str, option: str | None = None, **kwargs: object) -> object:
+        if option is not None:
+            return _merged_maps(self)[style_name][option]
+        if not kwargs:
+            return _merged_maps(self).get(style_name, {})
         self.map_calls.append((style_name, kwargs))
+        return None
 
 
 class _FakeRoot:
@@ -31,6 +48,9 @@ class _FakeRoot:
         self.tk = SimpleNamespace(call=lambda *args: None)
 
     def configure(self, **kwargs: object) -> None:
+        pass
+
+    def option_add(self, pattern: str, value: str, priority: str) -> None:
         pass
 
 

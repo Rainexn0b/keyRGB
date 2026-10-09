@@ -23,6 +23,7 @@ VALUE_LABEL_STYLE = "KeyRGB.Value.TLabel"
 # Semantic action styles.
 PRIMARY_BUTTON_STYLE = "KeyRGB.Primary.TButton"
 DESTRUCTIVE_BUTTON_STYLE = "KeyRGB.Destructive.TButton"
+TAB_DIVIDER_FRAME_STYLE = "KeyRGB.TabDivider.TFrame"
 
 SEMANTIC_LABEL_STYLES: tuple[str, ...] = (
     TITLE_LABEL_STYLE,

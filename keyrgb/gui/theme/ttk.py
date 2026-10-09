@@ -3,11 +3,22 @@ from __future__ import annotations
 import logging
 import os
 import tkinter as tk
+from collections.abc import Iterable
 from tkinter import font as tkfont, ttk
-from typing import Literal
+from typing import TYPE_CHECKING, Literal, cast
 
 from . import metrics
-from .ttk_maps import apply_semantic_styles as _apply_semantic_styles, apply_state_maps as _apply_state_maps
+from .ttk_maps import (
+    apply_classic_palette as _apply_classic_palette,
+    apply_dark_surfaces,
+    apply_semantic_styles as _apply_semantic_styles,
+    apply_state_maps as _apply_state_maps,
+)
+
+if TYPE_CHECKING:
+    from tkinter.ttk import _Statespec
+
+    _StyleStateMaps = dict[str, Iterable[_Statespec]]
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +35,8 @@ DARK_DISABLED_FG = "#9a9a9a"
 DARK_FOCUS = "#7ab8ff"
 DARK_BUTTON_BG = "#404040"
 DARK_BUTTON_ACTIVE_BG = "#505050"
+DARK_BORDER = "#555555"
+DARK_THEME_NAME = "keyrgb-dark"
 DARK_PRIMARY_BG = "#0b5cad"
 DARK_PRIMARY_ACTIVE_BG = "#1565b8"
 DARK_DESTRUCTIVE_BG = "#b71c1c"
@@ -74,6 +87,7 @@ def apply_clam_light_theme(root: tk.Misc) -> tuple[str, str]:
 
     field_bg = style.lookup("TEntry", "fieldbackground") or "#ffffff"
     button_bg = style.lookup("TButton", "background") or LIGHT_BUTTON_FALLBACK_BG
+    _apply_classic_palette(root, bg_color, fg_color, style.lookup(".", "bordercolor") or "#9e9a91", LIGHT_PRIMARY_BG)
 
     fonts = ensure_theme_fonts(root)
 
@@ -131,7 +145,50 @@ def apply_clam_dark_theme(root: tk.Misc) -> tuple[str, str]:
     """
 
     style = ttk.Style(root)
-    style.theme_use("clam")
+    # Isolate dark overrides so opening a light window in this interpreter
+    # still gets pristine clam defaults, including borders and notebook maps.
+    if DARK_THEME_NAME not in style.theme_names():
+        style.theme_use("clam")
+        # Parent themes share elements/layouts, not style settings. Copy the
+        # native metrics/maps before overriding colors (Tk 8.6 and Tk 9 differ).
+        base_styles = (
+            ".",
+            "TButton",
+            "TCheckbutton",
+            "TRadiobutton",
+            "TMenubutton",
+            "TEntry",
+            "TCombobox",
+            "TSpinbox",
+            "TNotebook",
+            "TNotebook.Tab",
+            "TFrame",
+            "TLabelframe",
+            "TLabelframe.Label",
+            "TLabel",
+            "TScale",
+            "TScrollbar",
+            "TSeparator",
+            "TProgressbar",
+            "TPanedwindow",
+            "Sash",
+            "Treeview",
+            "Treeview.Heading",
+        )
+        style.theme_create(
+            DARK_THEME_NAME,
+            parent="clam",
+            # Tk returns lists of state/value tuples. The current typeshed
+            # getter overload incorrectly describes each map as one tuple.
+            settings={
+                name: {
+                    "configure": style.configure(name) or {},
+                    "map": cast("_StyleStateMaps", style.map(name)),
+                }
+                for name in base_styles
+            },
+        )
+    style.theme_use(DARK_THEME_NAME)
 
     _apply_scaling_if_configured(root)
 
@@ -192,25 +249,36 @@ def apply_clam_dark_theme(root: tk.Misc) -> tuple[str, str]:
         fonts=fonts,
     )
 
+    apply_dark_surfaces(
+        style,
+        bg=bg_color,
+        fg=fg_color,
+        field_bg=field_bg,
+        border=DARK_BORDER,
+        disabled_fg=DARK_DISABLED_FG,
+        focus=DARK_FOCUS,
+        button_bg=DARK_BUTTON_BG,
+        hover_bg=DARK_BUTTON_ACTIVE_BG,
+        primary_bg=DARK_PRIMARY_BG,
+        primary_active_bg=DARK_PRIMARY_ACTIVE_BG,
+        destructive_bg=DARK_DESTRUCTIVE_BG,
+        destructive_active_bg=DARK_DESTRUCTIVE_ACTIVE_BG,
+    )
+    _apply_classic_palette(root, bg_color, fg_color, DARK_BORDER, DARK_PRIMARY_BG)
+
     return bg_color, fg_color
 
 
 def ensure_theme_fonts(root: tk.Misc | None = None) -> dict[str, str]:
     """Create (or reuse) Tk named fonts for the semantic roles.
 
-    Roles use absolute point sizes from
-    :data:`keyrgb.gui.theme.metrics.FONT_SPECS` on the system-resolved
-    ``Sans`` alias, preserving the established 14/11/10/9/8 hierarchy while
-    staying in named fonts (Tk scaling and ``KEYRGB_TK_SCALING`` still apply
-    because sizes are points, not pixels). ``TkDefaultFont`` is still read —
-    with the supplied ``root`` — for interpreter availability and its valid
-    slant, but its family/size are never inherited, so sessions reporting
-    e.g. fixed 8 cannot collapse the hierarchy. The supplied ``root`` is
-    forwarded to every :mod:`tkinter.font` call instead of relying on the
-    implicit default root. Returned mapping is ``{style_name: font_name}``;
-    it is empty when no Tk interpreter is available (headless unit tests).
-    Created fonts are retained in ``_FONT_REFS`` so Tk does not
-    garbage-collect them.
+    Roles use absolute point sizes from :data:`metrics.FONT_SPECS` on ``Sans``,
+    preserving the 14/11/10/9/8 hierarchy and Tk/``KEYRGB_TK_SCALING`` scaling.
+    ``TkDefaultFont`` supplies interpreter availability and valid slant, never
+    family or size, so a reported fixed 8 cannot collapse the hierarchy.
+    Every :mod:`tkinter.font` call receives ``root`` rather than the implicit
+    default root. Returns ``{style_name: font_name}``, or an empty mapping when
+    no Tk interpreter is available. ``_FONT_REFS`` prevents garbage collection.
     """
 
     try:
