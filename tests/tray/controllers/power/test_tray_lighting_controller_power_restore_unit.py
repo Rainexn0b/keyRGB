@@ -87,10 +87,7 @@ class TestPowerTurnOffRestore:
         assert mock_tray._idle_forced_off is False
         assert mock_tray.tray_idle_power_state.power_forced_off is True
         assert mock_tray.is_off is True
-        mock_tray.engine.turn_off.assert_called_once_with(
-            fade=True,
-            fade_duration_s=DEFAULT_IDLE_FADE_DURATION_S,
-        )
+        mock_tray.engine.turn_off.assert_called_once_with()
 
     def test_power_turn_off_already_controller_sleep_off_uses_immediate_off_no_fade(self):
         from keyrgb.tray.controllers.lighting_controller import power_turn_off
@@ -125,19 +122,16 @@ class TestPowerTurnOffRestore:
         turn_off_aux.assert_called_once_with(mock_tray)
         turn_off_areas.assert_called_once_with(mock_tray)
 
-    def test_power_turn_off_ordinary_suspend_still_uses_configured_fade(self):
+    def test_power_turn_off_ordinary_suspend_is_immediate(self):
         from keyrgb.tray.controllers.lighting_controller import power_turn_off
         from tests.tray.fakes import make_owner_backed_mock_tray
 
         mock_tray = make_owner_backed_mock_tray(is_off=False)
-        # Default controller_sleep_off is False: an on-state suspend fades.
+        # Pre-suspend off must not spend its shutdown budget on a cosmetic fade.
 
         power_turn_off(mock_tray)
 
-        mock_tray.engine.turn_off.assert_called_once_with(
-            fade=True,
-            fade_duration_s=DEFAULT_IDLE_FADE_DURATION_S,
-        )
+        mock_tray.engine.turn_off.assert_called_once_with()
 
     def test_power_restore_restores_when_power_forced(self):
         from keyrgb.tray.controllers.lighting_controller import power_restore

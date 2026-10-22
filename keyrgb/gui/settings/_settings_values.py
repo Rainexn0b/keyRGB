@@ -98,6 +98,7 @@ class SettingsValues:
     # Physical keyboard layout for per-key editor / calibrator overlay.
     # Canonical values come from keyrgb.core.resources.layouts.catalog.
     physical_layout: str = "auto"
+    wake_on_any_input: bool = False
 
 
 def load_settings_values(*, config: settings_reader.SettingsSourceLike, os_autostart_enabled: bool) -> SettingsValues:
@@ -196,6 +197,7 @@ def load_settings_values(*, config: settings_reader.SettingsSourceLike, os_autos
         battery_power_mode=battery_power_mode,
         screen_dim_sync_enabled=screen_dim_sync_enabled,
         controller_sleep_respect=controller_sleep_respect,
+        wake_on_any_input=reader.read_bool("wake_on_any_input", default=False),
         screen_dim_sync_mode=screen_dim_sync_mode,
         screen_dim_temp_brightness=screen_dim_temp_brightness,
         idle_dim_debounce_enter_polls=idle_dim_debounce_enter_polls,
@@ -254,6 +256,7 @@ def _apply_settings_values_to_config_unbatched(
 
     config.screen_dim_sync_enabled = bool(values.screen_dim_sync_enabled)
     config.controller_sleep_respect = bool(values.controller_sleep_respect)
+    config.wake_on_any_input = bool(values.wake_on_any_input)
 
     mode = str(values.screen_dim_sync_mode or "off").strip().lower()
     config.screen_dim_sync_mode = mode if mode in {"off", "temp"} else "off"

@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from keyrgb.core.lighting_result import APPLIED, BLOCKED, DEFERRED, FAILED, LightingResult, lighting_result
+
 from ..policies.power_event_policy import PowerEventInputs
 
 
@@ -17,11 +19,14 @@ class PowerEventExecutionPlan:
         return self.action_count > 0
 
 
-def build_power_event_inputs(*, enabled: bool, action_enabled: bool, is_off: bool) -> PowerEventInputs:
+def build_power_event_inputs(
+    *, enabled: bool, action_enabled: bool, is_off: bool, restore_blocked: bool = False
+) -> PowerEventInputs:
     return PowerEventInputs(
         enabled=bool(enabled),
         action_enabled=bool(action_enabled),
         is_off=bool(is_off),
+        restore_blocked=bool(restore_blocked),
     )
 
 
@@ -84,25 +89,24 @@ def execute_power_event_plan(
     log_message: str,
     kb_method_name: str,
     log_info_fn: Callable[[str], None],
-    sleep_fn: Callable[[float], None],
-    invoke_keyboard_method_fn: Callable[[str], None],
+    invoke_keyboard_method_fn: Callable[[str], object],
     should_invoke_fn: Callable[[], bool] = lambda: True,
-) -> bool:
+) -> LightingResult:
     if not plan.should_invoke:
-        return False
-
-    if plan.delay_s > 0:
-        sleep_fn(plan.delay_s)
+        return BLOCKED
 
     if not should_invoke_fn():
-        return False
+        return DEFERRED
 
     if plan.should_log:
         log_info_fn(log_message)
 
+    outcome = APPLIED
     for _ in range(plan.action_count):
-        invoke_keyboard_method_fn(kb_method_name)
-    return True
+        result = lighting_result(invoke_keyboard_method_fn(kb_method_name))
+        if result.status is not APPLIED.status:
+            outcome = result
+    return outcome
 
 
 def invoke_keyboard_method(
@@ -110,13 +114,15 @@ def invoke_keyboard_method(
     kb_controller,
     method_name: str,
     run_recoverable_runtime_boundary_fn,
-) -> None:
-    def _invoke() -> None:
+) -> LightingResult:
+    def _invoke() -> LightingResult:
         fn = getattr(kb_controller, method_name, None)
         if callable(fn):
-            fn()
+            return lighting_result(fn())
+        return FAILED
 
-    run_recoverable_runtime_boundary_fn(
+    return run_recoverable_runtime_boundary_fn(
         _invoke,
         log_message=f"Power event keyboard action '{method_name}' failed",
+        fallback=FAILED,
     )

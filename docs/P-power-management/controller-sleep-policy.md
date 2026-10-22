@@ -58,8 +58,10 @@ special case.
 
 ## Respect controller sleep (opt-in)
 
-When the setting is enabled, a confirmed native sleep is accepted as a valid
-off state:
+In **Settings → Advanced → Controller sleep and idle timing**, enable **Let
+the controller's own sleep timeout turn the keyboard off**. A confirmed native
+sleep is then accepted as a valid off state. With **Wake on any input** disabled
+(the default):
 
 1. KeyRGB stops the active software effect so render frames do not fight the
    controller's decision.
@@ -68,12 +70,14 @@ off state:
    dark.
 4. A non-modifier keyboard `EV_KEY` key-down, power restore, or manual **Turn
    On** restores the configured scene.
-5. Keyboard restore sends an explicit off command before soft-on. This clears
-   the observed ITE stale-off latch, then primes user mode at brightness 1 and
-   fades to the configured level.
+5. Keyboard and firmware-first wake use the controller-brightness handoff.
+   Reactive rendering adopts the physical baseline and descends through its
+   frame guard; it does not send another off or soft-on prime. A temporary dim
+   target remains authoritative. Failed restarts retain native-sleep ownership
+   for retry. Backend-declared settle deadlines defer the restart when needed.
 
-The same key-only restore rule applies when screen-idle synchronization turned
-the deck off while this setting was enabled.
+The same default key-only restore rule applies when screen-idle synchronization
+turned the deck off while controller-sleep respect was enabled.
 
 Modifier filtering is tray policy, not an ITE protocol requirement. On affected
 KDE systems, touchpad gestures can emit synthetic `KEY_LEFTMETA` events through
@@ -85,15 +89,47 @@ If firmware itself wakes before the idle-power evdev loop consumes the key,
 hardware polling claims the wake and restarts the stopped effect directly. The
 idle loop then yields instead of issuing a second off/soft-on transition.
 
+### Wake on any input (opt-in)
+
+Enable **Wake on any input** directly below the controller-sleep checkbox to
+also accept modifier keys, mouse movement/clicks/scrolling, and touchpad activity.
+The config key is `wake_on_any_input` (`IDLE_DISPLAY`, default `False`); it takes
+effect only while `controller_sleep_respect` is enabled. This changes keyboard
+lighting wake behavior, not the computer's ability to wake from system suspend.
+
+- Input must occur after the latest active native-sleep or screen-idle off.
+  Manual off, suspend/lid/power-off ownership, configured zero brightness, and
+  temporary dim limits remain authoritative. Screen-idle restores still obey
+  screen state and the existing debounce/power-source guards.
+- Evdev accepts timestamped key/button downs and pointer/contact activity using
+  an fd-local monotonic event clock. Startup, empty reads, releases, held-key
+  repeats, metadata, and dropped-event resynchronization do not count as wake.
+- An input-only Wayland listener supplies activity when evdev cannot see a
+  device. It requires `ext_idle_notifier_v1` version 2 on both compositor and
+  client. Its zero-timeout notification is scoped to the current dark period;
+  only a real `idled → resumed` event qualifies. Compositor startup/reconnect,
+  a bare active-session status, and idle inhibitors do not trigger a wake.
+  Where that protocol is unavailable, readable evdev devices remain the source.
+- After the backend's settle interval, the pipeline reads hardware state under
+  `kb_lock`. Already-awake firmware retains the native brightness handoff;
+  a still-dark device uses the shared idle soft-on restore. Input duplicates
+  cannot start a second fade, and failed restores retain ownership for retry.
+  A later firmware wake retains its own settle deadline: time spent waiting on
+  pointer activity while the controller was dark cannot shorten that interval.
+
 ## Diagnostic events
 
 Useful runtime events are:
 
 - `hardware:controller_sleep_off`
-- `idle_power:controller_sleep_rearm trigger=keyboard_evdev`
+- `idle_power:controller_sleep_native_wake_handoff trigger=keyboard_evdev`
 - `idle_power:controller_sleep_restore trigger=keyboard_evdev`
 - `hardware:controller_sleep_firmware_wake`
 - `idle_power:screen_idle_restore trigger=keyboard_evdev`
+- `idle_power:screen_idle_restore trigger=any_input`
+- `deck:transition` (identity, source, state, outcome and ownership)
+  uses `source=input_wake` for a host-driven input restore and
+  `source=firmware_wake` when the device was already awake.
 
 While controller sleep is honored, a non-zero brightness register together
 with `is_off=True` is valid: an explicit corrective off command may preserve
@@ -103,6 +139,7 @@ the register value while the deck remains physically dark.
 
 Unifying the overlapping wake writers is tracked in
 [sleep-wake-pipeline-campaign.md](sleep-wake-pipeline-campaign.md). That
-campaign must keep this document's two user policies, key-only restore rule,
-and firmware-versus-evdev single-restore race. It must not replace them with a
+campaign must keep this document's two user policies, default key-only restore
+rule, explicit any-input opt-in, and firmware-versus-evdev single-restore race.
+It must not replace them with a
 post-wake brightness clamp.

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import fcntl
 import select
+import struct
 import time
 import warnings
 from collections.abc import Callable, Iterable, Sequence
@@ -20,6 +22,8 @@ class _InputEventProtocol(Protocol):
     type: int
     code: int
     value: int
+
+    def timestamp(self) -> float: ...
 
 
 _InputDevice: TypeAlias = _InputDeviceProtocol
@@ -58,6 +62,39 @@ def _is_keyboard_wake_key_down(event: object) -> bool:
     except (AttributeError, TypeError, ValueError, OverflowError):
         return False
     return event_type == _EV_KEY and value == _KEY_DOWN and code not in _MODIFIER_KEY_CODES
+
+
+def _set_monotonic_event_clock(device: _InputDevice) -> bool:
+    """Set this fd's event clock only; never grab or write to the input device."""
+    fd = getattr(device, "fd", None)
+    if not isinstance(fd, int) or fd < 0:
+        return False
+    try:
+        # Linux EVIOCSCLOCKID = _IOW('E', 0xa0, int). python-evdev has no wrapper.
+        fcntl.ioctl(fd, 0x400445A0, struct.pack("i", time.CLOCK_MONOTONIC))
+    except OSError:
+        return False
+    return True
+
+
+def _wake_activity_time(event: object, *, now: float) -> float:
+    """Genuine key/button down or pointer movement, with a trusted event time."""
+    typed_event = cast(_InputEventProtocol, event)
+    try:
+        kind, code, value = int(typed_event.type), int(typed_event.code), int(typed_event.value)
+        activity = (
+            (kind == _EV_KEY and value == _KEY_DOWN and code > 0)
+            or (kind == 0x02 and code in {0, 1, 6, 8, 11, 12} and value != 0)  # EV_REL: movement/scroll
+            or (kind == 0x03 and code in {0, 1, 0x35, 0x36})  # ABS/MT position
+            or (kind == 0x03 and code == 0x39 and value >= 0)  # MT contact begins
+        )
+        if activity:
+            timestamp = float(typed_event.timestamp())
+            if 0 < timestamp <= now:
+                return timestamp
+    except (AttributeError, TypeError, ValueError, OverflowError):
+        pass
+    return 0.0
 
 
 def _read_udev_input_properties(device_path: str) -> dict[str, str]:
@@ -127,10 +164,15 @@ class InputIdleTracker:
     is_keyboard_device_fn: Callable[[str], bool] = _is_keyboard_input_device
     select_fn: Callable[..., tuple[list, list, list]] = select.select
     refresh_interval_s: float = 30.0
+    set_event_clock_fn: Callable[[_InputDevice], bool] = _set_monotonic_event_clock
 
     devices: list[_InputDevice] | None = field(default=None, init=False)
     last_activity_at: float = field(default=0.0, init=False)
     last_keyboard_activity_at: float = field(default=0.0, init=False)
+    # Unlike last_activity_at, initialization/readiness alone never advances this.
+    last_wake_activity_at: float = field(default=0.0, init=False)
+    monotonic_device_paths: set[str] = field(default_factory=set, init=False)
+    dropped_device_paths: set[str] = field(default_factory=set, init=False)
     last_refresh_at: float = field(default=0.0, init=False)
 
     def __post_init__(self) -> None:
@@ -146,7 +188,10 @@ class InputIdleTracker:
             if not self.is_input_device_fn(path):
                 continue
             try:
-                opened.append(self.open_device_fn(path))
+                device = self.open_device_fn(path)
+                opened.append(device)
+                if self.set_event_clock_fn(device):
+                    self.monotonic_device_paths.add(str(path))
             except _RECOVERABLE_DEVICE_EXCEPTIONS:
                 continue
         return opened or None
@@ -157,6 +202,8 @@ class InputIdleTracker:
         self.last_refresh_at = float(self.monotonic_fn())
 
     def close(self) -> None:
+        self.monotonic_device_paths.clear()
+        self.dropped_device_paths.clear()
         if not self.devices:
             self.devices = None
             return
@@ -206,6 +253,19 @@ class InputIdleTracker:
                         _is_keyboard_wake_key_down(event) for event in events
                     ):
                         keyboard_wake_key_down = True
+                    if str(dev.path) in self.monotonic_device_paths:
+                        read_at = float(self.monotonic_fn())
+                        for event in events:
+                            if getattr(event, "type", None) == 0:
+                                if getattr(event, "code", None) == 3:  # SYN_DROPPED
+                                    self.dropped_device_paths.add(str(dev.path))
+                                elif getattr(event, "code", None) == 0:  # SYN_REPORT
+                                    self.dropped_device_paths.discard(str(dev.path))
+                            if str(dev.path) in self.dropped_device_paths:
+                                continue
+                            self.last_wake_activity_at = max(
+                                self.last_wake_activity_at, _wake_activity_time(event, now=read_at)
+                            )
                 if keyboard_wake_key_down:
                     self.last_keyboard_activity_at = float(now)
         except _RECOVERABLE_DEVICE_EXCEPTIONS:

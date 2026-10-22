@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import threading
-import time
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -152,6 +150,11 @@ class TestPowerManagerEventHandlers:
         with patch("time.sleep"):
             pm._on_resume()
 
+        mock_kb.restore.assert_not_called()
+        mock_policy_instance.restore_pending = True
+        pm._power_event_clock = lambda: pm._pending_power_restore_not_before
+        pm._retry_pending_power_restore()
+
         mock_kb.restore.assert_called_once()
 
     @patch("keyrgb.core.power.management.manager.PowerEventPolicy")
@@ -239,45 +242,19 @@ class TestPowerManagerEventHandlers:
         pm._config.management_enabled = True
         pm._config.power_restore_on_resume = True
         pm._config.power_off_on_suspend = True
-        sleep_started = threading.Event()
-        release_resume = threading.Event()
-        suspend_received = threading.Event()
-        begin_power_event = pm._begin_power_event
-
-        def track_power_event_generation() -> int:
-            generation = begin_power_event()
-            if generation == 2:
-                suspend_received.set()
-            return generation
-
-        pm._begin_power_event = track_power_event_generation
-
-        def blocked_sleep(_seconds: float) -> None:
-            sleep_started.set()
-            release_resume.wait()
-
         try:
-            with patch("keyrgb.core.power.management.manager.time.sleep", side_effect=blocked_sleep):
-                resume = threading.Thread(target=pm._on_resume)
-                resume.start()
-                assert sleep_started.wait(timeout=1.0)
-                suspend = threading.Thread(target=pm._on_suspend)
-                suspend.start()
-                assert suspend_received.wait(timeout=1.0)
-                release_resume.set()
-                resume.join(timeout=1.0)
-                suspend.join(timeout=1.0)
+            pm._power_event_clock = lambda: 100.0
+            pm._on_resume()
+            pm._on_suspend()
+            pm._power_event_clock = lambda: 101.0
+            coordinator.run(pm._retry_pending_power_restore)
         finally:
-            release_resume.set()
             assert coordinator.stop_and_drain(timeout_s=1.0) is True
 
-        assert not resume.is_alive()
-        assert not suspend.is_alive()
         mock_kb.turn_off.assert_called_once_with()
         mock_kb.restore.assert_not_called()
 
     def test_duplicate_lid_open_retries_restore_discarded_as_stale(self):
-        from keyrgb.core.power.management import manager as manager_module
         from keyrgb.core.power.management.manager import PowerManager
         from keyrgb.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
 
@@ -296,50 +273,22 @@ class TestPowerManagerEventHandlers:
         pm._on_suspend()
         mock_kb.turn_off.assert_called_once_with()
 
-        sleep_started = threading.Event()
-        release_resume = threading.Event()
-        replacement_received = threading.Event()
-        begin_power_event = pm._begin_power_event
-
-        def track_power_event_generation() -> int:
-            generation = begin_power_event()
-            if generation == 3:
-                replacement_received.set()
-            return generation
-
-        pm._begin_power_event = track_power_event_generation
-
-        def blocked_sleep(_seconds: float) -> None:
-            sleep_started.set()
-            release_resume.wait()
-
-        resume = threading.Thread(target=pm._on_resume)
-        lid_open = threading.Thread(target=pm._on_lid_open)
         try:
-            with patch.object(manager_module.time, "sleep", side_effect=blocked_sleep):
-                resume.start()
-                assert sleep_started.wait(timeout=1.0)
-
-                lid_open.start()
-                assert replacement_received.wait(timeout=1.0)
-
-                release_resume.set()
-                resume.join(timeout=1.0)
-                lid_open.join(timeout=1.0)
+            pm._power_event_clock = lambda: 100.0
+            pm._on_resume()
+            pm._on_lid_open()
+            mock_kb.restore.assert_not_called()
+            pm._power_event_clock = lambda: 101.0
+            coordinator.run(pm._retry_pending_power_restore)
         finally:
-            release_resume.set()
             assert coordinator.stop_and_drain(timeout_s=1.0) is True
 
-        assert not resume.is_alive()
-        assert not lid_open.is_alive()
         mock_kb.restore.assert_called_once_with()
 
     @patch("keyrgb.core.power.management.manager.PowerEventPolicy")
     def test_delayed_resume_is_discarded_after_newer_manual_transition(self, mock_policy_cls):
         from keyrgb.core.power.management.manager import PowerManager, RestoreFromEvent
         from keyrgb.tray.controllers.runtime_coordination import (
-            active_transition_revision,
-            capture_transition_revision,
             run_tray_transition,
         )
         from keyrgb.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
@@ -358,11 +307,11 @@ class TestPowerManagerEventHandlers:
             def run_runtime_transition(self, action):
                 return run_tray_transition(self, action)
 
-            def capture_runtime_transition_revision(self):
-                return capture_transition_revision(self)
+            def capture_lighting_intent_revision(self):
+                return self.runtime_coordinator.capture_intent_revision()
 
-            def active_runtime_transition_revision(self):
-                return active_transition_revision(self)
+            def active_lighting_intent_revision(self):
+                return self.runtime_coordinator.active_intent_revision()
 
         tray = _Tray()
         mock_policy_instance = MagicMock()
@@ -371,35 +320,16 @@ class TestPowerManagerEventHandlers:
         pm = PowerManager(tray)
         pm._config.management_enabled = True
         pm._config.power_restore_on_resume = True
-        sleep_started = threading.Event()
-        release_resume = threading.Event()
-
-        def blocked_sleep(_seconds: float) -> None:
-            sleep_started.set()
-            release_resume.wait()
-
-        resume = threading.Thread(target=pm._on_resume)
-        manual_off = threading.Thread(
-            target=lambda: tray.run_runtime_transition(tray.turn_off),
-        )
         try:
-            with patch("keyrgb.core.power.management.manager.time.sleep", side_effect=blocked_sleep):
-                resume.start()
-                assert sleep_started.wait(timeout=1.0)
-                manual_off.start()
-                deadline = time.monotonic() + 1.0
-                while tray.runtime_coordinator.capture_revision() < 2 and time.monotonic() < deadline:
-                    threading.Event().wait(0.001)
-                assert tray.runtime_coordinator.capture_revision() >= 2
-                release_resume.set()
-                resume.join(timeout=1.0)
-                manual_off.join(timeout=1.0)
+            pm._power_event_clock = lambda: 100.0
+            pm._on_resume()
+            run_tray_transition(tray, tray.turn_off, supersedes_lighting=True)
+            mock_policy_instance.restore_pending = True
+            pm._power_event_clock = lambda: 101.0
+            tray.run_runtime_transition(pm._retry_pending_power_restore)
         finally:
-            release_resume.set()
             assert tray.runtime_coordinator.stop_and_drain(timeout_s=1.0) is True
 
-        assert not resume.is_alive()
-        assert not manual_off.is_alive()
         tray.restore.assert_not_called()
         tray.turn_off.assert_called_once_with()
 

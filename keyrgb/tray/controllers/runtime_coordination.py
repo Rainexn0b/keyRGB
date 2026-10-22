@@ -34,7 +34,7 @@ def _flush_ui_request(tray: object, request: UiRefreshRequest) -> None:
         ui_tray._update_menu()
 
 
-def run_tray_transition(tray: object, action: Callable[[], _T]) -> _T:
+def run_tray_transition(tray: object, action: Callable[[], _T], *, supersedes_lighting: bool = False) -> _T:
     """Run through the production owner, retaining direct fake compatibility."""
 
     coordinator = _coordinator_or_none(tray)
@@ -43,6 +43,7 @@ def run_tray_transition(tray: object, action: Callable[[], _T]) -> _T:
     return coordinator.run(
         action,
         after=lambda request: _flush_ui_request(tray, request),
+        supersedes_lighting=supersedes_lighting,
     )
 
 

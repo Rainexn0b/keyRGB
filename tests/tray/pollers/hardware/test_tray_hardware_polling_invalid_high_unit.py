@@ -123,7 +123,9 @@ def test_invalid_high_heal_clears_stale_logical_off_state(monkeypatch) -> None:
 
     monkeypatch.setattr(hp, "_recover_invalid_high_brightness_best_effort", lambda *_a, **_kw: True)
     tray = _DummyTray(brightness=10, is_off=True)
-    tray.tray_idle_power_state.deck_state = DeckState.RESTORING
+    from keyrgb.tray._deck_state_store import _store_deck_state
+
+    _store_deck_state(tray, DeckState.RESTORING)
     refreshed_states: list[tuple[bool, DeckState]] = []
     tray._refresh_ui = lambda **_kw: refreshed_states.append((bool(tray.is_off), tray.tray_idle_power_state.deck_state))
 

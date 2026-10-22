@@ -78,6 +78,7 @@ _DOMAIN_KEY_LISTS: dict[ConfigDomain, tuple[str, ...]] = {
     ConfigDomain.IDLE_DISPLAY: (
         "screen_dim_sync_enabled",
         "controller_sleep_respect",
+        "wake_on_any_input",
         "screen_dim_sync_mode",
         "screen_dim_temp_brightness",
         "idle_dim_debounce_enter_polls",

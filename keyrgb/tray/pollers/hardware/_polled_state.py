@@ -6,6 +6,7 @@ from keyrgb.tray.deck_pipeline import commit_sleep_wake_intent
 from keyrgb.tray.deck_state import SleepWakeGuards, SleepWakeIntent, SleepWakeIntentKind
 from keyrgb.tray.idle_power_state import (
     dim_temp_target_brightness,
+    ensure_tray_idle_power_state,
     is_dim_temp_active,
     read_forced_off_flags,
     read_last_resume_at,
@@ -64,6 +65,11 @@ def apply_polled_hardware_state(
     last_brightness,
     last_off_state,
 ):
+    # Fade steps are observable now that waits run outside the FIFO. A real
+    # restore owns these transient samples; do not heal, adopt off, or clear
+    # its guard until its completion returns to the coordinator.
+    if ensure_tray_idle_power_state(tray).restore_context is not None:
+        return normalize_brightness_to_config_scale(current_brightness), bool(tray.is_off)
     # If we're temporarily forcing brightness due to screen dim sync, do not
     # persist that brightness back into config.json (it would become a user
     # setting). Still allow off/on transitions to be detected.

@@ -35,7 +35,7 @@ def test_restore_from_idle_best_effort_and_log_swallow(monkeypatch) -> None:
         _refresh_ui=None,
     )
 
-    def boom_start():
+    def boom_start(**_kwargs):
         calls["start"] += 1
         assert tray.engine.current_color == (0, 0, 0)
         raise RuntimeError("boom")

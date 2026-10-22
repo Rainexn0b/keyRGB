@@ -38,9 +38,8 @@ def _decide(
 def test_tray_idle_power_state_defaults_to_lit_deck() -> None:
     owner = TrayIdlePowerState()
     assert owner.deck_state is DeckState.LIT
-    assert owner.deferred_brightness is None
-    assert owner.deferred_perkey_profile is None
-    assert owner.restoring_target is None
+    assert owner.restore_context is None
+    assert owner.restore_sequence == 0
 
 
 @pytest.mark.parametrize(

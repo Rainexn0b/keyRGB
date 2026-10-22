@@ -310,7 +310,7 @@ def test_firmware_wake_restart_stamps_resume_and_accepts_void_callback() -> None
     calls: list[str] = []
     tray = make_owner_backed_simple_tray(
         engine=SimpleNamespace(),
-        _start_current_effect=lambda: calls.append("start"),
+        _start_current_effect=lambda **_kwargs: calls.append("start"),
         last_resume_at=0.0,
     )
 
@@ -319,11 +319,11 @@ def test_firmware_wake_restart_stamps_resume_and_accepts_void_callback() -> None
     assert tray.tray_idle_power_state.last_resume_at == 123.5
 
 
-def test_firmware_wake_handoff_preserves_legacy_start_callback() -> None:
+def test_firmware_wake_handoff_is_delivered_to_start_callback() -> None:
     calls: list[str] = []
     tray = make_owner_backed_simple_tray(
         engine=SimpleNamespace(),
-        _start_current_effect=lambda: calls.append("start"),
+        _start_current_effect=lambda **kwargs: calls.append(kwargs["controller_brightness_handoff"]),
         last_resume_at=0.0,
     )
 
@@ -335,11 +335,11 @@ def test_firmware_wake_handoff_preserves_legacy_start_callback() -> None:
         )
         is True
     )
-    assert calls == ["start"]
+    assert calls == [50]
     assert tray.tray_idle_power_state.last_resume_at == 123.5
 
 
-def test_firmware_wake_commit_adapts_legacy_restarter_then_refreshes_lit_state() -> None:
+def test_firmware_wake_commit_delivers_handoff_then_refreshes_lit_state() -> None:
     calls: list[tuple[float, int | None]] = []
     refreshed: list[tuple[bool, bool]] = []
     tray = _make_recovery_tray(is_off=True, controller_sleep_off=True)
@@ -349,7 +349,8 @@ def test_firmware_wake_commit_adapts_legacy_restarter_then_refreshes_lit_state()
         (bool(tray.is_off), bool(tray.tray_idle_power_state.controller_sleep_off))
     )
 
-    def legacy_restarter(_tray, *, now: float, brightness_override: int | None) -> bool:
+    def restarter(_tray, *, now: float, brightness_override: int | None, controller_brightness_handoff: int) -> bool:
+        assert controller_brightness_handoff == 50
         calls.append((float(now), brightness_override))
         return True
 
@@ -358,7 +359,7 @@ def test_firmware_wake_commit_adapts_legacy_restarter_then_refreshes_lit_state()
         now=123.5,
         current_brightness=50,
         dim_temp_target=None,
-        restart_firmware_wake=legacy_restarter,
+        restart_firmware_wake=restarter,
     )
 
     assert result is True
@@ -382,7 +383,7 @@ def test_firmware_wake_restart_logs_recoverable_callback_failure(monkeypatch) ->
     logged: list[Exception] = []
     tray = make_owner_backed_simple_tray(
         engine=SimpleNamespace(),
-        _start_current_effect=lambda: (_ for _ in ()).throw(RuntimeError("start failed")),
+        _start_current_effect=lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("start failed")),
     )
     monkeypatch.setattr(
         _controller_sleep._recovery,

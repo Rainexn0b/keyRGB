@@ -5,6 +5,7 @@ import logging
 from typing import TypedDict
 
 from keyrgb.core.effects import catalog as effects_catalog
+from keyrgb.core.lighting_result import LightingResult
 from keyrgb.core.utils import exceptions as core_exceptions, safe_attrs
 from keyrgb.tray.controllers import (
     _lighting_controller_helpers as lighting_controller_helpers,
@@ -331,8 +332,8 @@ def on_brightness_clicked(tray: LightingTrayProtocol, item: object) -> None:
     )
 
 
-def turn_off(tray: LightingTrayProtocol) -> None:
-    lighting_power_state.turn_off_impl(
+def turn_off(tray: LightingTrayProtocol) -> LightingResult:
+    return lighting_power_state.turn_off_impl(
         tray,
         try_log_event=lighting_controller_helpers.try_log_event,
         software_effect_target_routes_aux_devices=software_target_controller.software_effect_target_routes_aux_devices,
@@ -341,16 +342,16 @@ def turn_off(tray: LightingTrayProtocol) -> None:
     )
 
 
-def turn_on(tray: LightingTrayProtocol) -> None:
-    lighting_power_state.turn_on_impl(
+def turn_on(tray: LightingTrayProtocol) -> LightingResult:
+    return lighting_power_state.turn_on_impl(
         tray,
         try_log_event=lighting_controller_helpers.try_log_event,
         start_current_effect=start_current_effect,
     )
 
 
-def power_turn_off(tray: LightingTrayProtocol) -> None:
-    lighting_power_state.power_turn_off_impl(
+def power_turn_off(tray: LightingTrayProtocol) -> LightingResult:
+    return lighting_power_state.power_turn_off_impl(
         tray,
         try_log_event=lighting_controller_helpers.try_log_event,
         software_effect_target_routes_aux_devices=software_target_controller.software_effect_target_routes_aux_devices,
@@ -359,8 +360,8 @@ def power_turn_off(tray: LightingTrayProtocol) -> None:
     )
 
 
-def power_restore(tray: LightingTrayProtocol) -> None:
-    lighting_power_state.power_restore_impl(
+def power_restore(tray: LightingTrayProtocol) -> LightingResult:
+    return lighting_power_state.power_restore_impl(
         tray,
         try_log_event=lighting_controller_helpers.try_log_event,
         safe_int_attr_fn=safe_attrs.safe_int_attr,

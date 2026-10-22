@@ -72,8 +72,9 @@ prebootstrap and starts it before power workers and pollers.
   the owner execute inline, avoiding self-deadlock and duplicate revisions.
 - A revision is assigned when each root command is accepted. Hardware, idle and
   scheduler probes carry the revision captured before observation; stale results
-  are discarded. Delayed power restores also require both the latest power-event
-  generation and the active coordinator revision.
+  are discarded. Power events use a separate event generation and explicit
+  lighting-intent revision: ordinary observation/no-op traffic cannot cancel
+  suspend-off or consume a pending wake. Manual on/off supersedes older wakes.
 - Config reload/classification that participates in a transition executes on the
   owner. Sensor probing may remain outside when its result is revision-gated.
 - Icon/menu requests made during a command are coalesced and flushed by the
@@ -92,7 +93,7 @@ in `keyrgb/tray/deck_state.py` decides; the pipeline is the low-frequency
 commit owner. Render frames stay outside the coordinator. See
 `docs/P-power-management/sleep-wake-pipeline-campaign.md`.
 - Scheduler and menu brightness use that same predicate: off-family changes
-  update persisted base/reactive layers and safe engine caches, but do not
+  (including an in-flight restore) update persisted base/reactive layers and safe engine caches, but do not
   relight or restart. Menu speed and effect selection likewise persist the
   normalized intent (including capability fallbacks) until a legal restore.
   This does not reinterpret a bare `is_off` flag; the existing narrow manual
@@ -103,6 +104,86 @@ commit owner. Render frames stay outside the coordinator. See
   `keyrgb/tray/controllers/view_snapshots.py`.
 - High-frequency effect frames, render-local caches and backend-local I/O locks
   remain outside this owner.
+
+### Sleep/wake completion contract (2026-10-22)
+
+`TrayIdlePowerState` is the authoritative deck ownership record. Its read-only
+`deck_state` projects the overlapping user, power, idle, native-sleep and dim
+causes, plus the transient restore phase. There is no separately cached stable
+enum. Production compatibility attributes proxy this record; field bridges
+import/export plain attributes only for duck-typed callers.
+
+`keyrgb/tray/_deck_restore.py` owns manual, power, screen-idle and native-wake
+transactions. Each has an identity, source, originating revision, off-state
+snapshot and completion future. Failed starts/fades roll back ownership and
+`is_off`; duplicate wakes share the same completion. A newer off cancels the
+fade token and rolls back the prior transaction before acquiring ownership.
+Controller-native wake retains its physical-brightness handoff and dim target.
+Engine rollback errors are logged without replacing the initiating failure;
+ownership rollback, transaction clearing and completion settlement still run.
+Transition logging cannot leave the completion unresolved.
+
+The opt-in `wake_on_any_input` path observes timestamped evdev events or an
+input-only Wayland v2 notification scoped to the current dark period. Its
+`INPUT_WAKE` intent revalidates the off timestamp and observation revision on
+the coordinator; user/power off and an existing restore still block it. The
+input settle deadline stays local to `IdlePollLoopState.input_wake`, separate
+from firmware-wake evidence. Once due, the pipeline probes under `kb_lock` and
+selects the native handoff for already-awake hardware or the shared soft-on
+transaction for a dark device. It preserves dim limits and screen-idle guards.
+Listeners close when disabled, the dark period ends, or polling shuts down.
+
+Lighting edits arriving during a restore persist config and request one
+coalesced reapply of the latest scene at completion. They do not alter the
+in-flight fade token or brightness caches. Power-source classification pauses
+until completion, then observes the current source; no source-change action is
+consumed behind a live restore.
+
+Controller and power-manager boundaries exchange `LightingResult`:
+
+| Result | Meaning | Consume pending power restore? |
+|---|---|---|
+| `APPLIED` | Start and any global restore fade completed | Yes |
+| `BLOCKED` | Current policy intentionally keeps the deck dark | Yes |
+| `DEFERRED` | Deadline, another physical cause, or in-flight work | No |
+| `FAILED` | Start/device/fade failure | No; retry with capped backoff |
+
+Resume's 0.5-second stabilization is a monotonic deadline serviced by the
+power-source poll, outside FIFO waits. Both first attempt and retry check the
+same lid/suspend blockers. Releasing one cause retains the original lit intent
+while another cause remains. Resume reasserts a lit scene even when suspend-off
+was disabled. Failed-device retries back off from 1 second up to 30 seconds;
+new suspend/lid-off cancels the old pending restore.
+
+Engine fade jobs run outside the coordinator. Their tokens are reserved on the
+owner, every write checks the token under `kb_lock`, and completion returns to
+the owner. Reactive global-cap release is tied to actual fade completion and
+renderer generation. Engine close is terminal, invalidates pending fades and
+blocks device acquisition before releasing the keyboard. Fade workers drain
+outside engine locks with a shared two-second deadline. Render frames keep their
+existing independent generation/lock contract.
+
+`EVENT deck:transition` records restore identity, source, old/new state,
+originating revision, result, reason and active owners. Hardware handoff events
+continue to supply device observations.
+
+### Pre-suspend shutdown and logind
+
+Power-off commits immediately, without a cosmetic fade or per-key flatten.
+Effect shutdown retains its bounded two-second join; no resume/fade sleep holds
+the coordinator. Backend I/O still follows backend timeouts, so this is a
+best-effort shutdown rather than a hard real-time guarantee.
+
+Delay inhibition was evaluated. logind's `Inhibit(..., "delay")` requires
+holding a returned Unix file descriptor before `PrepareForSleep(true)`,
+releasing it after off, and reacquiring it after resume. The current
+`dbus-monitor` text transport cannot own that descriptor. A short-lived
+`busctl` subprocess cannot substitute for that lifecycle. This consolidation
+keeps the existing transport; adding inhibition requires a separately validated
+FD-capable D-Bus connection and shutdown/reconnection lifecycle. Live acceptance
+must verify pre-suspend off timing on the supported desktop/backend combination.
+
+Implementation and validation: [sleep/wake consolidation tracker](../P-power-management/sleep-wake-consolidation-tracker.md).
 
 Shutdown first stops pollers and power workers, then drains/verifies the
 coordinator, then closes the effects engine and secondary targets. Quit starts

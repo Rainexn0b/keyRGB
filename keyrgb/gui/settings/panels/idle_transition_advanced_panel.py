@@ -20,12 +20,14 @@ class IdleTransitionAdvancedPanel:
         parent: ttk.Frame,
         *,
         var_controller_sleep_respect: tk.BooleanVar,
+        var_wake_on_any_input: tk.BooleanVar,
         var_debounce_enter: tk.DoubleVar,
         var_debounce_exit: tk.DoubleVar,
         var_idle_fade_duration: tk.DoubleVar,
         on_toggle: Callable[[], None],
     ) -> None:
         self.var_controller_sleep_respect = var_controller_sleep_respect
+        self.var_wake_on_any_input = var_wake_on_any_input
         self.var_debounce_enter = var_debounce_enter
         self.var_debounce_exit = var_debounce_exit
         self.var_idle_fade_duration = var_idle_fade_duration
@@ -46,7 +48,7 @@ class IdleTransitionAdvancedPanel:
             parent,
             text=(
                 "Recommended for supported ITE controllers: firmware sleeps after ~10 min without typing. When "
-                "it or screen-idle sync turns the deck off, only a non-modifier keypress restores lighting."
+                "it or screen-idle sync turns the deck off, a non-modifier keypress restores lighting by default."
             ),
             style=theme_metrics.CAPTION_LABEL_STYLE,
             justify="left",
@@ -54,6 +56,26 @@ class IdleTransitionAdvancedPanel:
         )
         controller_sleep_desc.pack(anchor="w", fill="x", padx=(24, 0), pady=(0, 8))
         bind_wraplength_sync(parent, [controller_sleep_desc], margin=48)
+
+        self.chk_wake_on_any_input = ttk.Checkbutton(
+            parent,
+            text="Wake on any input",
+            variable=self.var_wake_on_any_input,
+            command=self._on_toggle,
+        )
+        self.chk_wake_on_any_input.pack(anchor="w", padx=(24, 0))
+        wake_desc = ttk.Label(
+            parent,
+            text=(
+                "Also wake from modifier keys, mouse movement/clicks and touchpad activity. "
+                "Manual off and power-off policies still take precedence."
+            ),
+            style=theme_metrics.CAPTION_LABEL_STYLE,
+            justify="left",
+            wraplength=400,
+        )
+        wake_desc.pack(anchor="w", fill="x", padx=(24, 0), pady=(0, 8))
+        bind_wraplength_sync(parent, [wake_desc], margin=48)
 
         debounce_frame = ttk.Frame(parent)
         debounce_frame.pack(fill="x", pady=(theme_metrics.SECTION_GAP_Y, 0))
@@ -136,6 +158,7 @@ class IdleTransitionAdvancedPanel:
         self.scale_fade_duration.bind("<ButtonRelease-1>", lambda _e: self._on_toggle())
 
     def apply_enabled_state(self, *, power_management_enabled: bool) -> None:
+        self.chk_wake_on_any_input.configure(state="normal" if self.var_controller_sleep_respect.get() else "disabled")
         # The controller-sleep checkbox is intentionally never disabled with
         # power management; only the timing controls follow that toggle.
         state = "normal" if power_management_enabled else "disabled"

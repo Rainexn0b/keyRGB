@@ -7,9 +7,11 @@ import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from keyrgb.tray._deck_state_store import _completed_lit_state, _store_deck_state
-from keyrgb.tray.deck_state import DeckState, SleepWakeGuards, SleepWakeIntent, SleepWakeIntentKind, next_state
-from keyrgb.tray.idle_power_state import is_dim_temp_active
+from keyrgb.core.lighting_result import APPLIED, BLOCKED, DEFERRED, FAILED, LightingResult
+from keyrgb.tray._deck_restore import cancel_restore, execute_restore, record_transition
+from keyrgb.tray._deck_state_store import _store_deck_state
+from keyrgb.tray.deck_state import DeckState, SleepWakeGuards, SleepWakeIntent, SleepWakeIntentKind
+from keyrgb.tray.idle_power_state import ensure_tray_idle_power_state
 from keyrgb.tray.pollers.hardware._controller_sleep import clear_controller_wake_settle
 
 if TYPE_CHECKING:
@@ -27,7 +29,7 @@ def commit_lighting_power_intent(
     respect: bool | None = None,
     guards: SleepWakeGuards | None = None,
     fade_in_duration_s: float | None = None,
-) -> bool:
+) -> LightingResult:
     """Pipeline decision for menu/power ``is_off`` writes.
 
     The four ``lighting_controller`` entrypoints (``turn_on``, ``turn_off``,
@@ -39,10 +41,9 @@ def commit_lighting_power_intent(
     * bare ``tray.is_off=True`` with no forced-off flag is treated as
       ``POWER_OFF`` only for ``MANUAL_ON``/``POWER_RESUME`` via the narrow
       override (``hardware_apply_deferred`` stays false);
-    * a restoring leaf publishes ``RESTORING`` before it blocks on its fade,
-      then ``LIT``/``DIM_TEMP`` on success or the origin on failure;
-    * a second wake intent while ``RESTORING`` coalesces via
-      ``next_state(RESTORING, wake) -> noop``.
+    * a restoring leaf publishes ``RESTORING`` until its asynchronous fade
+      completes, then resolves stable ownership or rolls back on failure;
+    * a second wake intent while ``RESTORING`` shares the existing completion.
     """
 
     from keyrgb.tray.deck_pipeline import (
@@ -64,6 +65,8 @@ def commit_lighting_power_intent(
         # blocked restore.
         clear_controller_wake_settle(tray)
 
+    if intent_kind in (SleepWakeIntentKind.MANUAL_OFF, SleepWakeIntentKind.POWER_OFF):
+        cancel_restore(tray)
     origin = derive_deck_state(tray)
     now_val = float(now if now is not None else time.monotonic())
     respect_val = respect_enabled(tray) if respect is None else bool(respect)
@@ -76,7 +79,7 @@ def commit_lighting_power_intent(
         guards=guards_val,
     )
     if plan.deferred:
-        return False
+        return DEFERRED
     if not plan.should_commit:
         # Power restore must still run its housekeeping (last_resume_at, guard
         # clear) even when the pipeline correctly blocks the restore while
@@ -86,65 +89,32 @@ def commit_lighting_power_intent(
             DeckState.IDLE_OFF,
         ):
             leaf_fn()
-        return False
+        context = ensure_tray_idle_power_state(tray).restore_context
+        result = (
+            LightingResult(DEFERRED.status, context.completion if context else None)
+            if origin is DeckState.RESTORING
+            else BLOCKED
+        )
+        record_transition(tray, source=intent_kind, before=origin, after=origin, result=result, reason="policy")
+        return result
 
     if plan.state is DeckState.RESTORING:
-        _store_deck_state(tray, DeckState.RESTORING)
-        seeded = _seed_lighting_power_restore_windows(
-            tray,
-            fade_in_duration_s=fade_in_duration_s,
-        )
-        leaf_completed = False
-        try:
-            leaf_result = leaf_fn()
-            leaf_completed = True
-        finally:
-            if seeded:
-                _consume_lighting_power_restore_seed(tray)
-            if not leaf_completed:
-                # Preserve the caller-visible exception while repairing the
-                # pipeline state so later intents are not stranded RESTORING.
-                _store_deck_state(tray, origin)
 
-        success = leaf_result is not False
-        if intent_kind in (SleepWakeIntentKind.MANUAL_ON, SleepWakeIntentKind.POWER_RESUME):
+        def restore_leaf() -> object:
+            seeded = _seed_lighting_power_restore_windows(tray, fade_in_duration_s=fade_in_duration_s)
             try:
-                if bool(getattr(tray, "is_off", False)):
-                    success = False
-            except (AttributeError, TypeError, ValueError):
-                pass
+                result = leaf_fn()
+                return FAILED if result is False or bool(tray.is_off) else APPLIED
+            finally:
+                if seeded:
+                    _consume_lighting_power_restore_seed(tray)
 
-        if success:
-            dim_active = is_dim_temp_active(tray)
-            guards2 = SleepWakeGuards(dim_temp_still_active=bool(dim_active))
-            plan2 = next_state(
-                DeckState.RESTORING,
-                SleepWakeIntent(SleepWakeIntentKind.RESTORE_COMPLETE),
-                respect=respect_val,
-                guards=guards2,
-            )
-            if plan2.should_commit:
-                _store_deck_state(tray, plan2.state)
-            else:
-                _store_deck_state(tray, _completed_lit_state(tray))
-            return True
-
-        guards2 = SleepWakeGuards(dim_temp_still_active=is_dim_temp_active(tray))
-        plan2 = next_state(
-            DeckState.RESTORING,
-            SleepWakeIntent(SleepWakeIntentKind.RESTORE_FAILED, restore_origin=origin),
-            respect=respect_val,
-            guards=guards2,
-        )
-        if plan2.should_commit:
-            _store_deck_state(tray, plan2.state)
-        else:
-            _store_deck_state(tray, origin)
-        return False
+        return execute_restore(tray, intent_kind, restore_leaf)
 
     leaf_fn()
     _store_deck_state(tray, plan.state)
-    return True
+    record_transition(tray, source=intent_kind, before=origin, after=plan.state, result=APPLIED, reason="intent")
+    return APPLIED
 
 
 def _seed_lighting_power_restore_windows(

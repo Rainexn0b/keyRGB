@@ -48,6 +48,7 @@ def test_load_settings_defaults_without_overrides() -> None:
     assert values.os_autostart_enabled is False
     assert values.experimental_backends_enabled is False
     assert values.screen_dim_sync_enabled is True
+    assert values.wake_on_any_input is False
     assert values.screen_dim_sync_mode in {"off", "temp"}
     assert clamp_nonzero_brightness(values.screen_dim_temp_brightness) == values.screen_dim_temp_brightness
     assert values.day_base_brightness == 30

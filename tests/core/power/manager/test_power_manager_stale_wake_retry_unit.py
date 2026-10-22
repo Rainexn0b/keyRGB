@@ -48,16 +48,17 @@ class _Tray:
         return active_transition_revision(self)
 
     def turn_off(self):
-        lighting_controller.power_turn_off(self)
+        return lighting_controller.power_turn_off(self)
 
     def restore(self):
-        lighting_controller.power_restore(self)
+        return lighting_controller.power_restore(self)
 
 
 @pytest.fixture
 def wake_runtime(monkeypatch):
     tray = _Tray()
     pm = PowerManager(tray, config=tray.config)
+    pm._power_event_clock = lambda: 100.0
     pm._is_enabled = MagicMock(return_value=True)
     pm._flag = MagicMock(return_value=True)
     pm._classify_battery_saver_iteration = MagicMock(
@@ -75,7 +76,7 @@ def wake_runtime(monkeypatch):
 
 
 def _cancel_wake_with_queued_action(pm, tray, wake, action):
-    """Queue a newer revision while the real wake route is deciding its plan."""
+    """Queue work during the real wake decision, then advance its deadline."""
     deciding = threading.Event()
     release = threading.Event()
 
@@ -104,12 +105,16 @@ def _cancel_wake_with_queued_action(pm, tray, wake, action):
     finally:
         release.set()
         pm._get_keyboard_intent_state = MagicMock(return_value=False)
+        pm._power_event_clock = lambda: 101.0
 
 
 @pytest.mark.parametrize("wake_name", ["_on_resume", "_on_lid_open"])
 def test_queued_source_poll_retries_stale_wake_and_unblocks_ac_profile(wake_runtime, wake_name):
     tray, pm, start = wake_runtime
-    pm._on_suspend()
+    if wake_name == "_on_resume":
+        pm._on_suspend()
+    else:
+        pm._on_lid_close()
     assert derive_deck_state(tray) is DeckState.POWER_OFF
     policy = PowerSourceLoopPolicy()
 
@@ -119,6 +124,8 @@ def test_queued_source_poll_retries_stale_wake_and_unblocks_ac_profile(wake_runt
         getattr(pm, wake_name),
         lambda: pm._run_battery_saver_iteration(policy, poll_interval_s=0.0),
     )
+    if wake_name == "_on_resume":
+        pm._run_battery_saver_iteration(policy, poll_interval_s=0.0)
 
     start.assert_called_once()
     assert tray.is_off is False
@@ -249,6 +256,7 @@ def test_battery_to_ac_during_sleep_applies_red_profile_after_stale_wake(wake_ru
     _cancel_wake_with_queued_action(
         pm, tray, pm._on_resume, lambda: pm._run_battery_saver_iteration(policy, poll_interval_s=0.0)
     )
+    pm._run_battery_saver_iteration(policy, poll_interval_s=0.0)
     pm._run_battery_saver_iteration(policy, poll_interval_s=0.0)  # Second AC observation stabilizes the source.
     assert pm._stable_on_ac is True
     assert source["profile"] == "Red"

@@ -30,27 +30,43 @@ Then verify the supply-chain audit locally:
 Exit semantics: 0 clean, 1 findings, 2 tool/advisory/resolution failure. It audits
 runtime requirements declared in pyproject rather than arbitrary ambient packages.
 
-Then run the safe release flow:
-
-AppImage builds require `zsyncmake` (the `zsync` package on Debian/Ubuntu).
-Buildpython validates the embedded update information and the `.zsync` sidecar's
-length, SHA-1, filename, URL, and block checksum table before release upload.
+Run the local CI-equivalent gate before publishing:
 
 ```bash
-.venv/bin/python -m buildpython --profile=release
+.venv/bin/python -m buildpython --profile=ci
+```
+
+The tag-triggered release workflow builds the AppImage on Ubuntu 22.04 and installs
+`zsyncmake` (the `zsync` package). A local `--profile=release` run is optional on
+hosts equipped for AppImage builds. If it fails solely because a release-host
+dependency such as `zsyncmake` is missing, rely on the release workflow instead;
+never ignore code, test, or dependency-audit failures. Buildpython validates the
+embedded update information and the `.zsync` sidecar's length, SHA-1, filename,
+URL, and block checksum table before release upload.
+
+Then run the safe release flow:
+
+```bash
 git add -A
+git status --short  # inspect the staged set
 git commit -m "Release vX.Y.Z"
 git push origin main
+# Verify origin/main points at HEAD, its CI quality/runtime jobs passed, and the tag does not exist locally or remotely.
 git tag -a vX.Y.Z -m "vX.Y.Z"
 git push origin vX.Y.Z
 ```
 
-After the release workflow succeeds, verify that the GitHub Release contains all
-three nonempty assets:
+Only tag after the committed revision is on `origin/main` and its CI passes.
+After the tagged release workflow succeeds, download and verify all three
+nonempty GitHub Release assets:
 
 - `keyrgb-x86_64.AppImage`
 - `keyrgb-x86_64.AppImage.zsync`
 - `keyrgb-x86_64.AppImage.sha256`
+
+Run `sha256sum -c keyrgb-x86_64.AppImage.sha256` in the download directory
+alongside the AppImage. Do not consider the release complete if any asset is
+missing or empty or the checksum fails.
 
 The embedded update information is
 `gh-releases-zsync|Rainexn0b|keyRGB|latest|keyrgb-x86_64.AppImage.zsync`.

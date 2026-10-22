@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import threading
 
+from keyrgb.core.lighting_result import LightingResult
 from keyrgb.tray.controllers.runtime_coordination import (
     active_transition_revision,
     capture_transition_revision,
@@ -16,6 +17,7 @@ from keyrgb.tray.controllers.runtime_coordination import (
     run_tray_observation_if_current,
     run_tray_transition,
 )
+from keyrgb.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
 
 
 def _application_module():
@@ -25,6 +27,8 @@ def _application_module():
 
 
 class KeyRGBTrayDelegateMixin:
+    runtime_coordinator: TrayRuntimeCoordinator
+
     def run_runtime_transition(self, action):
         return run_tray_transition(self, action)
 
@@ -127,10 +131,20 @@ class KeyRGBTrayDelegateMixin:
         )
 
     def _on_off_clicked(self, _icon, _item):
-        run_tray_transition(self, lambda: _application_module().callbacks.on_off_clicked(self))
+        run_tray_transition(
+            self, lambda: _application_module().callbacks.on_off_clicked(self), supersedes_lighting=True
+        )
 
     def _on_turn_on_clicked(self, _icon, _item):
-        run_tray_transition(self, lambda: _application_module().callbacks.on_turn_on_clicked(self))
+        run_tray_transition(
+            self, lambda: _application_module().callbacks.on_turn_on_clicked(self), supersedes_lighting=True
+        )
+
+    def capture_lighting_intent_revision(self) -> int:
+        return self.runtime_coordinator.capture_intent_revision()
+
+    def active_lighting_intent_revision(self) -> int | None:
+        return self.runtime_coordinator.active_intent_revision()
 
     def _on_perkey_clicked(self, _icon, _item):
         _application_module().callbacks.on_perkey_clicked(self)
@@ -174,10 +188,10 @@ class KeyRGBTrayDelegateMixin:
             daemon=True,
         ).start()
 
-    def turn_off(self):
+    def turn_off(self) -> LightingResult:
         return run_tray_transition(self, lambda: _application_module().power_turn_off(self))
 
-    def restore(self):
+    def restore(self) -> LightingResult:
         return run_tray_transition(self, lambda: _application_module().power_restore(self))
 
     def apply_brightness_from_power_policy(self, brightness: int) -> None:

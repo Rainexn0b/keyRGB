@@ -12,8 +12,9 @@ if TYPE_CHECKING:
 
 
 def _store_deck_state(tray: IdlePowerTrayProtocol, state: DeckState) -> None:
+    """Publish the transient phase; stable state derives from owned causes."""
     try:
-        ensure_tray_idle_power_state(tray).deck_state = state
+        ensure_tray_idle_power_state(tray)._restoring = state is DeckState.RESTORING
     except (AttributeError, TypeError):
         return
 

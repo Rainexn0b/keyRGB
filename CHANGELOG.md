@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.39.0 (2026-10-22)
+
+Sleep/wake ownership consolidation and optional pointer/modifier wake.
+
+- Tray/Power: Unify manual, idle, native-controller and power restore through one transaction with explicit applied, blocked, deferred and failed outcomes. Retain overlapping off causes, retry failed restores, reassert the scene after resume even when suspend-off is disabled, and preserve lid/user-off precedence.
+- Effects: Run restore fades outside the runtime coordinator with generation and `kb_lock` guards. Make engine close terminal and bound fade-worker shutdown; prevent stale or cancelled fades from reopening the keyboard.
+- Settings/Power: Add opt-in **Wake on any input** under **Advanced → Controller sleep and idle timing**. With controller-sleep respect enabled, modifier keys, mouse and touchpad activity can restore lighting. Keep firmware-native brightness handoff, dim limits, screen-idle guards and single-restore ordering; include the setting in diagnostics.
+- Tests/Docs: Add sleep/wake sequence, rollback, shutdown and input-event regressions. Automated validation does not replace live hardware acceptance for controller sleep, wake timing and physical LED behavior.
+
 ## 0.38.2 (2026-10-09)
 
 Dark-theme polish and AppImage update metadata.

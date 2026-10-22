@@ -3,9 +3,9 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 
+from keyrgb.core.lighting_result import LightingResult
 from keyrgb.tray._power_restore_policy import normalize_lighting_power_restore_policy_state
 from keyrgb.tray.idle_power_state import (
-    read_idle_power_state_bool_field,
     read_last_brightness,
     set_idle_power_state_field,
 )
@@ -63,23 +63,6 @@ def _set_last_resume_at(tray: LightingTrayProtocol, value: float) -> None:
     set_idle_power_state_field(tray, attr_name="_last_resume_at", state_name="last_resume_at", value=value)
 
 
-def _read_controller_sleep_off(tray: LightingTrayProtocol) -> bool:
-    """Read whether the controller has native-slept the deck dark.
-
-    This is the firmware-input-timeout sleep, distinct from an explicit off:
-    the physical deck is already dark but the engine's cached brightness is
-    untouched. A fade-off would flatten and re-enter user mode at that cached
-    brightness and briefly relight the deck before fading it back to off.
-    """
-
-    return read_idle_power_state_bool_field(
-        tray,
-        attr_name="_controller_sleep_off",
-        state_name="controller_sleep_off",
-        default=False,
-    )
-
-
 def turn_off_impl(
     tray: LightingTrayProtocol,
     *,
@@ -87,7 +70,7 @@ def turn_off_impl(
     software_effect_target_routes_aux_devices: Callable[[LightingTrayProtocol], bool],
     turn_off_secondary_software_targets: Callable[[LightingTrayProtocol], None],
     turn_off_secondary_profile_areas: Callable[[LightingTrayProtocol], None] | None = None,
-) -> None:
+) -> LightingResult:
     # Late import to avoid cycles: deck_pipeline is the commit owner.
     from keyrgb.tray.deck_pipeline import commit_lighting_power_intent
     from keyrgb.tray.deck_state import SleepWakeIntentKind
@@ -105,7 +88,7 @@ def turn_off_impl(
         tray.is_off = True
         tray._refresh_ui()
 
-    commit_lighting_power_intent(tray, SleepWakeIntentKind.MANUAL_OFF, _leaf)
+    return commit_lighting_power_intent(tray, SleepWakeIntentKind.MANUAL_OFF, _leaf)
 
 
 def turn_on_impl(
@@ -113,7 +96,7 @@ def turn_on_impl(
     *,
     try_log_event: Callable[..., None],
     start_current_effect: Callable[..., object],
-) -> None:
+) -> LightingResult:
     from keyrgb.tray.deck_pipeline import commit_lighting_power_intent
     from keyrgb.tray.deck_state import SleepWakeIntentKind
 
@@ -150,7 +133,7 @@ def turn_on_impl(
         tray._refresh_ui()
         return started is not False
 
-    commit_lighting_power_intent(
+    return commit_lighting_power_intent(
         tray,
         SleepWakeIntentKind.MANUAL_ON,
         _leaf,
@@ -165,7 +148,7 @@ def power_turn_off_impl(
     software_effect_target_routes_aux_devices: Callable[[LightingTrayProtocol], bool],
     turn_off_secondary_software_targets: Callable[[LightingTrayProtocol], None],
     turn_off_secondary_profile_areas: Callable[[LightingTrayProtocol], None] | None = None,
-) -> None:
+) -> LightingResult:
     from keyrgb.tray.deck_pipeline import commit_lighting_power_intent
     from keyrgb.tray.deck_state import SleepWakeIntentKind
 
@@ -175,23 +158,16 @@ def power_turn_off_impl(
         _set_idle_forced_off(tray, False)
         _set_controller_sleep_resume_guard(tray, False)
         tray.is_off = True
-        # If the controller already native-slept the deck dark
-        # (controller_sleep_off), an explicit off keeps it dark without a
-        # wake-capable flatten/fade write: the engine's cached brightness is still
-        # the last user value, so a fade would re-enter user mode at that brightness
-        # and visibly relight the deck before turning it off. An ordinary on-state
-        # suspend still fades to off as configured.
-        if _read_controller_sleep_off(tray):
-            tray.engine.turn_off()
-        else:
-            tray.engine.turn_off(fade=True, fade_duration_s=idle_fade_duration_s(tray.config))
+        # PrepareForSleep has a finite shutdown budget. Commit off immediately;
+        # also avoids flattening a natively sleeping deck back into user mode.
+        tray.engine.turn_off()
         if software_effect_target_routes_aux_devices(tray):
             turn_off_secondary_software_targets(tray)
         if turn_off_secondary_profile_areas is not None:
             turn_off_secondary_profile_areas(tray)
         tray._refresh_ui(refresh_menu=False)
 
-    commit_lighting_power_intent(tray, SleepWakeIntentKind.POWER_OFF, _leaf)
+    return commit_lighting_power_intent(tray, SleepWakeIntentKind.POWER_OFF, _leaf)
 
 
 def power_restore_impl(
@@ -203,7 +179,7 @@ def power_restore_impl(
     is_software_effect_fn: Callable[[str], bool],
     is_reactive_effect_fn: Callable[[str], bool],
     start_current_effect: Callable[..., object],
-) -> None:
+) -> LightingResult:
     from keyrgb.tray.deck_pipeline import commit_lighting_power_intent
     from keyrgb.tray.deck_state import SleepWakeIntentKind
 
@@ -261,7 +237,7 @@ def power_restore_impl(
         tray._refresh_ui(refresh_menu=False)
         return started is not False
 
-    commit_lighting_power_intent(
+    return commit_lighting_power_intent(
         tray,
         SleepWakeIntentKind.POWER_RESUME,
         _leaf,

@@ -7,8 +7,10 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from concurrent.futures import Future
 from typing import TYPE_CHECKING
 
+from keyrgb.core.lighting_result import BLOCKED, FAILED, LightingResult, lighting_result
 from keyrgb.core.profile import profiles as perkey_profiles, runtime_activation as profile_runtime_activation
 
 from ..policies import power_event_policy as _power_event_policy
@@ -76,15 +78,15 @@ def _run_tray_transition_if_available(tray: object, action):
 
 
 def _capture_tray_transition_revision(tray: object) -> int | None:
-    if not callable(getattr(type(tray), "capture_runtime_transition_revision", None)):
+    if not callable(getattr(type(tray), "capture_lighting_intent_revision", None)):
         return None
-    return tray.capture_runtime_transition_revision()  # type: ignore[attr-defined]
+    return tray.capture_lighting_intent_revision()  # type: ignore[attr-defined]
 
 
 def _active_tray_transition_revision(tray: object) -> int | None:
-    if not callable(getattr(type(tray), "active_runtime_transition_revision", None)):
+    if not callable(getattr(type(tray), "active_lighting_intent_revision", None)):
         return None
-    return tray.active_runtime_transition_revision()  # type: ignore[attr-defined]
+    return tray.active_lighting_intent_revision()  # type: ignore[attr-defined]
 
 
 def _tray_callable(tray: object, name: str):
@@ -209,12 +211,16 @@ class PowerManager:
         self._power_event_generation_lock = threading.Lock()
         self._power_event_context = threading.local()
         self._battery_iteration_context = threading.local()
-        self._saved_state = None
         self._event_policy = PowerEventPolicy()
-        self._pending_power_restore_route: tuple[str, str, int] | None = None
+        self._pending_power_restore_route: tuple[str, str, int, int | None] | None = None
+        self._pending_power_restore_not_before = 0.0
+        self._pending_power_restore_future: Future[LightingResult] | None = None
+        self._power_restore_failures = 0
+        self._power_event_clock = time.monotonic
         self._stable_on_ac: bool | None = None
         self._pending_on_ac: bool | None = None
         self._lid_closed = False
+        self._suspended = False
 
     def _reload_config(self, *, context: str) -> bool:
         return reload_power_management_config(self._config, context=context, logger=logger)
@@ -299,8 +305,7 @@ class PowerManager:
 
         def sync_lid_and_retry_wake() -> None:
             self._sync_lid_state_from_system()
-            if not self._lid_closed or not self._flag("power_off_on_lid_close", True):
-                self._retry_pending_power_restore()
+            self._retry_pending_power_restore()
 
         def execute_plan(plan, *, poll_interval_s: float) -> bool:
             return self._execute_battery_saver_iteration_plan(
@@ -489,6 +494,8 @@ class PowerManager:
         expected_action_type,
         kb_method_name: str,
     ) -> None:
+        if expected_action_type is RestoreFromEvent and delay_s > 0 and not self._pending_power_restore_not_before:
+            self._pending_power_restore_not_before = self._power_event_clock() + delay_s
         orchestrate_power_event(
             enabled=enabled,
             action_enabled=action_enabled,
@@ -500,11 +507,7 @@ class PowerManager:
                 plan,
                 log_message=log_message,
                 kb_method_name=kb_method_name,
-                record_restore_executed_fn=(
-                    self._event_policy.record_power_restore_executed
-                    if expected_action_type is RestoreFromEvent
-                    else None
-                ),
+                restoring=expected_action_type is RestoreFromEvent,
             ),
         )
 
@@ -533,6 +536,7 @@ class PowerManager:
             enabled=enabled,
             action_enabled=action_enabled,
             is_off=is_off,
+            restore_blocked=self._power_restore_blocked(),
         )
 
         return self._run_recoverable_runtime_boundary(
@@ -546,38 +550,82 @@ class PowerManager:
         *,
         log_message: str,
         kb_method_name: str,
-        record_restore_executed_fn=None,
+        restoring: bool = False,
     ) -> None:
         executed = execute_power_event_plan(
             plan=plan,
             log_message=log_message,
             kb_method_name=kb_method_name,
             log_info_fn=logger.info,
-            sleep_fn=time.sleep,
             invoke_keyboard_method_fn=self._invoke_keyboard_method,
-            should_invoke_fn=self._power_event_is_current,
+            should_invoke_fn=lambda: (
+                self._power_event_is_current(preserve_off_causes=not restoring)
+                and (not restoring or self._power_restore_eligible())
+            ),
         )
-        if executed and callable(record_restore_executed_fn):
-            record_restore_executed_fn()
+        if not restoring or not plan.should_invoke:
+            return
+        result = lighting_result(executed)
+        if result.completion is not None:
+            self._pending_power_restore_future = result.completion
+
+            def completed(future: Future[LightingResult]) -> None:
+                def accept_completion() -> None:
+                    if self._pending_power_restore_future is not future:
+                        return
+                    self._pending_power_restore_future = None
+                    self._record_power_restore_result(future.result())
+
+                self._run_recoverable_runtime_boundary(
+                    lambda: _run_tray_transition_if_available(self.kb_controller, accept_completion),
+                    log_message="Power restore completion failed",
+                )
+
+            result.completion.add_done_callback(completed)
+        else:
+            self._record_power_restore_result(result)
+
+    def _record_power_restore_result(self, result: LightingResult) -> None:
+        if result.settled:
+            self._event_policy.record_power_restore_executed()
             self._pending_power_restore_route = None
-        elif bool(getattr(plan, "should_invoke", False)) and callable(record_restore_executed_fn):
-            logger.debug("Power restore plan superseded; retaining saved intent for the next power-source poll")
+            self._pending_power_restore_not_before = 0.0
+            self._power_restore_failures = 0
+        elif result.status is FAILED.status:
+            self._power_restore_failures += 1
+            self._pending_power_restore_not_before = self._power_event_clock() + min(
+                30.0, 0.5 * 2 ** min(self._power_restore_failures, 6)
+            )
+        logger.debug("Power restore result=%s pending=%s", result.status.value, self._event_policy.restore_pending)
+
+    def _power_restore_eligible(self) -> bool:
+        """The same current blockers and deadline govern first attempt and retry."""
+        return (
+            not self._power_restore_blocked()
+            and self._pending_power_restore_future is None
+            and self._power_event_clock() >= self._pending_power_restore_not_before
+        )
+
+    def _power_restore_blocked(self) -> bool:
+        return self._suspended or (self._lid_closed and self._flag("power_off_on_lid_close", True))
 
     def _retry_pending_power_restore(self) -> None:
-        """Complete a received wake rejected by a newer queued polling revision.
-
-        Retaining policy intent alone is insufficient: lid-open/resume may be
-        the last wake events, and the power-off latch otherwise pauses source
-        polling forever. Retry inside its next serialized iteration, before
-        that latch check. Preserve the original flag and event generation so a
-        disabled restore or a newer suspend still wins. The original wake has
-        already waited its stabilization delay; do not repeat it on every poll.
-        """
+        """Retry a received wake after its deadline, before source-poll gating."""
 
         route = self._pending_power_restore_route
         if route is None or self._event_policy.restore_pending is not True:
             return
-        flag_name, log_message, generation = route
+        flag_name, log_message, generation, intent_revision = route
+        if not self._is_enabled() or (
+            intent_revision is not None and intent_revision != _capture_tray_transition_revision(self.kb_controller)
+        ):
+            self._record_power_restore_result(BLOCKED)
+            return
+        if not self._power_restore_eligible():
+            return
+        if not self._flag(flag_name, True):
+            self._record_power_restore_result(BLOCKED)
+            return
         with self._power_event_generation_lock:
             if generation != self._power_event_generation:
                 return
@@ -595,13 +643,22 @@ class PowerManager:
             self._power_event_generation += 1
             return self._power_event_generation
 
-    def _power_event_is_current(self) -> bool:
+    def _power_event_is_current(self, *, preserve_off_causes: bool = False) -> bool:
         generation = getattr(self._power_event_context, "generation", None)
         if generation is None:
             return True
         with self._power_event_generation_lock:
-            if int(generation) != self._power_event_generation:
-                return False
+            superseded = int(generation) != self._power_event_generation
+        # A lid-open during suspend cannot cancel the queued suspend-off.
+        # Read configuration outside the generation lock.
+        if superseded and (
+            not preserve_off_causes
+            or not (
+                (self._suspended and self._flag("power_off_on_suspend", True))
+                or (self._lid_closed and self._flag("power_off_on_lid_close", True))
+            )
+        ):
+            return False
         transition_revision = getattr(self._power_event_context, "transition_revision", None)
         if transition_revision is None:
             return True
@@ -615,8 +672,8 @@ class PowerManager:
         finally:
             del self._power_event_context.generation
 
-    def _invoke_keyboard_method(self, method_name: str) -> None:
-        invoke_keyboard_method(
+    def _invoke_keyboard_method(self, method_name: str) -> LightingResult:
+        return invoke_keyboard_method(
             kb_controller=self.kb_controller,
             method_name=method_name,
             run_recoverable_runtime_boundary_fn=self._run_recoverable_runtime_boundary,
@@ -646,9 +703,12 @@ class PowerManager:
                 self._power_event_context.transition_revision = active_revision
             try:
                 if expected_action_type is RestoreFromEvent and event_generation is not None:
-                    self._pending_power_restore_route = (flag_name, log_message, event_generation)
+                    self._pending_power_restore_route = (flag_name, log_message, event_generation, active_revision)
                 elif expected_action_type is TurnOffFromEvent:
                     self._pending_power_restore_route = None
+                    self._pending_power_restore_future = None
+                    self._pending_power_restore_not_before = 0.0
+                    self._power_restore_failures = 0
                 self._handle_power_event(
                     enabled=self._is_enabled(),
                     action_enabled=self._flag(flag_name, True),
@@ -681,6 +741,7 @@ class PowerManager:
 
     def _on_suspend(self) -> None:
         """Called when system is about to suspend."""
+        self._suspended = True
         self._run_received_power_event(
             lambda: self._dispatch_power_event_route(
                 flag_name="power_off_on_suspend",
@@ -693,6 +754,7 @@ class PowerManager:
 
     def _on_resume(self) -> None:
         """Called when system resumes from suspend."""
+        self._suspended = False
         self._run_received_power_event(
             lambda: self._dispatch_power_event_route(
                 flag_name="power_restore_on_resume",

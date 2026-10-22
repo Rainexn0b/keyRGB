@@ -105,7 +105,7 @@ def test_nonzero_read_while_controller_sleep_off_restarts_stopped_effect(monkeyp
     assert tray.is_off is False
     assert last_brightness == 25
     assert owner.last_resume_at == 101.0
-    assert start_calls == [{"controller_brightness_handoff": 25}]
+    assert start_calls == [{"brightness_override": None, "controller_brightness_handoff": 25}]
 
 
 def test_failed_firmware_wake_keeps_controller_sleep_latched_for_retry(monkeypatch) -> None:
@@ -198,7 +198,7 @@ def test_firmware_wake_without_temp_dim_still_restores_full_brightness(monkeypat
 
     assert len(start_calls) == 1
     # No brightness override -> full configured brightness; no forced-off dim.
-    assert start_calls[0] == {"controller_brightness_handoff": 25}
+    assert start_calls[0] == {"brightness_override": None, "controller_brightness_handoff": 25}
     assert result == (25, False)
     assert owner.last_resume_at == 101.0
 

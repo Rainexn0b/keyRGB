@@ -101,9 +101,9 @@ def _apply_time_scheduler_brightness_owned(
     if reactive_brightness_int is not None and reactive_brightness_int < 0:
         return False
 
-    from keyrgb.tray.deck_pipeline import hardware_apply_deferred
+    from keyrgb.tray.deck_pipeline import defer_lighting_change
 
-    defer_hardware_apply = hardware_apply_deferred(tray)
+    defer_hardware_apply = defer_lighting_change(tray)
 
     try:
         apply_layered_brightness_update(

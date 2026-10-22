@@ -68,7 +68,7 @@ def test_controller_sleep_restore_on_new_evdev_input_edge() -> None:
 
     _runtime._maybe_restore_from_controller_sleep(tray, loop_state=loop_state, session_idle=None)
 
-    assert calls == [{"controller_brightness_handoff": 50}]
+    assert calls == [{"brightness_override": None, "controller_brightness_handoff": 50}]
     assert refreshed == [(False, False)]
 
 
@@ -83,7 +83,7 @@ def test_controller_sleep_restore_stays_armed_when_native_handoff_fails() -> Non
 
     _runtime._maybe_restore_from_controller_sleep(tray, loop_state=loop_state, session_idle=None)
 
-    assert calls == [{"controller_brightness_handoff": 50}]
+    assert calls == [{"brightness_override": None, "controller_brightness_handoff": 50}]
     assert tray._controller_sleep_off is True
 
 
@@ -153,7 +153,7 @@ def test_controller_sleep_polls_keyboard_tracker_alongside_wayland() -> None:
     )
 
     assert loop_state.input_idle_tracker is tracker
-    assert calls == [{"controller_brightness_handoff": 50}]
+    assert calls == [{"brightness_override": None, "controller_brightness_handoff": 50}]
 
 
 def test_controller_sleep_evdev_restore_yields_to_firmware_wake_claim() -> None:
@@ -277,7 +277,7 @@ def test_controller_sleep_restore_event_waits_for_actual_relight(caplog) -> None
 
         _runtime._maybe_restore_from_controller_sleep(immediate, loop_state=immediate_loop_state, session_idle=None)
 
-        assert start_calls == [{"controller_brightness_handoff": 50}]
+        assert start_calls == [{"brightness_override": None, "controller_brightness_handoff": 50}]
         assert [record for record in caplog.records if "controller_sleep_restore" in record.getMessage()]
 
 

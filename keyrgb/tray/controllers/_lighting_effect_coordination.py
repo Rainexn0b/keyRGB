@@ -10,6 +10,8 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable
+from concurrent.futures import Future
+from contextlib import nullcontext
 from dataclasses import dataclass
 from operator import attrgetter
 
@@ -264,40 +266,33 @@ def _apply_effect_fade_ramp(
         else:
             _reactive_support.set_engine_attr(tray.engine, "_reactive_follow_global_brightness", True)
             fade_generation = _effect_generation(tray.engine)
-        fade_completed = False
+
+        def finalize(completed: bool) -> None:
+            if completed:
+                _seed_post_fade_reactive_release(
+                    tray,
+                    from_brightness=int(target_brightness),
+                    duration_s=float(fade_in_duration_s),
+                )
+            _reactive_support.set_engine_attr(tray.engine, "_reactive_follow_global_brightness", False)
+
+        prepared = False
         try:
-            tray.engine.set_brightness(
+            fade = tray.engine.set_brightness(
                 target_brightness,
                 apply_to_hardware=False,
                 fade=True,
                 fade_duration_s=float(fade_in_duration_s),
             )
-            fade_completed = True
+            prepared = True
         finally:
-
-            def _finalize_owned_fade() -> None:
-                fade_still_owned = fade_generation is not None and _effect_generation(tray.engine) == fade_generation
-                if fade_completed and fade_still_owned:
-                    _seed_post_fade_reactive_release(
-                        tray,
-                        from_brightness=int(target_brightness),
-                        duration_s=float(fade_in_duration_s),
-                    )
-                if fade_still_owned:
-                    _reactive_support.set_engine_attr(
-                        tray.engine,
-                        "_reactive_follow_global_brightness",
-                        False,
-                    )
-
-            if lifecycle_lock is not None:
-                with lifecycle_lock:
-                    _finalize_owned_fade()
-            else:
-                _finalize_owned_fade()
+            if not prepared:
+                _finish_effect_fade(tray, None, fade_generation, lambda _: finalize(False))
+        _finish_effect_fade(tray, fade, fade_generation, finalize)
         return
 
     follow_global_flag = False
+    fade_generation = _effect_generation(tray.engine)
     saved_reactive_br = None
     saved_perkey_br = None
     if plan.apply_to_hardware:
@@ -310,31 +305,39 @@ def _apply_effect_fade_ramp(
         follow_global_flag = True
         _reactive_support.set_engine_attr(tray.engine, "_reactive_follow_global_brightness", True)
 
-    if plan.apply_to_hardware:
-        tray.engine.set_brightness(
-            target_brightness,
-            apply_to_hardware=True,
-            fade=True,
-            fade_duration_s=float(fade_in_duration_s),
-        )
-    else:
-        tray.engine.set_brightness(
-            target_brightness,
-            apply_to_hardware=False,
-            fade=True,
-            fade_duration_s=float(fade_in_duration_s),
-        )
+    fade = tray.engine.set_brightness(
+        target_brightness,
+        apply_to_hardware=plan.apply_to_hardware,
+        fade=True,
+        fade_duration_s=float(fade_in_duration_s),
+    )
 
-    if follow_global_flag:
-        _reactive_support.set_engine_attr(tray.engine, "_reactive_follow_global_brightness", False)
-
-    if saved_reactive_br is not None:
-        try:
+    def finalize_targets(_completed: bool) -> None:
+        if follow_global_flag:
+            _reactive_support.set_engine_attr(tray.engine, "_reactive_follow_global_brightness", False)
+        if saved_reactive_br is not None:
             tray.engine.reactive_brightness = int(saved_reactive_br)
-        except (AttributeError, TypeError, ValueError, OverflowError):
-            pass
-    if saved_perkey_br is not None:
-        try:
+        if saved_perkey_br is not None:
             tray.engine.per_key_brightness = int(saved_perkey_br)
-        except (AttributeError, TypeError, ValueError, OverflowError):
-            pass
+
+    _finish_effect_fade(tray, fade, fade_generation, finalize_targets)
+
+
+def _finish_effect_fade(
+    tray: LightingTrayProtocol, fade: object, generation: int | None, finalize: Callable[[bool], None]
+) -> None:
+    def finish(future: Future[bool] | None = None) -> None:
+        completed = future is None or (future.exception() is None and future.result())
+        if future is not None and not completed:
+            # Keep the global cap until the owner stops/retries a failed restore.
+            return
+        lock = getattr(tray.engine, "_start_lock", None)
+        with lock if lock is not None else nullcontext():
+            if generation is not None and _effect_generation(tray.engine) != generation:
+                return
+            finalize(completed)
+
+    if isinstance(fade, Future):
+        fade.add_done_callback(finish)
+    else:
+        finish()

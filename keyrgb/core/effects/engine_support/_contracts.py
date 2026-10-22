@@ -18,6 +18,7 @@ class EngineSupportContract(Protocol):
     kb: KeyboardDeviceProtocol
     backend_caps: BackendCapabilities
     device_available: bool
+    _closed: bool
     running: bool
     thread: Thread | None
     speed: int
@@ -40,6 +41,8 @@ class EngineSupportContract(Protocol):
 
     def _ensure_device_available(self) -> bool: ...
 
+    def _drain_brightness_fades(self, timeout_s: float) -> bool: ...
+
     def get_backend_effects(self) -> dict[str, Callable[..., object]]: ...
 
     def get_backend_colors(self) -> dict[str, object]: ...
@@ -50,6 +53,7 @@ _REQUIRED_ENGINE_SUPPORT_MEMBERS = (
     "kb",
     "backend_caps",
     "device_available",
+    "_closed",
     "running",
     "thread",
     "speed",
@@ -69,6 +73,7 @@ _REQUIRED_ENGINE_SUPPORT_MEMBERS = (
     "_permission_error_cb",
     "stop",
     "_ensure_device_available",
+    "_drain_brightness_fades",
     "get_backend_effects",
     "get_backend_colors",
 )

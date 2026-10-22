@@ -42,6 +42,7 @@ _CONFIG_SNAPSHOT_SETTINGS_WHITELIST = (
     "experimental_backends_enabled",
     "software_effect_target",
     "controller_sleep_respect",
+    "wake_on_any_input",
     "screen_dim_sync_enabled",
     "screen_dim_sync_mode",
 )

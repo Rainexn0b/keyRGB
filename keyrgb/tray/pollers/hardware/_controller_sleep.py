@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import inspect
-from collections.abc import Callable
-from typing import Any, cast
+from typing import cast
 
 from keyrgb.core.backends.policies.sleep_state import is_controller_sleep_state
 from keyrgb.core.backends.policies.wake_settle import controller_wake_settle_s
@@ -15,19 +13,6 @@ from . import _recovery
 
 _HARDWARE_POLL_RECOVERY_EXCEPTIONS = _recovery._HARDWARE_POLL_RECOVERY_EXCEPTIONS
 _HARDWARE_POLL_RUNTIME_EXCEPTIONS = _recovery._HARDWARE_POLL_RUNTIME_EXCEPTIONS
-
-
-def _callback_accepts_controller_handoff(callback: object) -> bool:
-    """Preserve older tray callback facades that predate the handoff keyword."""
-
-    try:
-        parameters = inspect.signature(cast(Callable[..., Any], callback)).parameters.values()
-    except (TypeError, ValueError):
-        return False
-    return any(
-        parameter.name == "controller_brightness_handoff" or parameter.kind is inspect.Parameter.VAR_KEYWORD
-        for parameter in parameters
-    )
 
 
 def controller_wake_settle_delay_s(tray: IdlePowerTrayProtocol) -> float:
@@ -199,21 +184,13 @@ def restart_effect_after_firmware_wake_best_effort(
     start_current_effect = _recovery._resolve_tray_callback(tray, "_start_current_effect")
     try:
         if callable(start_current_effect):
-            # Older tray facades returned None after a successful start.
-            supports_handoff = _callback_accepts_controller_handoff(start_current_effect)
-            if brightness_override is not None:
-                if controller_brightness_handoff is None or not supports_handoff:
-                    return start_current_effect(brightness_override=int(brightness_override)) is not False
-                return (
-                    start_current_effect(
-                        brightness_override=int(brightness_override),
-                        controller_brightness_handoff=controller_brightness_handoff,
-                    )
-                    is not False
+            return (
+                start_current_effect(
+                    brightness_override=brightness_override,
+                    controller_brightness_handoff=controller_brightness_handoff,
                 )
-            if controller_brightness_handoff is None or not supports_handoff:
-                return start_current_effect() is not False
-            return start_current_effect(controller_brightness_handoff=controller_brightness_handoff) is not False
+                is not False
+            )
 
         from keyrgb.tray.controllers.lighting_controller import start_current_effect as start_effect
 

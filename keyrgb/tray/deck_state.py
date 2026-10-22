@@ -1,9 +1,4 @@
-"""Pure sleep/wake deck-state decision table.
-
-SWP-0 of the sleep/wake brightness pipeline. Runtime pollers do not call this
-yet; the table freezes legal transitions and ``controller_sleep_respect``
-policy before any commit path moves.
-"""
+"""Pure sleep/wake decision table used by the runtime deck pipeline."""
 
 from __future__ import annotations
 
@@ -12,7 +7,7 @@ from enum import Enum
 
 
 class DeckState(str, Enum):
-    """Commit-time lighting authority. Off reasons are not combinable."""
+    """Effective commit-time authority; the owner retains overlapping causes."""
 
     LIT = "lit"
     DIM_TEMP = "dim_temp"
@@ -30,6 +25,7 @@ class SleepWakeIntentKind(str, Enum):
     CONTROLLER_SLEEP = "controller_sleep"
     AUTO_HEAL = "auto_heal"
     KEYBOARD_WAKE = "keyboard_wake"
+    INPUT_WAKE = "input_wake"
     FIRMWARE_WAKE = "firmware_wake"
     SCREEN_WAKE = "screen_wake"
     POWER_OFF = "power_off"
@@ -43,6 +39,7 @@ class SleepWakeIntentKind(str, Enum):
 
 class RestoreSource(str, Enum):
     KEYBOARD_EVDEV = "keyboard_evdev"
+    INPUT_ACTIVITY = "input_activity"
     FIRMWARE_WAKE = "firmware_wake"
     POWER_RESUME = "power_resume"
     SCREEN_WAKE = "screen_wake"
@@ -62,6 +59,7 @@ _LIT_FAMILY = frozenset({DeckState.LIT, DeckState.DIM_TEMP})
 _WAKE_KINDS = frozenset(
     {
         SleepWakeIntentKind.KEYBOARD_WAKE,
+        SleepWakeIntentKind.INPUT_WAKE,
         SleepWakeIntentKind.FIRMWARE_WAKE,
         SleepWakeIntentKind.SCREEN_WAKE,
         SleepWakeIntentKind.POWER_RESUME,
@@ -71,6 +69,7 @@ _WAKE_KINDS = frozenset(
 )
 _INTENT_RESTORE_SOURCE = {
     SleepWakeIntentKind.KEYBOARD_WAKE: RestoreSource.KEYBOARD_EVDEV,
+    SleepWakeIntentKind.INPUT_WAKE: RestoreSource.INPUT_ACTIVITY,
     SleepWakeIntentKind.FIRMWARE_WAKE: RestoreSource.FIRMWARE_WAKE,
     SleepWakeIntentKind.SCREEN_WAKE: RestoreSource.SCREEN_WAKE,
     SleepWakeIntentKind.POWER_RESUME: RestoreSource.POWER_RESUME,
@@ -98,6 +97,8 @@ class SleepWakeGuards:
     stable_zero_confirmed: bool = False
     idle_restore_requires_keyboard: bool = False
     keyboard_activity: bool = False
+    input_activity: bool = False
+    wake_on_any_input: bool = False
     dim_temp_still_active: bool = False
 
 
@@ -165,6 +166,16 @@ def next_state(
 
     if kind is SleepWakeIntentKind.AUTO_HEAL:
         return _plan_auto_heal(state, respect=respect, guards=active)
+
+    if kind is SleepWakeIntentKind.INPUT_WAKE:
+        if (
+            respect
+            and active.wake_on_any_input
+            and active.input_activity
+            and state in (DeckState.CONTROLLER_SLEEP_DARK, DeckState.IDLE_OFF)
+        ):
+            return _restoring(kind)
+        return _noop(state)
 
     if kind in _WAKE_KINDS:
         return _plan_wake(state, kind, guards=active)
@@ -254,7 +265,7 @@ def _plan_wake(state: DeckState, kind: SleepWakeIntentKind, *, guards: SleepWake
         return _noop(state)
 
     if kind is SleepWakeIntentKind.POWER_RESUME:
-        if state is DeckState.POWER_OFF or state is DeckState.CONTROLLER_SLEEP_DARK:
+        if state in _LIT_FAMILY or state in (DeckState.POWER_OFF, DeckState.CONTROLLER_SLEEP_DARK):
             return _restoring(kind)
         return _noop(state)
 

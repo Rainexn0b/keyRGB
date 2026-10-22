@@ -53,8 +53,7 @@ def _call_runtime_boundary(
     on_recoverable: Callable[[Exception], None] | None = None,
 ) -> bool:
     try:
-        fn()
-        return True
+        return fn() is not False
     except _RECOVERABLE_RUNTIME_ERRORS as exc:
         if on_recoverable is not None:
             on_recoverable(exc)
@@ -266,7 +265,7 @@ def _set_brightness_best_effort(
         )
 
 
-def restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
+def restore_from_idle(tray: IdlePowerTrayProtocol) -> bool:
     from keyrgb.tray.controllers._power._transition_constants import (
         SOFT_ON_START_BRIGHTNESS,
         idle_fade_duration_s,
@@ -341,7 +340,7 @@ def restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
         float(fade_duration_s),
     )
 
-    _call_runtime_boundary(
+    restored = _call_runtime_boundary(
         lambda: start_current_effect_for_idle_restore(
             tray,
             brightness_override=brightness_override,
@@ -365,6 +364,7 @@ def restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
         call_runtime_boundary=_call_runtime_boundary,
         warning_level=logging.WARNING,
     )
+    return restored
 
 
 def apply_idle_action(
@@ -372,13 +372,13 @@ def apply_idle_action(
     *,
     action: str | None,
     dim_temp_brightness: int,
-    restore_from_idle_fn: Callable[[IdlePowerTrayProtocol], None],
+    restore_from_idle_fn: Callable[[IdlePowerTrayProtocol], object],
     reactive_effects_set: frozenset[str],
     sw_effects_set: frozenset[str],
-) -> None:
+) -> bool:
     from keyrgb.tray.pollers.idle_power._action_execution import execute_idle_action
 
-    execute_idle_action(
+    return execute_idle_action(
         tray,
         action=action,
         dim_temp_brightness=dim_temp_brightness,

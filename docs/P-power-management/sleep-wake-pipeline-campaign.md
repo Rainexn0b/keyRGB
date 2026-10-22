@@ -6,6 +6,13 @@
 **Hardware validation gate:** inherit [KSW-8](keyboard-sleep-wake-hardening-campaign.md)
 plus one-restore-per-wake evidence after the pipeline cutover
 
+**2026-10-22 follow-up:** the implemented ownership/outcome/deadline model is
+documented in [tray runtime state ownership](../1-src/13-tray-runtime-state-ownership.md)
+and tracked in [sleep-wake-consolidation-tracker.md](sleep-wake-consolidation-tracker.md).
+It supersedes the prospective state/restore shape below: causes can overlap,
+stable deck state is derived from the typed owner, and restore fades complete
+asynchronously.
+
 ## Purpose
 
 Collapse overlapping sleep/wake brightness writers into **one intent pipeline**
@@ -50,7 +57,7 @@ Yes. `controller_sleep_respect` is a first-class pipeline policy input, not a
 side flag sprinkled through pollers.
 
 Config key: `controller_sleep_respect` (`IDLE_DISPLAY`, default `False`).
-GUI: Settings → Screen idle/blanking sync → **Let the controller's own sleep
+GUI: Settings → Advanced → Controller sleep and idle timing → **Let the controller's own sleep
 timeout turn the keyboard off**.
 
 The pipeline has two restore policies over the same state machine:
@@ -69,8 +76,12 @@ Legal wakes when the setting is on, unchanged from
 4. Firmware-first race: hardware sees `brightness>0 && !is_off` before evdev;
    one restore commit, the trailing evdev restore is a no-op
 
-Mouse, touchpad, compositor-resume, and modifier-only events stay ignored.
-Screen-idle off inherits the same key-only restore rule while the setting is on.
+Mouse, touchpad, compositor-resume, and modifier-only events stay ignored by
+default. The follow-up **Wake on any input** setting (`wake_on_any_input`,
+default `False`) explicitly enables modifier/pointer wake through `INPUT_WAKE`
+and the shared restore transaction. Screen-idle off inherits the selected input
+rule while controller-sleep respect is on. See the durable policy for evidence,
+settling and fallback requirements.
 Sleep detection stays backend-owned in
 `keyrgb/core/backends/policies/sleep_state.py`. No backend-name checks.
 

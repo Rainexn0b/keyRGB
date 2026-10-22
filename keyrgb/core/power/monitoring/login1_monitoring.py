@@ -13,7 +13,7 @@ def iter_prepare_for_sleep_events(lines: Iterable[str]) -> Iterator[bool]:
     Yields:
         True for suspend (going to sleep), False for resume (waking up).
 
-    This logic intentionally mirrors the legacy behavior in `PowerManager._monitor_loop`.
+    Shared by the live monitor and parser tests.
     """
 
     it = iter(lines)
@@ -63,27 +63,22 @@ def monitor_prepare_for_sleep(
 
         # For type-checkers: stdout is only None if stdout=DEVNULL/None.
         assert process.stdout is not None
+        stdout = process.stdout
 
         if on_started is not None:
             on_started()
 
-        # Read incrementally to preserve the original behavior.
-        while is_running():
-            line = process.stdout.readline()
-            if not is_running():
-                break
-            if not line:
-                break
+        def lines() -> Iterator[str]:
+            while is_running():
+                line = stdout.readline()
+                if not line or not is_running():
+                    return
+                yield line
 
-            if "PrepareForSleep" not in line:
-                continue
-
-            next_line = process.stdout.readline()
-            if not is_running():
-                break
-            if "boolean true" in next_line:
+        for suspending in iter_prepare_for_sleep_events(lines()):
+            if suspending:
                 on_suspend()
-            elif "boolean false" in next_line:
+            else:
                 on_resume()
     finally:
         _terminate_process(process)

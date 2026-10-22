@@ -29,7 +29,7 @@ class TestPendingSettleCancellation:
             lambda: leaf_calls.append(1),
         )
 
-        assert committed is False
+        assert committed.status.value == "blocked"
         assert leaf_calls == []
         assert controller_wake_settle_pending(tray) is False
 
@@ -47,7 +47,7 @@ class TestPendingSettleCancellation:
             lambda: leaf_calls.append(1),
         )
 
-        assert committed is False
+        assert committed.status.value == "blocked"
         # Blocked-restore housekeeping still runs, with no stale deadline left.
         assert leaf_calls == [1]
         assert controller_wake_settle_pending(tray) is False
@@ -65,10 +65,11 @@ class TestPendingSettleCancellation:
             lambda: leaf_calls.append(1),
         )
 
-        assert committed is True
+        assert committed.status.value == "applied"
         assert leaf_calls == [1]
         assert controller_wake_settle_pending(tray) is False
-        assert tray.tray_idle_power_state.deck_state is DeckState.POWER_OFF
+        # State belongs to the real leaf/typed owner, not a second enum cache.
+        assert tray.tray_idle_power_state.deck_state is DeckState.LIT
 
     def test_manual_on_deferred_plan_cancels_pending_settle(self) -> None:
         from keyrgb.tray.deck_pipeline import commit_lighting_power_intent
@@ -88,6 +89,6 @@ class TestPendingSettleCancellation:
                 lambda: leaf_calls.append(1),
             )
 
-        assert committed is False
+        assert committed.status.value == "deferred"
         assert leaf_calls == []
         assert controller_wake_settle_pending(tray) is False

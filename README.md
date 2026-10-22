@@ -316,7 +316,7 @@ static output always follows the active profile.
 Access **Settings** via the tray menu to configure:
 
 - **Power Management**: toggle LEDs on Suspend/Resume or Lid Close/Open.
-- **Screen idle/blanking sync**: optionally turn the keyboard off (or drop to a temporary brightness) when the screen idles/blanks, with an adjustable fade duration. You can also let the keyboard controller's own sleep timeout turn the backlight off (ITE firmware blanks the deck after ~10 minutes without typing; it lights again on the next input).
+- **Screen idle/blanking sync**: optionally turn the keyboard off (or drop to a temporary brightness) when the screen idles/blanks, with an adjustable fade duration. **Settings → Advanced → Controller sleep and idle timing** can also honor the controller's own sleep timeout (ITE firmware blanks the deck after ~10 minutes without typing). A non-modifier keypress wakes lighting by default; enable **Wake on any input** to include modifier keys, mouse and touchpad activity.
 - **Autostart**: enable “Start KeyRGB on login”.
 - **Backend policy**: opt in to experimental backends. The UI labels experimental paths as speculative or research-backed.
 
@@ -353,7 +353,7 @@ Most supported controllers use a fixed LED matrix (e.g., 6×21). To map this to 
 | Per-key not working | You likely need to run the Keymap Calibrator first. |
 | Brightness works but color does not (kernel / `kbd_backlight`) | The sysfs node is likely **brightness-only** (no `multi_intensity`, `color`, or `rgb` under `/sys/class/leds/*kbd_backlight*`). KeyRGB can only change color when the kernel exposes RGB attributes. On ASUS ROG, use `asusctl` / rog-control-center for Aura/RGB. |
 | Per-key editor not available | The editor needs a backend that can address individual LEDs (typically USB ITE / TongFang). Many kernel drivers expose only uniform brightness, and sometimes uniform RGB, not per-key RGB. |
-| Keyboard backlight turns off by itself after ~10 minutes without typing | This is the ITE controller's own firmware sleep timer; host software cannot disable it. By default KeyRGB re-lights the deck automatically (a brief blink). To leave it dark until the next keypress, enable **Settings → Screen idle/blanking sync → "Let the controller's own sleep timeout turn the keyboard off"**. |
+| Keyboard backlight turns off by itself after ~10 minutes without typing | This is the ITE controller's own firmware sleep timer; host software cannot disable it. By default KeyRGB re-lights the deck automatically (a brief blink). To leave it dark until the next non-modifier keypress, enable **Settings → Advanced → "Let the controller's own sleep timeout turn the keyboard off"**. The adjacent **Wake on any input** option also allows modifier keys, mouse and touchpad activity. |
 
 For a suspend/resume or runtime problem, use **Diagnostic Session** from the KeyRGB app-menu entry (after reinstalling to refresh desktop integration), or run:
 

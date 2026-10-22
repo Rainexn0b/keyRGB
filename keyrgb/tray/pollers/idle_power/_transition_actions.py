@@ -71,7 +71,7 @@ def start_current_effect_for_idle_restore(
     brightness_override: int | None,
     fade_in: bool,
     fade_in_duration_s: float,
-) -> None:
+) -> bool:
     use_loop_effect_ramp = _use_idle_restore_loop_effect_ramp(tray, fade_in=fade_in)
     seed_reactive_restore_windows = _should_seed_reactive_restore_windows(tray, fade_in=fade_in)
     if use_loop_effect_ramp:
@@ -94,14 +94,11 @@ def start_current_effect_for_idle_restore(
     start_fn = _start_current_effect_or_none(tray)
     try:
         if callable(start_fn):
-            try:
-                start_fn(
-                    brightness_override=brightness_override,
-                    fade_in=bool(fade_in),
-                    fade_in_duration_s=fade_in_duration_s,
-                )
-            except TypeError:
-                start_fn()
+            started = start_fn(
+                brightness_override=brightness_override,
+                fade_in=bool(fade_in),
+                fade_in_duration_s=fade_in_duration_s,
+            )
             if seed_reactive_restore_windows:
                 # Do not build a fresh post-start seed that would reset DAMPING
                 # to FIRST_PULSE_PENDING. Only re-apply the original queued seed
@@ -110,11 +107,11 @@ def start_current_effect_for_idle_restore(
                     _reactive_restore_seed.apply_queued_reactive_restore_seed(engine)
                 except (AttributeError, TypeError, ValueError):
                     pass
-            return
+            return started is not False
 
         from keyrgb.tray.controllers.lighting_controller import start_current_effect
 
-        start_current_effect(
+        started = start_current_effect(
             cast(LightingTrayProtocol, tray),
             brightness_override=brightness_override,
             fade_in=bool(fade_in),
@@ -125,6 +122,7 @@ def start_current_effect_for_idle_restore(
                 _reactive_restore_seed.apply_queued_reactive_restore_seed(engine)
             except (AttributeError, TypeError, ValueError):
                 pass
+        return started is not False
     finally:
         if use_loop_effect_ramp:
             try:

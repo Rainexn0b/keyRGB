@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import select
 import threading
+import time
 from collections.abc import Callable, Sequence
 from typing import Any, Optional
 
@@ -51,13 +52,16 @@ class WaylandIdleTracker:
         timeout_ms: int = 10_000,
         display_name_or_fd: int | str | None = None,
         select_fn: _SelectFn = select.select,
+        input_only: bool = False,
     ) -> None:
         self._timeout_ms = int(timeout_ms)
         self._display_name_or_fd = display_name_or_fd
         self._select_fn = select_fn
+        self._input_only = bool(input_only)
         self._lock = threading.Lock()
         self._idle = False
         self._available = False
+        self._last_activity_at = 0.0
 
         self._display: Optional[Any] = None  # noqa: UP045 - pywayland object has no usable static type
         self._idle_notifier: Optional[Any] = None  # noqa: UP045 - pywayland object has no usable static type
@@ -99,6 +103,11 @@ class WaylandIdleTracker:
             display.disconnect()
             raise RuntimeError("Required Wayland globals (wl_seat, ext_idle_notifier_v1) not available")
 
+        notifier_version = negotiated_bind_version(advertised["notifier"], ExtIdleNotifierV1.version)
+        if self._input_only and notifier_version < 2:
+            display.disconnect()
+            raise RuntimeError("Input-only Wayland wake notifications require ext_idle_notifier_v1 version 2")
+
         self._display = display
         self._seat = registry.bind(
             seat_global_name,
@@ -108,7 +117,7 @@ class WaylandIdleTracker:
         self._idle_notifier = registry.bind(
             notifier_global_name,
             ExtIdleNotifierV1,
-            negotiated_bind_version(advertised["notifier"], ExtIdleNotifierV1.version),
+            notifier_version,
         )
         self._available = True
         logger.info("Wayland idle tracker connected (timeout=%d ms)", self._timeout_ms)
@@ -130,16 +139,27 @@ class WaylandIdleTracker:
         # state so we wait for the compositor to send an idled event.
         with self._lock:
             self._idle = False
+            self._last_activity_at = 0.0
 
-        notification = self._idle_notifier.get_idle_notification(self._timeout_ms, self._seat)
+        notification = (
+            self._idle_notifier.get_input_idle_notification(self._timeout_ms, self._seat)
+            if self._input_only
+            else self._idle_notifier.get_idle_notification(self._timeout_ms, self._seat)
+        )
 
         def _on_idled(_proxy: object) -> None:
             with self._lock:
+                if self._notification is not notification:
+                    return
                 self._idle = True
             logger.debug("Wayland idle notifier: idled")
 
         def _on_resumed(_proxy: object) -> None:
             with self._lock:
+                if self._notification is not notification:
+                    return
+                if self._idle:
+                    self._last_activity_at = time.monotonic()
                 self._idle = False
             logger.debug("Wayland idle notifier: resumed")
 
@@ -149,6 +169,11 @@ class WaylandIdleTracker:
         self._notification = notification
         if self._display is not None:
             self._display.flush()
+
+    @property
+    def last_activity_at(self) -> float:
+        with self._lock:
+            return self._last_activity_at
 
     def set_timeout_ms(self, timeout_ms: int) -> None:
         timeout_ms = int(timeout_ms)
@@ -240,9 +265,11 @@ class WaylandIdleTracker:
 def create_wayland_idle_tracker(
     timeout_ms: int = 10_000,
     display_name_or_fd: int | str | None = None,
+    *,
+    input_only: bool = False,
 ) -> WaylandIdleTracker | None:
     try:
-        return WaylandIdleTracker(timeout_ms=timeout_ms, display_name_or_fd=display_name_or_fd)
+        return WaylandIdleTracker(timeout_ms=timeout_ms, display_name_or_fd=display_name_or_fd, input_only=input_only)
     except _RECOVERABLE_WAYLAND_EXCEPTIONS as exc:
         logger.info("Wayland idle tracker unavailable: %s", exc)
         return None

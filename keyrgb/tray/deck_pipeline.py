@@ -12,12 +12,16 @@ import logging
 from collections.abc import Callable
 from typing import cast
 
+from keyrgb.core.lighting_result import LightingResult
+from keyrgb.core.utils.safe_attrs import safe_bool_attr, safe_int_attr
+
 logger = logging.getLogger(__name__)
 
 from keyrgb.tray._deck_sleep_wake_commits import (
     _commit_controller_sleep,
     _commit_firmware_wake,
     _commit_idle_action,
+    _commit_input_wake,
     _commit_keyboard_wake,
     _commit_stable_zero_heal,
 )
@@ -49,18 +53,12 @@ RestartWakeFn = Callable[..., bool]
 
 
 def derive_deck_state(tray: object) -> DeckState:
-    """Map live forced-off / controller-sleep flags onto ``DeckState``.
-
-    SWP-5 will invert this so flags derive from ``DeckState``. Until then the
-    flags remain the compatibility seam and the pipeline reads them once per
-    decision.
-    """
+    """Read the typed deck owner, importing duck-typed facade fields if needed."""
 
     tray = cast(IdlePowerTrayProtocol, tray)
 
     owner = ensure_tray_idle_power_state(tray)
-    stored = getattr(owner, "deck_state", DeckState.LIT)
-    if stored is DeckState.RESTORING:
+    if owner.deck_state is DeckState.RESTORING:
         return DeckState.RESTORING
 
     # Preserve the legacy sentinel contract verified by
@@ -88,17 +86,25 @@ def derive_deck_state(tray: object) -> DeckState:
             return DeckState.POWER_OFF
         if idle_forced_off:
             return DeckState.IDLE_OFF
-    if _recovery.controller_sleep_off_active(tray):
-        return DeckState.CONTROLLER_SLEEP_DARK
-    if is_dim_temp_active(tray):
-        return DeckState.DIM_TEMP
-    return DeckState.LIT
+    _recovery.controller_sleep_off_active(tray)
+    is_dim_temp_active(tray)
+    return owner.deck_state
 
 
 def hardware_apply_deferred(tray: object) -> bool:
     """True when config/scheduler/power-source must persist intent only."""
 
-    return is_off_family(derive_deck_state(tray))
+    state = derive_deck_state(tray)
+    return state is DeckState.RESTORING or is_off_family(state)
+
+
+def defer_lighting_change(tray: object) -> bool:
+    """Persist a new desired scene and coalesce its apply behind a live restore."""
+    context = ensure_tray_idle_power_state(tray).restore_context
+    if context is not None:
+        context.reapply_requested = True
+        return True
+    return hardware_apply_deferred(tray)
 
 
 def _is_bare_is_off(tray: IdlePowerTrayProtocol) -> bool:
@@ -180,6 +186,7 @@ def build_guards(
     stable_zero_confirmed: bool = False,
     idle_restore_requires_keyboard: bool = False,
     keyboard_activity: bool = False,
+    input_activity: bool = False,
 ) -> SleepWakeGuards:
     return SleepWakeGuards(
         recently_restored=recently_restored_at(tray, now=now),
@@ -187,6 +194,8 @@ def build_guards(
         stable_zero_confirmed=bool(stable_zero_confirmed),
         idle_restore_requires_keyboard=bool(idle_restore_requires_keyboard),
         keyboard_activity=bool(keyboard_activity),
+        input_activity=bool(input_activity),
+        wake_on_any_input=safe_bool_attr(getattr(tray, "config", None), "wake_on_any_input", default=False),
         dim_temp_still_active=is_dim_temp_active(tray),
     )
 
@@ -230,6 +239,8 @@ def commit_sleep_wake_intent(
     """Execute one sleep/wake plan. Returns True when a commit ran."""
 
     kind = intent.kind
+    if ensure_tray_idle_power_state(tray).restore_context is not None:
+        return False
     if kind is SleepWakeIntentKind.AUTO_HEAL:
         if int(current_brightness) > CONFIG_BRIGHTNESS_MAX:
             invalid_recover = recover_invalid_brightness or _recovery._recover_invalid_high_brightness_best_effort
@@ -278,6 +289,10 @@ def commit_sleep_wake_intent(
         )
     if kind is SleepWakeIntentKind.KEYBOARD_WAKE:
         return _commit_keyboard_wake(tray, now=now, dim_temp_target=dim_temp_target)
+    if kind is SleepWakeIntentKind.INPUT_WAKE:
+        if safe_int_attr(tray.config, "brightness", default=0) <= 0:
+            return False
+        return _commit_input_wake(tray, now=now)
     if kind in {
         SleepWakeIntentKind.IDLE_TURN_OFF,
         SleepWakeIntentKind.DIM_TO_TEMP,
@@ -297,7 +312,7 @@ def commit_lighting_power_intent(
     respect: bool | None = None,
     guards: SleepWakeGuards | None = None,
     fade_in_duration_s: float | None = None,
-) -> bool:
+) -> LightingResult:
     from keyrgb.tray._deck_lighting_power import commit_lighting_power_intent as _commit
 
     return _commit(
@@ -316,6 +331,7 @@ __all__ = [
     "commit_lighting_power_intent",
     "commit_sleep_wake_intent",
     "decide_sleep_wake",
+    "defer_lighting_change",
     "derive_deck_state",
     "hardware_apply_deferred",
     "is_off_family",

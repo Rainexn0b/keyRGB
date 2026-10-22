@@ -26,6 +26,7 @@ class _FakeNotifier(_FakeProxy):
         self.notifications: list[_FakeProxy] = []
         self.last_timeout: int | None = None
         self.last_seat: object | None = None
+        self.input_only_requests = 0
 
     def get_idle_notification(self, timeout_ms: int, seat: object) -> _FakeProxy:
         self.last_timeout = timeout_ms
@@ -33,6 +34,10 @@ class _FakeNotifier(_FakeProxy):
         note = _FakeProxy()
         self.notifications.append(note)
         return note
+
+    def get_input_idle_notification(self, timeout_ms: int, seat: object) -> _FakeProxy:
+        self.input_only_requests += 1
+        return self.get_idle_notification(timeout_ms, seat)
 
 
 class _FakeRegistry:
@@ -278,3 +283,45 @@ def test_create_notification_handles_destroy_errors(monkeypatch: pytest.MonkeyPa
     tracker._create_notification()
     assert tracker._notification is not None
     assert tracker._notification is not bad
+
+
+def test_input_wake_listener_requires_real_resumed_event_and_ignores_replaced_notification(monkeypatch):
+    _install_fake_pywayland(monkeypatch)
+    monkeypatch.setattr(_ExtIdleNotifierV1, "version", 2)
+    original_init = _FakeDisplay.__init__
+
+    def init_v2(self, display_name_or_fd=None):
+        original_init(self, display_name_or_fd)
+        self.registry.notifier_version = 2
+
+    monkeypatch.setattr(_FakeDisplay, "__init__", init_v2)
+    monkeypatch.setattr(wayland_idle.time, "monotonic", lambda: 110.0)
+    tracker = wayland_idle.WaylandIdleTracker(timeout_ms=0, input_only=True, select_fn=lambda *_: ([], [], []))
+    try:
+        assert tracker._idle_notifier.input_only_requests == 1
+        assert tracker._idle_notifier.last_timeout == 0
+        assert tracker.is_idle() is False
+        assert tracker.last_activity_at == 0.0
+        note = tracker._notification
+        note.dispatcher["resumed"](note)  # Invalid startup/resume without prior idle.
+        assert tracker.last_activity_at == 0.0
+        note.dispatcher["idled"](note)
+        assert tracker.last_activity_at == 0.0
+        note.dispatcher["resumed"](note)
+        note.dispatcher["idled"](note)  # Fast activity can end between polls.
+        assert tracker.last_activity_at == 110.0
+        tracker._create_notification()
+        assert tracker.last_activity_at == 0.0
+        note.dispatcher["idled"](note)
+        note.dispatcher["resumed"](note)
+        assert tracker.last_activity_at == 0.0
+        assert tracker.is_idle() is False
+    finally:
+        tracker.close()
+
+
+def test_input_only_listener_falls_back_when_compositor_is_v1(monkeypatch):
+    _install_fake_pywayland(monkeypatch)
+    monkeypatch.setattr(_ExtIdleNotifierV1, "version", 2)
+    assert wayland_idle.create_wayland_idle_tracker(timeout_ms=0, input_only=True) is None
+    assert _FakeDisplay.instances[-1].disconnected

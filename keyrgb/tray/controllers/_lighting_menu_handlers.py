@@ -38,9 +38,9 @@ def on_speed_clicked_impl(
 
     # Save globally and as a per-effect override so each effect remembers its speed.
     tray.config.speed = speed
-    from keyrgb.tray.deck_pipeline import hardware_apply_deferred
+    from keyrgb.tray.deck_pipeline import defer_lighting_change
 
-    defer_hardware_apply = hardware_apply_deferred(tray)
+    defer_hardware_apply = defer_lighting_change(tray)
     effect = lighting_controller_helpers.get_effect_name(tray)
     if defer_hardware_apply:
         # The engine may still describe the last physically running effect.
@@ -79,7 +79,7 @@ def on_brightness_clicked_impl(
     if brightness is None:
         return
 
-    from keyrgb.tray.deck_pipeline import hardware_apply_deferred
+    from keyrgb.tray.deck_pipeline import defer_lighting_change
 
     apply_layered_brightness_update(
         tray,
@@ -88,5 +88,5 @@ def on_brightness_clicked_impl(
         reactive_brightness=None,
         reactive_source_label="tray brightness",
         start_current_effect=start_current_effect,
-        defer_hardware_apply=hardware_apply_deferred(tray),
+        defer_hardware_apply=defer_lighting_change(tray),
     )

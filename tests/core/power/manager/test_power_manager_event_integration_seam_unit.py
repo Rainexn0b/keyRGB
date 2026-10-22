@@ -69,8 +69,8 @@ class TestPowerManagerEventIntegrationFullPath:
         # 3. Logging occurred
         log_info_mock.assert_called_once_with("Test suspend event")
 
-        # 4. Sleep was called with correct delay
-        sleep_mock.assert_called_once_with(0.1)
+        # Off actions never wait inside the runtime coordinator.
+        sleep_mock.assert_not_called()
 
     @patch("keyrgb.core.power.management.manager.PowerEventPolicy")
     def test_handle_power_event_full_path_with_restore_action(self, mock_policy_cls):
@@ -97,8 +97,9 @@ class TestPowerManagerEventIntegrationFullPath:
             kb_method_name="restore",
         )
 
-        # Verify restore was called
-        assert mock_kb.restore.call_count == 1
+        # A deadline defers restore without sleeping on the owner.
+        mock_kb.restore.assert_not_called()
+        assert pm._pending_power_restore_not_before > 0
         # Policy eval was called
         assert mock_policy_instance.handle_power_restore_event.call_count == 1
 

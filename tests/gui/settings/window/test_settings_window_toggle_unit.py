@@ -68,6 +68,7 @@ def test_on_toggle_preserves_best_effort_status_when_settings_apply_fails(monkey
     gui.var_battery_power_mode = _FakeVar("Keep current power mode")
     gui.var_dim_sync_enabled = _FakeVar(True)
     gui.var_controller_sleep_respect = _FakeVar(False)
+    gui.var_wake_on_any_input = _FakeVar(False)
     gui.var_dim_sync_mode = _FakeVar("temp")
     gui.var_dim_temp_brightness = _FakeVar(4.4)
     gui.var_debounce_enter = _FakeVar(6)
@@ -116,6 +117,7 @@ def test_on_toggle_saves_values_updates_state_and_schedules_status_clear(monkeyp
     gui.var_battery_power_mode = _FakeVar("Keep current power mode")
     gui.var_dim_sync_enabled = _FakeVar(True)
     gui.var_controller_sleep_respect = _FakeVar(False)
+    gui.var_wake_on_any_input = _FakeVar(True)
     gui.var_dim_sync_mode = _FakeVar("temp")
     gui.var_dim_temp_brightness = _FakeVar(4.4)
     gui.var_debounce_enter = _FakeVar(6)
@@ -143,6 +145,7 @@ def test_on_toggle_saves_values_updates_state_and_schedules_status_clear(monkeyp
     assert apply_calls[0].battery_lighting_brightness == 8
     assert apply_calls[0].ac_power_mode == PowerMode.BALANCED.value
     assert apply_calls[0].battery_power_mode is None
+    assert apply_calls[0].wake_on_any_input is True
     # UI delays are seconds; config persists idle-poll counts (1 poll = 0.5s).
     assert apply_calls[0].idle_dim_debounce_enter_polls == 12
     assert apply_calls[0].idle_dim_debounce_exit_polls == 20
@@ -175,6 +178,7 @@ def test_on_toggle_recovers_os_autostart_var_when_set_fails(monkeypatch: pytest.
     gui.var_battery_power_mode = _FakeVar("Performance")
     gui.var_dim_sync_enabled = _FakeVar(False)
     gui.var_controller_sleep_respect = _FakeVar(False)
+    gui.var_wake_on_any_input = _FakeVar(False)
     gui.var_dim_sync_mode = _FakeVar("off")
     gui.var_dim_temp_brightness = _FakeVar(5.0)
     gui.var_debounce_enter = _FakeVar(6)
@@ -268,6 +272,7 @@ def test_basic_toggle_preserves_advanced_values_without_opening_advanced(
     gui.var_dim_temp_brightness = _FakeVar(7.0)
     # Pre-existing Advanced values; the tab is never opened.
     gui.var_controller_sleep_respect = _FakeVar(True)
+    gui.var_wake_on_any_input = _FakeVar(True)
     gui.var_debounce_enter = _FakeVar(2.5)
     gui.var_debounce_exit = _FakeVar(7.5)
     gui.var_idle_fade_duration = _FakeVar(1.2)
@@ -294,6 +299,7 @@ def test_basic_toggle_preserves_advanced_values_without_opening_advanced(
     assert len(apply_calls) == 1
     saved = apply_calls[0]
     assert saved.controller_sleep_respect is True
+    assert saved.wake_on_any_input is True
     assert saved.idle_dim_debounce_enter_polls == 5
     assert saved.idle_dim_debounce_exit_polls == 15
     assert saved.idle_fade_duration_s == 1.2

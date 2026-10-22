@@ -30,7 +30,7 @@ def test_delay_zero_preserves_immediate_firmware_wake(clock) -> None:
     assert _apply(tray, brightness=25) == (25, False)
 
     assert len(tray.start_calls) == 1
-    assert tray.start_calls[0] == {"controller_brightness_handoff": 25}
+    assert tray.start_calls[0] == {"brightness_override": None, "controller_brightness_handoff": 25}
     assert tray.tray_idle_power_state.controller_sleep_off is False
     assert tray.is_off is False
     assert tray.tray_idle_power_state.controller_wake_settle_until == 0.0
@@ -102,7 +102,7 @@ def test_firmware_wake_completion_uses_deadline_dim_policy(clock) -> None:
     assert _apply(tray2, brightness=30, last_brightness=15) == (30, False)
 
     assert len(tray2.start_calls) == 1
-    assert tray2.start_calls[0] == {"controller_brightness_handoff": 30}
+    assert tray2.start_calls[0] == {"brightness_override": None, "controller_brightness_handoff": 30}
 
 
 def test_helpers_arm_once_clear_and_zero_delay() -> None:

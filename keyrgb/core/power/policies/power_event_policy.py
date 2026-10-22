@@ -21,6 +21,7 @@ class PowerEventInputs:
     enabled: bool
     action_enabled: bool
     is_off: bool
+    restore_blocked: bool = False
 
 
 @dataclass(frozen=True)
@@ -81,6 +82,13 @@ class PowerEventPolicy:
             return PowerEventResult(actions=())
 
         if self._saved_was_off is None:
+            return PowerEventResult(actions=())
+
+        # A wake only releases its own physical cause. Keep the original lit
+        # intent while another suspend/lid cause remains, even if this wake's
+        # restore setting is disabled. The final release decides eligibility.
+        if inputs.restore_blocked:
+            self._restore_pending = bool(inputs.action_enabled) and not self._saved_was_off
             return PowerEventResult(actions=())
 
         saved_was_off = bool(self._saved_was_off)

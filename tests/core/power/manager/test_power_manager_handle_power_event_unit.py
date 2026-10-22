@@ -102,7 +102,7 @@ class TestPowerManagerHandlePowerEventBranches:
                 kb_method_name="turn_off",
             )
 
-        sleep.assert_called_once_with(0.25)
+        sleep.assert_not_called()
         info.assert_called_once_with("hello")
         assert mock_kb.turn_off.call_count == 2
 

@@ -47,6 +47,7 @@ class ConditionalTransitionResult(Generic[_T]):
 class _TransitionCommand:
     action: Callable[[], object]
     revision: int
+    intent_revision: int = 0
     completed: threading.Event = field(default_factory=threading.Event)
     value: object = None
     error: BaseException | None = None
@@ -64,8 +65,10 @@ class TrayRuntimeCoordinator:
         self._state_lock = threading.Lock()
         self._accepting = True
         self._revision = 0
+        self._intent_revision = 0
         self._owner_ident: int | None = None
         self._active_revision: int | None = None
+        self._active_intent_revision: int | None = None
         self._active_ui_request: UiRefreshRequest | None = None
         self._thread: threading.Thread | None = None
 
@@ -90,18 +93,29 @@ class TrayRuntimeCoordinator:
             return None
         return self._active_revision
 
+    def capture_intent_revision(self) -> int:
+        """Explicit user lighting intent, independent of polling/FIFO traffic."""
+        with self._state_lock:
+            return self._intent_revision
+
+    def active_intent_revision(self) -> int | None:
+        if threading.get_ident() != self._owner_ident:
+            return None
+        return self._active_intent_revision
+
     def run(
         self,
         action: Callable[[], _T],
         *,
         after: Callable[[UiRefreshRequest], None] | None = None,
+        supersedes_lighting: bool = False,
     ) -> _T:
         """Run one transition synchronously, executing nested calls inline."""
 
         if threading.get_ident() == self._owner_ident:
             return action()
 
-        command = self._submit(action, expected_revision=None)
+        command = self._submit(action, expected_revision=None, supersedes_lighting=supersedes_lighting)
         assert command is not None
         return cast(_T, self._wait_for(command, after=after))
 
@@ -167,6 +181,7 @@ class TrayRuntimeCoordinator:
         action: Callable[[], _T],
         *,
         expected_revision: int | None,
+        supersedes_lighting: bool = False,
     ) -> _TransitionCommand | None:
         with self._state_lock:
             if not self._accepting:
@@ -175,9 +190,12 @@ class TrayRuntimeCoordinator:
                 return None
             self._start_thread_locked()
             self._revision += 1
+            if supersedes_lighting:
+                self._intent_revision += 1
             command = _TransitionCommand(
                 action=cast(Callable[[], object], action),
                 revision=self._revision,
+                intent_revision=self._intent_revision,
             )
             self._commands.put(command)
             return command
@@ -213,6 +231,7 @@ class TrayRuntimeCoordinator:
                 return
             typed_command = cast(_TransitionCommand, command)
             self._active_revision = typed_command.revision
+            self._active_intent_revision = typed_command.intent_revision
             self._active_ui_request = UiRefreshRequest()
             try:
                 typed_command.value = typed_command.action()
@@ -224,4 +243,5 @@ class TrayRuntimeCoordinator:
                 typed_command.ui_request = self._active_ui_request
                 self._active_ui_request = None
                 self._active_revision = None
+                self._active_intent_revision = None
                 typed_command.completed.set()

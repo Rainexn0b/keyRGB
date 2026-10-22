@@ -37,6 +37,22 @@ to `None` by the core owner.
 
 The public `EffectsEngine` methods and mixin composition remain stable.
 
+Sleep/wake commits may enter `defer_brightness_fades()`. In that scope,
+`set_brightness(..., fade=True)` and `turn_off(..., fade=True)` prepare token-owned
+jobs and return completion futures; jobs start when the leaf exits. Calls
+outside the scope retain synchronous execution. Restore startup callbacks accept
+the declared brightness/fade/handoff keyword arguments and execute once; a
+`TypeError` inside a callback is a failure, never a request to retry another
+signature. See [tray runtime ownership](13-tray-runtime-state-ownership.md).
+
+Engine `close()` is terminal: it serializes against effect startup, invalidates
+fade tokens, and blocks subsequent device acquisition and effect starts. Fade
+acquisition checks ownership under `kb_lock`, using the same lock as close and
+handle publication. Deferred workers are registered per engine and drained
+outside engine locks with one shared two-second budget, including completion
+callbacks. A late worker cannot reopen or write to a closed engine even if that
+budget expires. The effect worker retains its separate two-second stop bound.
+
 ## Reactive loop dependency contract
 
 `ReactiveApiFacade` in `keyrgb/core/effects/reactive/_effects_api.py` is a frozen,

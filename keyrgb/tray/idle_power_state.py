@@ -10,17 +10,21 @@ sibling modules and are re-exported so existing import paths stay stable:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from keyrgb.tray.deck_state import DeckState
+
+if TYPE_CHECKING:
+    from keyrgb.tray._deck_restore import RestoreContext
 
 
 @dataclass
 class TrayIdlePowerState:
     """Typed owner for idle/power runtime state.
 
-    Legacy tray attributes remain the public seam; this owner enables explicit
-    ownership while bridge helpers keep both representations synchronized.
+    Production compatibility attributes proxy this record. Stable deck state
+    derives from its causes; bridges synchronize plain attributes on fakes.
     """
 
     idle_forced_off: bool = False
@@ -82,12 +86,34 @@ class TrayIdlePowerState:
     hardware_toggle_restore_software_target: str = "keyboard"
     hardware_toggle_restore_hardware_effect: str = "none"
     hardware_toggle_restore_hardware_color: object = None
-    # SWP-0 pipeline authority. Runtime still uses the forced-off /
-    # controller_sleep_off flags above until SWP-1 moves commits.
-    deck_state: DeckState = DeckState.LIT
-    deferred_brightness: int | None = None
-    deferred_perkey_profile: str | None = None
-    restoring_target: int | None = None
+    # Restore identity is independent of observer/coordinator queue traffic.
+    _restoring: bool = field(default=False, init=False, repr=False)
+    restore_sequence: int = 0
+    restore_context: RestoreContext | None = None
+
+    @property
+    def restore_in_progress(self) -> bool:
+        return self._restoring
+
+    @property
+    def deck_state(self) -> DeckState:
+        """Effective deck authority from this single ownership record.
+
+        Causes may overlap. Never cache a second enum that can contradict them.
+        The tray's historical attributes proxy these fields in production.
+        """
+        if self._restoring:
+            return DeckState.RESTORING
+        for active, state in (
+            (self.user_forced_off, DeckState.USER_OFF),
+            (self.power_forced_off, DeckState.POWER_OFF),
+            (self.idle_forced_off, DeckState.IDLE_OFF),
+            (self.controller_sleep_off, DeckState.CONTROLLER_SLEEP_DARK),
+            (self.dim_temp_active, DeckState.DIM_TEMP),
+        ):
+            if active:
+                return state
+        return DeckState.LIT
 
     def reset_dim_state(self) -> None:
         self.dim_temp_active = False

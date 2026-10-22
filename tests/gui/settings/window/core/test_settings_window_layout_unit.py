@@ -199,6 +199,7 @@ def test_init_panels_builds_panel_stack_with_expected_arguments(monkeypatch: pyt
     gui.var_battery_power_mode = _FakeVar("Keep current power mode")
     gui.var_dim_sync_enabled = _FakeVar(True)
     gui.var_controller_sleep_respect = _FakeVar(False)
+    gui.var_wake_on_any_input = _FakeVar(False)
     gui.var_dim_sync_mode = _FakeVar("off")
     gui.var_dim_temp_brightness = _FakeVar(5.0)
     gui.var_debounce_enter = _FakeVar(6)
@@ -240,6 +241,7 @@ def test_init_panels_builds_panel_stack_with_expected_arguments(monkeypatch: pyt
         gui.var_controller_sleep_respect
     )
     assert created["idle_transition_advanced"].kwargs["var_debounce_enter"] is gui.var_debounce_enter
+    assert created["idle_transition_advanced"].kwargs["var_wake_on_any_input"] is gui.var_wake_on_any_input
     assert created["idle_transition_advanced"].kwargs["var_debounce_exit"] is gui.var_debounce_exit
     assert created["idle_transition_advanced"].kwargs["var_idle_fade_duration"] is gui.var_idle_fade_duration
     assert created["experimental"].args == (advanced,)

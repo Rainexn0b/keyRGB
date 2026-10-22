@@ -240,6 +240,7 @@ def test_idle_transition_panel_uses_caption_and_value_styles(monkeypatch) -> Non
     idle_transition_advanced_panel.IdleTransitionAdvancedPanel(
         object(),
         var_controller_sleep_respect=_FakeVar(False),
+        var_wake_on_any_input=_FakeVar(False),
         var_debounce_enter=_FakeVar(3.0),
         var_debounce_exit=_FakeVar(5.0),
         var_idle_fade_duration=_FakeVar(0.6),

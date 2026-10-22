@@ -50,6 +50,7 @@ class _EngineStart:
 
     kb_lock: RLock
     _start_lock: Lock
+    _closed: bool
     kb: KeyboardDeviceProtocol
     backend_caps: BackendCapabilities
     running: bool
@@ -103,6 +104,8 @@ class _EngineStart:
         # inside it). It remains held across stop()'s worker join by design, but
         # kb_lock is not held there, so the worker can finish any final output.
         with self._start_lock:
+            if self._closed:
+                raise RuntimeError("Effects engine is closed")
             # A brightness fade (screen-dim/idle turn_off, power brightness change)
             # can still be stepping on another thread. Advance the fade token before
             # any write this start performs, so the superseded operation commits no

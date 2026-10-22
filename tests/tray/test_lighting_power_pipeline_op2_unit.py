@@ -199,7 +199,7 @@ class TestRestoringFirewall:
 
         committed = commit_lighting_power_intent(tray, SleepWakeIntentKind.POWER_RESUME, second_leaf)
 
-        assert committed is False
+        assert committed.status.value == "deferred"
         assert second_calls == []
 
     def test_restore_failure_reverts_to_origin(self):
@@ -292,7 +292,7 @@ class TestExtractedPipelineCoverage:
                 lambda: calls.append(1),
             )
 
-        assert committed is False
+        assert committed.status.value == "deferred"
         assert calls == []
 
     def test_restore_leaf_false_reverts_origin(self) -> None:
@@ -304,7 +304,7 @@ class TestExtractedPipelineCoverage:
 
         committed = commit_lighting_power_intent(tray, SleepWakeIntentKind.MANUAL_ON, lambda: False)
 
-        assert committed is False
+        assert committed.status.value == "failed"
         assert tray.tray_idle_power_state.deck_state is origin
 
     def test_restore_leaf_keeps_is_off_as_failure(self) -> None:
@@ -319,7 +319,7 @@ class TestExtractedPipelineCoverage:
 
         committed = commit_lighting_power_intent(tray, SleepWakeIntentKind.MANUAL_ON, _leaf)
 
-        assert committed is False
+        assert committed.status.value == "failed"
 
     def test_reactive_seed_and_consume_errors_are_nonfatal(self) -> None:
         from keyrgb.tray._deck_lighting_power import (

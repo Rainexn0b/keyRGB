@@ -104,6 +104,12 @@ def _handle_controller_sleep_off(
 
 
 def _handle_forced_off(tray: ConfigPollingTrayProtocol, last_applied, current, cause: str, state_for_log_fn):
+    from keyrgb.tray.deck_pipeline import defer_lighting_change
+    from keyrgb.tray.idle_power_state import ensure_tray_idle_power_state
+
+    if ensure_tray_idle_power_state(tray).restore_in_progress:
+        defer_lighting_change(tray)
+        return True
     if _handle_controller_sleep_off(tray, last_applied, current, cause, state_for_log_fn):
         return True
 

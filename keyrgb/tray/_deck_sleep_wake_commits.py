@@ -6,6 +6,7 @@ import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+from keyrgb.tray._deck_restore import defer_engine_fades, execute_restore
 from keyrgb.tray._deck_state_store import _completed_lit_state, _store_deck_state
 from keyrgb.tray.deck_state import DeckState, SleepWakeIntentKind
 from keyrgb.tray.idle_power_state import dim_temp_target_brightness, is_dim_temp_active, set_idle_power_state_field
@@ -50,6 +51,7 @@ def _commit_firmware_wake(
     current_brightness: int,
     dim_temp_target: int | None,
     restart_firmware_wake: RestartWakeFn | None,
+    clear_idle_owner: bool = False,
 ) -> bool:
     restarter = restart_firmware_wake or _controller_sleep.restart_effect_after_firmware_wake_best_effort
     settle_delay = _controller_sleep.controller_wake_settle_delay_s(tray)
@@ -70,38 +72,37 @@ def _commit_firmware_wake(
             return True
         if not _controller_sleep.controller_wake_settle_due(tray, now=now_f):
             return True
-    _recovery._seed_reactive_restore_damp_best_effort(tray)
-    if _controller_sleep._callback_accepts_controller_handoff(restarter):
+
+    def restore() -> bool:
+        _recovery._seed_reactive_restore_damp_best_effort(tray)
         restored = restarter(
             tray,
             now=now,
             brightness_override=dim_temp_target,
             controller_brightness_handoff=int(current_brightness),
         )
-    else:
-        restored = restarter(tray, now=now, brightness_override=dim_temp_target)
-    if not restored:
         _recovery._log_polled_hardware_event(
             tray,
             "controller_sleep_firmware_wake",
-            effect_restored=False,
+            effect_restored=bool(restored),
         )
-        return False
-    # Keep a due deadline armed across a failed restart so a later poll can
-    # retry without another delay; only a successful restart clears it.
-    _controller_sleep.clear_controller_wake_settle(tray)
+        if not restored:
+            return False
+        # Retain a due settle deadline on failure; retries need no second delay.
+        _controller_sleep.clear_controller_wake_settle(tray)
+        if clear_idle_owner:
+            set_idle_power_state_field(tray, attr_name="_idle_forced_off", state_name="idle_forced_off", value=False)
+        _complete_native_wake(tray)
+        return True
+
+    return bool(execute_restore(tray, SleepWakeIntentKind.FIRMWARE_WAKE, restore))
+
+
+def _complete_native_wake(tray: IdlePowerTrayProtocol) -> None:
     _recovery.set_controller_sleep_off(tray, False)
     tray.is_off = False
-    if _recovery.controller_sleep_resume_guard_active(tray):
-        _recovery.set_controller_sleep_resume_guard(tray, False)
-    _recovery._log_polled_hardware_event(
-        tray,
-        "controller_sleep_firmware_wake",
-        effect_restored=bool(restored),
-    )
-    _store_deck_state(tray, _completed_lit_state(tray))
+    _recovery.set_controller_sleep_resume_guard(tray, False)
     _recovery._refresh_ui_without_icon_animation(tray)
-    return True
 
 
 _IDLE_INTENT_ACTIONS = {
@@ -139,30 +140,60 @@ def _commit_keyboard_wake(
             )
             _recovery._refresh_ui_without_icon_animation(tray)
         return bool(newly_armed)
-    _recovery._seed_reactive_restore_damp_best_effort(tray)
-    restored = _controller_sleep.restart_effect_after_firmware_wake_best_effort(
-        tray,
-        now=now,
-        brightness_override=effective_dim_target,
-        controller_brightness_handoff=CONFIG_BRIGHTNESS_MAX,
-    )
-    if not restored:
-        logger.warning("Controller-sleep native wake handoff failed")
-        return False
-    _recovery.set_controller_sleep_off(tray, False)
-    set_idle_power_state_field(
-        tray,
-        attr_name="_idle_forced_off",
-        state_name="idle_forced_off",
-        value=False,
-    )
-    tray.is_off = False
-    if _recovery.controller_sleep_resume_guard_active(tray):
-        _recovery.set_controller_sleep_resume_guard(tray, False)
-    logger.info("EVENT idle_power:controller_sleep_native_wake_handoff trigger=keyboard_evdev")
-    _store_deck_state(tray, _completed_lit_state(tray))
-    _recovery._refresh_ui_without_icon_animation(tray)
-    return True
+
+    def restore() -> bool:
+        _recovery._seed_reactive_restore_damp_best_effort(tray)
+        restored = _controller_sleep.restart_effect_after_firmware_wake_best_effort(
+            tray,
+            now=now,
+            brightness_override=effective_dim_target,
+            controller_brightness_handoff=CONFIG_BRIGHTNESS_MAX,
+        )
+        if not restored:
+            logger.warning("Controller-sleep native wake handoff failed")
+            return False
+        set_idle_power_state_field(tray, attr_name="_idle_forced_off", state_name="idle_forced_off", value=False)
+        _complete_native_wake(tray)
+        logger.info("EVENT idle_power:controller_sleep_native_wake_handoff trigger=keyboard_evdev")
+        return True
+
+    return bool(execute_restore(tray, SleepWakeIntentKind.KEYBOARD_WAKE, restore))
+
+
+def _commit_input_wake(tray: IdlePowerTrayProtocol, *, now: float) -> bool:
+    """Host-requested wake: never assume pointer/modifier input woke firmware."""
+    from keyrgb.tray.pollers.idle_power._actions import restore_from_idle
+
+    if _recovery.controller_sleep_off_active(tray):
+        if _controller_sleep.controller_wake_settle_pending(tray) and not _controller_sleep.controller_wake_settle_due(
+            tray, now=now
+        ):
+            return False
+        try:
+            with tray.engine.kb_lock:
+                brightness = int(tray.engine.kb.get_brightness())
+                is_off = bool(tray.engine.kb.is_off())
+        except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
+            logger.exception("Unable to read controller state for input wake")
+            return False
+        if brightness > 0 and not is_off:
+            return _commit_firmware_wake(
+                tray,
+                now=now,
+                current_brightness=min(CONFIG_BRIGHTNESS_MAX, brightness),
+                dim_temp_target=dim_temp_target_brightness(tray) if is_dim_temp_active(tray) else None,
+                restart_firmware_wake=None,
+                clear_idle_owner=True,
+            )
+
+    def restore() -> bool:
+        _recovery.set_controller_sleep_resume_guard(tray, True)
+        restored = restore_from_idle(tray)
+        if restored:
+            _controller_sleep.clear_controller_wake_settle(tray)
+        return restored
+
+    return bool(execute_restore(tray, SleepWakeIntentKind.INPUT_WAKE, restore))
 
 
 def _commit_idle_action(
@@ -178,14 +209,30 @@ def _commit_idle_action(
     if action is None:
         return False
     reactive_effects_set, sw_effects_set = frozenset(REACTIVE_EFFECTS), SW_EFFECTS_SET
-    apply_idle_action(
-        tray,
-        action=action,
-        dim_temp_brightness=int(dim_temp_brightness or 0),
-        restore_from_idle_fn=restore_from_idle,
-        reactive_effects_set=reactive_effects_set,
-        sw_effects_set=sw_effects_set,
-    )
+    if kind is SleepWakeIntentKind.SCREEN_WAKE:
+        return bool(
+            execute_restore(
+                tray,
+                kind,
+                lambda: apply_idle_action(
+                    tray,
+                    action=action,
+                    dim_temp_brightness=int(dim_temp_brightness or 0),
+                    restore_from_idle_fn=restore_from_idle,
+                    reactive_effects_set=reactive_effects_set,
+                    sw_effects_set=sw_effects_set,
+                ),
+            )
+        )
+    with defer_engine_fades(tray):
+        apply_idle_action(
+            tray,
+            action=action,
+            dim_temp_brightness=int(dim_temp_brightness or 0),
+            restore_from_idle_fn=restore_from_idle,
+            reactive_effects_set=reactive_effects_set,
+            sw_effects_set=sw_effects_set,
+        )
     if kind is SleepWakeIntentKind.IDLE_TURN_OFF:
         _store_deck_state(tray, DeckState.IDLE_OFF)
     elif kind is SleepWakeIntentKind.DIM_TO_TEMP:

@@ -27,9 +27,9 @@ def apply_brightness_from_power_policy_impl(
     if brightness_int < 0:
         return
 
-    from keyrgb.tray.deck_pipeline import hardware_apply_deferred
+    from keyrgb.tray.deck_pipeline import defer_lighting_change
 
-    forced_off = hardware_apply_deferred(tray)
+    forced_off = defer_lighting_change(tray)
 
     try:
         apply_layered_brightness_update(

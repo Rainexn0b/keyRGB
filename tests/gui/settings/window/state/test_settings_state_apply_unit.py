@@ -5,6 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from keyrgb.core.config import Config
+from keyrgb.core.config.domains import ConfigDomain
 from keyrgb.core.power.system import PowerMode
 from keyrgb.gui.settings import settings_state
 from keyrgb.gui.settings.settings_state import (
@@ -47,6 +49,18 @@ def _settings_values(**overrides) -> SettingsValues:
     }
     values.update(overrides)
     return SettingsValues(**values)
+
+
+def test_any_input_setting_round_trips_through_persisted_config(tmp_path, monkeypatch):
+    monkeypatch.setenv("KEYRGB_CONFIG_PATH", str(tmp_path / "config.json"))
+    config = Config()
+    assert config.wake_on_any_input is False
+    apply_settings_values_to_config(config=config, values=_settings_values(wake_on_any_input=True))
+    reopened = Config()
+    assert reopened.wake_on_any_input is True
+    assert reopened.domain_view(ConfigDomain.IDLE_DISPLAY)["wake_on_any_input"] is True
+    values = settings_state.load_settings_values(config=reopened, os_autostart_enabled=False)
+    assert values.wake_on_any_input is True
 
 
 def test_apply_settings_values_to_config() -> None:

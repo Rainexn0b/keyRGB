@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from keyrgb.core.utils.safe_attrs import safe_int_attr
-from keyrgb.tray.idle_power_state import set_last_brightness
+from keyrgb.tray.idle_power_state import ensure_tray_idle_power_state, set_last_brightness
 from keyrgb.tray.protocols import LightingTrayProtocol
 
 from ._lighting_controller_helpers import (
@@ -48,6 +48,18 @@ def apply_layered_brightness_update(
     is_sw_effect = is_software_effect(effect)
     is_reactive = is_reactive_effect(effect)
     is_perkey = effect == "perkey"
+
+    context = ensure_tray_idle_power_state(tray).restore_context
+    if context is not None:
+        context.reapply_requested = True
+        if base_brightness is not None:
+            tray.config.brightness = int(base_brightness)
+            if is_reactive or is_perkey:
+                tray.config.perkey_brightness = int(base_brightness)
+        if reactive_brightness is not None:
+            tray.config.reactive_brightness = int(reactive_brightness)
+        tray._refresh_ui(refresh_menu=refresh_menu)
+        return
 
     prev_cfg_brightness = safe_int_attr(tray.config, "brightness", default=0)
     fade_down = bool(base_brightness is not None and int(base_brightness) < prev_cfg_brightness)

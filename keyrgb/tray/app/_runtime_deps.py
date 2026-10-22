@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Protocol, cast
 
 if TYPE_CHECKING:
     from keyrgb.core.config import Config
+    from keyrgb.core.lighting_result import LightingResult
     from keyrgb.core.utils import exceptions as _exceptions
     from keyrgb.tray.app import backend as _backend, callbacks as _callbacks, lifecycle as _lifecycle
     from keyrgb.tray.controllers import (
@@ -131,12 +132,12 @@ def apply_brightness_from_power_policy(tray: object, brightness: int) -> None:
     _module("keyrgb.tray.controllers.lighting_controller").apply_brightness_from_power_policy(tray, brightness)
 
 
-def power_restore(tray: object) -> None:
-    _module("keyrgb.tray.controllers.lighting_controller").power_restore(tray)
+def power_restore(tray: object) -> LightingResult:
+    return _module("keyrgb.tray.controllers.lighting_controller").power_restore(tray)
 
 
-def power_turn_off(tray: object) -> None:
-    _module("keyrgb.tray.controllers.lighting_controller").power_turn_off(tray)
+def power_turn_off(tray: object) -> LightingResult:
+    return _module("keyrgb.tray.controllers.lighting_controller").power_turn_off(tray)
 
 
 def start_current_effect(tray: object, **kwargs: object) -> bool:

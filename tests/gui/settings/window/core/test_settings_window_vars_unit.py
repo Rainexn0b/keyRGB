@@ -49,6 +49,7 @@ def test_init_vars_creates_all_expected_tk_variables(monkeypatch: pytest.MonkeyP
     assert gui.var_ac_power_mode.get() == "Balanced"
     assert gui.var_battery_power_mode.get() == "Keep current power mode"
     assert gui.var_dim_sync_enabled.get() is True
+    assert gui.var_wake_on_any_input.get() is False
     assert gui.var_dim_sync_mode.get() == "temp"
     assert gui.var_dim_temp_brightness.get() == 7.0
     # UI exposes delays in seconds (0.5s steps); config stores polls.
@@ -62,7 +63,7 @@ def test_init_vars_creates_all_expected_tk_variables(monkeypatch: pytest.MonkeyP
     assert gui.var_day_reactive.get() == 50.0
     assert gui.var_night_base.get() == 20.0
     assert gui.var_night_reactive.get() == 50.0
-    assert len(bool_vars) == 13
+    assert len(bool_vars) == 14
     assert len(double_vars) == 10
     assert len(string_vars) == 5
     assert len(int_vars) == 0

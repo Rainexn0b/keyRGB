@@ -92,7 +92,7 @@ class TestIdleFadeDuration:
     def test_falls_back_on_uncoercible_value(self):
         assert idle_fade_duration_s(SimpleNamespace(idle_fade_duration_s="fast")) == DEFAULT_IDLE_FADE_DURATION_S
 
-    def test_power_turn_off_uses_configured_fade_duration(self):
+    def test_power_turn_off_skips_configured_fade_duration(self):
         from keyrgb.tray.controllers.lighting_controller import power_turn_off
         from tests.tray.fakes import make_owner_backed_mock_tray
 
@@ -101,4 +101,4 @@ class TestIdleFadeDuration:
 
         power_turn_off(mock_tray)
 
-        mock_tray.engine.turn_off.assert_called_once_with(fade=True, fade_duration_s=1.2)
+        mock_tray.engine.turn_off.assert_called_once_with()

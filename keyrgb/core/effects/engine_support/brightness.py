@@ -4,11 +4,13 @@ import logging
 import os
 import time
 from collections.abc import Callable
-from threading import RLock
+from concurrent.futures import Future
+from threading import RLock, get_ident
 
 from ..device import Color, KeyboardDeviceProtocol, PerKeyColorMap
 from ..software_targets import average_color_map
 from ..transitions import choose_steps
+from ._start_support import DeferredFadeJobs
 
 logger = logging.getLogger("keyrgb.core.effects.engine_brightness")
 
@@ -35,7 +37,7 @@ def _device_available_or_default(engine: _EngineBrightness, *, default: bool) ->
         return default
 
 
-class _EngineBrightness:
+class _EngineBrightness(DeferredFadeJobs):
     """Brightness state + best-effort fades."""
 
     kb_lock: RLock
@@ -90,7 +92,7 @@ class _EngineBrightness:
         """Whether *token* still owns brightness output. Never raises."""
 
         try:
-            return int(token) == int(self._brightness_fade_token)
+            return not self._closed and int(token) == int(self._brightness_fade_token)
         except _INT_ATTR_ERRORS:
             logger.exception("Failed to compare brightness fade token")
             return False
@@ -104,7 +106,7 @@ class _EngineBrightness:
         duration_s: float,
         token: int,
         max_steps: int = 30,
-    ) -> None:
+    ) -> bool:
         """Best-effort brightness fade.
 
         Uses small stepped updates to reduce abrupt off/dim transitions.
@@ -115,7 +117,7 @@ class _EngineBrightness:
             s = max(0, min(50, int(start)))
             e = max(0, min(50, int(end)))
             if e == s:
-                return
+                return True
 
             if duration_s <= 0:
                 steps = 1
@@ -125,14 +127,17 @@ class _EngineBrightness:
                 steps = max(2, int(steps))
                 dt = float(duration_s) / float(steps)
 
-            if apply_to_hardware:
-                self._ensure_device_available()
+            with self.kb_lock:
+                if not self._brightness_fade_token_is_current(token):
+                    return False
+                if apply_to_hardware:
+                    self._ensure_device_available()
 
             for i in range(1, steps + 1):
                 # Cheap unlocked pre-check: stop sleeping through a cancelled
                 # fade without waiting for the write lock.
                 if not self._brightness_fade_token_is_current(token):
-                    return
+                    return False
                 t = float(i) / float(steps)
                 val = round(s + (e - s) * t)
                 if val == s:
@@ -143,7 +148,7 @@ class _EngineBrightness:
                     # replacement start_effect takes over brightness output;
                     # without this, the stale step would still commit.
                     if not self._brightness_fade_token_is_current(token):
-                        return
+                        return False
                     self.brightness = val
                     if apply_to_hardware:
                         self.kb.set_brightness(int(val))
@@ -151,15 +156,28 @@ class _EngineBrightness:
                     time.sleep(dt)
         except _BRIGHTNESS_FADE_RUNTIME_ERRORS:
             logger.exception("Brightness fade failed")
-            return
+            return False
+        return True
 
-    def turn_off(self, *, fade: bool = False, fade_duration_s: float = 0.18) -> None:
+    def turn_off(self, *, fade: bool = False, fade_duration_s: float = 0.18) -> Future[bool] | None:
         """Turn off all LEDs."""
 
         token = self._bump_brightness_fade_token()
 
         self.stop()
         self._ensure_device_available()
+
+        jobs = self._deferred_fade_jobs if self._deferred_fade_owner == get_ident() else None
+        if fade and jobs is not None:
+            future: Future[bool] = Future()
+            jobs.append(
+                (future, lambda: self._turn_off_target(token=token, fade=fade, fade_duration_s=fade_duration_s))
+            )
+            return future
+        self._turn_off_target(token=token, fade=fade, fade_duration_s=fade_duration_s)
+        return None
+
+    def _turn_off_target(self, *, token: int, fade: bool, fade_duration_s: float) -> bool:
 
         if fade:
             try:
@@ -189,7 +207,7 @@ class _EngineBrightness:
             # while it faded. Committing it would blank the new effect.
             if not self._brightness_fade_token_is_current(token):
                 logger.debug("turn_off: superseded by a newer lighting operation; skipping off commit")
-                return
+                return False
             try:
                 self.brightness = 0
             except _INT_ATTR_ERRORS:
@@ -199,6 +217,7 @@ class _EngineBrightness:
             # effect 0x01). Row/brightness writes alone will not re-light it;
             # the next start must reassert user mode first.
             self._device_mode_off = True
+        return True
 
     def _flatten_perkey_frame_for_fade(self, prev: int, *, token: int) -> None:
         """Write a uniform base-color frame before an off-fade (best-effort).
@@ -236,11 +255,36 @@ class _EngineBrightness:
         apply_to_hardware: bool = True,
         fade: bool = False,
         fade_duration_s: float = 0.18,
-    ) -> None:
+    ) -> Future[bool] | None:
         """Set brightness (0-50 hardware scale)."""
 
         token = self._bump_brightness_fade_token()
         target = max(0, min(50, int(brightness)))
+
+        jobs = self._deferred_fade_jobs if self._deferred_fade_owner == get_ident() else None
+        if fade and jobs is not None:
+            future: Future[bool] = Future()
+            jobs.append(
+                (
+                    future,
+                    lambda: self._set_brightness_target(
+                        target,
+                        token=token,
+                        apply_to_hardware=apply_to_hardware,
+                        fade=fade,
+                        fade_duration_s=fade_duration_s,
+                    ),
+                )
+            )
+            return future
+        self._set_brightness_target(
+            target, token=token, apply_to_hardware=apply_to_hardware, fade=fade, fade_duration_s=fade_duration_s
+        )
+        return None
+
+    def _set_brightness_target(
+        self, target: int, *, token: int, apply_to_hardware: bool, fade: bool, fade_duration_s: float
+    ) -> bool:
 
         try:
             prev = int(self.brightness)
@@ -249,7 +293,7 @@ class _EngineBrightness:
 
         if fade and target != prev:
             end = 1 if target == 0 and prev > 1 else target
-            self._fade_brightness(
+            completed = self._fade_brightness(
                 start=prev,
                 end=end,
                 apply_to_hardware=bool(apply_to_hardware),
@@ -257,6 +301,8 @@ class _EngineBrightness:
                 token=token,
                 max_steps=30,
             )
+            if completed is False:
+                return False
 
         with self.kb_lock:
             # Same rule as turn_off: a replacement start_effect that advanced
@@ -264,7 +310,7 @@ class _EngineBrightness:
             # land on the new effect (cache or hardware).
             if not self._brightness_fade_token_is_current(token):
                 logger.debug("set_brightness: superseded by a newer lighting operation; skipping target commit")
-                return
+                return False
 
             try:
                 prev = int(self.brightness)
@@ -283,9 +329,10 @@ class _EngineBrightness:
                 )
 
             if not apply_to_hardware:
-                return
+                return True
 
             self._ensure_device_available()
             if _debug_brightness_enabled():
                 logger.info("engine -> kb.set_brightness: %s", self.brightness)
             self.kb.set_brightness(self.brightness)
+        return True

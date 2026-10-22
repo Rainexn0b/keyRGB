@@ -13,6 +13,7 @@ from keyrgb.tray.controllers.runtime_coordination import (
     run_tray_observation_if_current,
     run_tray_transition,
 )
+from keyrgb.tray.deck_state import DeckState
 from keyrgb.tray.idle_power_state import (
     is_dim_temp_active,
     read_forced_off_flags,
@@ -25,6 +26,7 @@ from keyrgb.tray.protocols import IdlePowerTrayProtocol
 from ._actions import restore_from_idle  # noqa: F401 — re-export for test monkeypatches
 from ._constants import POST_POWER_SOURCE_CHANGE_IDLE_ACTION_SUPPRESSION_S
 from ._input_idle import InputIdleTracker
+from ._input_wake import InputWakeState, commit_input_wake, poll_input_wake, wake_on_any_input_enabled
 from ._power_source_guard import (
     plan_power_source_guard_update,
     power_source_idle_guard_active as _pure_power_source_idle_guard_active,
@@ -54,6 +56,7 @@ class IdlePollLoopState:
     last_power_source_change_at: float = 0.0
     backlight_state: BacklightState = field(default_factory=BacklightState)
     input_idle_tracker: InputIdleTracker | None = None
+    input_wake: InputWakeState = field(default_factory=InputWakeState)
     wayland_idle_tracker: object | None = None
     wayland_idle_fail_count: int = 0
     wayland_idle_retry_at: float = 0.0
@@ -390,14 +393,28 @@ def run_idle_power_iteration(
         bool(screen_off),
     )
 
-    _maybe_restore_from_controller_sleep(
+    input_wake = poll_input_wake(
         tray,
         loop_state=loop_state,
-        session_idle=session_idle,
-        create_input_idle_tracker_fn=create_input_idle_tracker_fn,
-        read_input_idle_seconds_fn=read_input_idle_seconds_fn,
-        observation_revision=observation_revision,
+        now=now,
+        create_input=create_input_idle_tracker_fn,
+        read_input=read_input_idle_seconds_fn,
+        create_wayland=create_wayland_idle_tracker_fn,
+        read_wayland=read_wayland_idle_fn,
     )
+    any_input_enabled = wake_on_any_input_enabled(tray)
+    if any_input_enabled:
+        if input_wake is not None and input_wake.state is DeckState.CONTROLLER_SLEEP_DARK:
+            commit_input_wake(tray, input_wake, now=now, observation_revision=observation_revision)
+    else:
+        _maybe_restore_from_controller_sleep(
+            tray,
+            loop_state=loop_state,
+            session_idle=session_idle,
+            create_input_idle_tracker_fn=create_input_idle_tracker_fn,
+            read_input_idle_seconds_fn=read_input_idle_seconds_fn,
+            observation_revision=observation_revision,
+        )
     loop_state.prev_session_idle = session_idle
 
     user_forced_off, power_forced_off, idle_forced_off = read_forced_off_flags(tray)
@@ -411,7 +428,9 @@ def run_idle_power_iteration(
         idle_forced_off and safe_bool_attr(tray.config, "controller_sleep_respect", default=False)
     )
     keyboard_activity_after_idle_off = False
-    if idle_restore_requires_keyboard:
+    if idle_restore_requires_keyboard and any_input_enabled:
+        keyboard_activity_after_idle_off = input_wake is not None
+    elif idle_restore_requires_keyboard:
         keyboard_activity_after_idle_off = _keyboard_activity_after(
             loop_state=loop_state,
             timestamp=last_idle_turn_off_at,
@@ -441,14 +460,17 @@ def run_idle_power_iteration(
             attr_name="_controller_sleep_off",
             state_name="controller_sleep_off",
             default=False,
-        ),
+        )
+        and not (any_input_enabled and idle_forced_off),
         idle_restore_requires_keyboard=idle_restore_requires_keyboard,
         keyboard_activity_after_idle_off=keyboard_activity_after_idle_off,
     )
     if _power_source_idle_guard_active(loop_state=loop_state, now=now):
         action = None
     if action == "restore" and idle_restore_requires_keyboard and keyboard_activity_after_idle_off:
-        logger.info("EVENT idle_power:screen_idle_restore trigger=keyboard_evdev")
+        logger.info(
+            "EVENT idle_power:screen_idle_restore trigger=%s", "any_input" if any_input_enabled else "keyboard_evdev"
+        )
 
     action_key = build_idle_action_key_fn(
         action=action,
@@ -476,6 +498,9 @@ def run_idle_power_iteration(
             dim_temp_brightness=int(dim_temp_brightness),
         )
 
+    if action == "restore" and input_wake is not None:
+        commit_input_wake(tray, input_wake, now=now, observation_revision=observation_revision)
+        return
     run_tray_observation_if_current(
         tray,
         observation_revision,

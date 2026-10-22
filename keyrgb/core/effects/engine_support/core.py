@@ -137,6 +137,8 @@ def _query_backend_mapping(
 class _EngineCore:
     """Core engine lifecycle and device acquisition."""
 
+    _drain_brightness_fades: Callable[[float], bool]
+
     def __init__(self, *, backend: _EffectsBackendProtocol | None = None) -> None:
         self.backend = backend
         self._backend_capabilities_changed: Callable[[BackendCapabilities], None] | None = None
@@ -154,6 +156,7 @@ class _EngineCore:
         # start can publish until that lifecycle is resolved; kb_lock is not
         # held during the join.
         self._start_lock = Lock()
+        self._closed = False
         self.device_available = False
         self.kb: KeyboardDeviceProtocol = NullKeyboard()
 
@@ -192,14 +195,19 @@ class _EngineCore:
     def _ensure_device_available(self) -> bool:
         """Best-effort attempt to connect to the keyboard device."""
 
-        self._refresh_backend_capabilities()
-        if self.device_available and not isinstance(self.kb, NullKeyboard):
-            return True
+        # Acquisition and publication share the close/write lock. A worker that
+        # resumes after close cannot reopen the backend or publish a stale handle.
+        with self.kb_lock:
+            if self._closed:
+                return False
+            self._refresh_backend_capabilities()
+            if self.device_available and not isinstance(self.kb, NullKeyboard):
+                return True
 
-        kb, available = acquire_keyboard(kb_lock=self.kb_lock, logger=logger, backend=self.backend)
-        self.kb = kb
-        self.device_available = bool(available)
-        return self.device_available
+            kb, available = acquire_keyboard(kb_lock=self.kb_lock, logger=logger, backend=self.backend)
+            self.kb = kb
+            self.device_available = bool(available)
+            return self.device_available
 
     def set_backend(self, backend: _EffectsBackendProtocol | None) -> None:
         """Update the selected backend and force the next reacquire through it."""
@@ -267,9 +275,17 @@ class _EngineCore:
                 logger.debug("Error closing keyboard device on mark_device_unavailable", exc_info=True)
 
     def close(self) -> None:
-        """Stop the current effect and release the keyboard device."""
+        """Permanently stop output and release the keyboard device."""
 
-        self.stop()
+        with self._start_lock:
+            with self.kb_lock, self._brightness_fade_lock:
+                self._closed = True
+                self._brightness_fade_token += 1
+            self.stop()
+        # Fade completion may re-enter the coordinator/start path. Never join
+        # these workers while holding a lock needed by that completion.
+        if not self._drain_brightness_fades(2.0):
+            logger.warning("Brightness fade workers are still stopping; further device access is blocked")
         thread = self.thread
         if thread is not None and thread.is_alive():
             logger.warning("Deferring keyboard close while effect thread is still stopping")
@@ -278,8 +294,7 @@ class _EngineCore:
         with self.kb_lock:
             old_kb = self.kb
             self.kb = NullKeyboard()
-
-        self.device_available = False
+            self.device_available = False
 
         close_fn = getattr(old_kb, "close", None)
         if callable(close_fn):

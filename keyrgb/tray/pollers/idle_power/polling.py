@@ -220,7 +220,8 @@ def _read_input_idle_seconds(tracker: InputIdleTracker) -> float | None:
 def _create_wayland_idle_tracker(timeout_ms: int) -> object | None:
     from ._wayland_idle import create_wayland_idle_tracker
 
-    return create_wayland_idle_tracker(timeout_ms=timeout_ms)
+    # Zero-timeout listeners are armed only for the opt-in input-wake epoch.
+    return create_wayland_idle_tracker(timeout_ms=timeout_ms, input_only=timeout_ms == 0)
 
 
 def _read_wayland_idle(tracker: object) -> bool | None:
@@ -231,7 +232,7 @@ def _read_wayland_idle(tracker: object) -> bool | None:
     return tracker.is_idle()
 
 
-def _restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
+def _restore_from_idle(tray: IdlePowerTrayProtocol) -> bool:
     from ._actions import restore_from_idle
 
     return restore_from_idle(tray)

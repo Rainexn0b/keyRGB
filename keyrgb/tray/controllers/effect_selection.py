@@ -227,9 +227,9 @@ def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> N
         effect_name = _resolve_lighting_profile_toggle(effect_tray, effect_name)
         base_effect_name = effects_catalog.strip_effect_namespace(effect_name)
 
-        from keyrgb.tray.deck_pipeline import hardware_apply_deferred
+        from keyrgb.tray.deck_pipeline import defer_lighting_change
 
-        if hardware_apply_deferred(tray):
+        if defer_lighting_change(tray):
             _defer_effect_selection(
                 effect_tray,
                 effect_name=effect_name,

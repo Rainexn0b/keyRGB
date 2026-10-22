@@ -189,7 +189,7 @@ def poll_idle_power_loop(
             )
             sleep_fn(0.5)
     finally:
-        for tracker in (loop_state.input_idle_tracker, loop_state.wayland_idle_tracker):
+        for tracker in (loop_state.input_idle_tracker, loop_state.wayland_idle_tracker, loop_state.input_wake):
             close = getattr(tracker, "close", None)
             if not callable(close):
                 continue

@@ -80,6 +80,7 @@ def test_init_builds_controller_sleep_delays_and_fade(monkeypatch) -> None:
     panel = idle_transition_advanced_panel.IdleTransitionAdvancedPanel(
         object(),
         var_controller_sleep_respect=_FakeVar(False),
+        var_wake_on_any_input=_FakeVar(False),
         var_debounce_enter=_FakeVar(6),
         var_debounce_exit=_FakeVar(10),
         var_idle_fade_duration=_FakeVar(0.6),
@@ -91,7 +92,8 @@ def test_init_builds_controller_sleep_delays_and_fade(monkeypatch) -> None:
     assert "wraplength" not in registry["checks"][0].kwargs
     assert registry["labels"][1].kwargs["text"].startswith("Recommended for supported ITE controllers")
     assert registry["labels"][1].kwargs["wraplength"] == 400
-    assert registry["labels"][2].kwargs["text"] == "Delay before reacting to screen idle/blanking, in seconds."
+    assert registry["checks"][1].kwargs["text"] == "Wake on any input"
+    assert registry["labels"][3].kwargs["text"] == "Delay before reacting to screen idle/blanking, in seconds."
     assert registry["spinboxes"][0].kwargs["from_"] == 0.5
     assert registry["spinboxes"][0].kwargs["to"] == 30.0
     assert registry["spinboxes"][0].kwargs["increment"] == 0.5
@@ -108,6 +110,7 @@ def test_init_builds_controller_sleep_delays_and_fade(monkeypatch) -> None:
     assert panel.spn_exit.bind_calls[0][0] == "<Return>"
 
     registry["checks"][0].kwargs["command"]()
+    registry["checks"][1].kwargs["command"]()
     registry["spinboxes"][0].kwargs["command"]()
     registry["spinboxes"][1].kwargs["command"]()
     panel.spn_enter.bind_calls[0][1](None)
@@ -115,7 +118,7 @@ def test_init_builds_controller_sleep_delays_and_fade(monkeypatch) -> None:
     panel.scale_fade_duration.bind_calls[0][1](None)
     panel.scale_fade_duration.kwargs["command"]("1.2")
 
-    assert toggle_calls == ["toggle"] * 6
+    assert toggle_calls == ["toggle"] * 7
     assert panel.lbl_fade_duration_val.options["text"] == "1.2 s"
 
 
@@ -124,6 +127,8 @@ def _make_panel() -> idle_transition_advanced_panel.IdleTransitionAdvancedPanel:
         idle_transition_advanced_panel.IdleTransitionAdvancedPanel
     )
     panel.chk_controller_sleep = _FakeWidget()
+    panel.chk_wake_on_any_input = _FakeWidget()
+    panel.var_controller_sleep_respect = _FakeVar(False)
     panel.spn_enter = _FakeWidget()
     panel.spn_exit = _FakeWidget()
     panel.scale_fade_duration = _FakeWidget()
@@ -140,6 +145,14 @@ def test_apply_enabled_state_never_disables_controller_sleep_checkbox() -> None:
     assert panel.scale_fade_duration.options["state"] == "disabled"
     # Intentionally not gated by power management.
     assert panel.chk_controller_sleep.configure_calls == []
+    assert panel.chk_wake_on_any_input.options["state"] == "disabled"
+
+
+def test_any_input_option_follows_sleep_respect_even_without_power_management() -> None:
+    panel = _make_panel()
+    panel.var_controller_sleep_respect = _FakeVar(True)
+    panel.apply_enabled_state(power_management_enabled=False)
+    assert panel.chk_wake_on_any_input.options["state"] == "normal"
 
 
 def test_apply_enabled_state_enables_timing_controls_with_power_management() -> None:

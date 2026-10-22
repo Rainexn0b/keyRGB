@@ -36,7 +36,7 @@ def execute_idle_action(
     *,
     action: str | None,
     dim_temp_brightness: int,
-    restore_from_idle_fn: Callable[[IdlePowerTrayProtocol], None],
+    restore_from_idle_fn: Callable[[IdlePowerTrayProtocol], object],
     reactive_effects_set: frozenset[str],
     sw_effects_set: frozenset[str],
     call_runtime_boundary: Callable[..., bool],
@@ -46,7 +46,7 @@ def execute_idle_action(
     set_reactive_transition: Callable[..., None],
     set_brightness_best_effort: Callable[..., None],
     recoverable_effect_name_exceptions: tuple[type[BaseException], ...],
-) -> None:
+) -> bool:
     if action == "turn_off":
         _execute_turn_off(
             tray,
@@ -56,7 +56,7 @@ def execute_idle_action(
             log_idle_power_exception=log_idle_power_exception,
             recoverable_effect_name_exceptions=recoverable_effect_name_exceptions,
         )
-        return
+        return True
 
     if action == "dim_to_temp":
         _execute_dim_to_temp(
@@ -71,7 +71,7 @@ def execute_idle_action(
             set_brightness_best_effort=set_brightness_best_effort,
             recoverable_effect_name_exceptions=recoverable_effect_name_exceptions,
         )
-        return
+        return True
 
     if action == "restore_brightness":
         _execute_restore_brightness(
@@ -85,14 +85,15 @@ def execute_idle_action(
             set_brightness_best_effort=set_brightness_best_effort,
             recoverable_effect_name_exceptions=recoverable_effect_name_exceptions,
         )
-        return
+        return True
 
     if action == "restore":
-        _execute_restore(
+        return _execute_restore(
             tray,
             restore_from_idle_fn=restore_from_idle_fn,
             set_engine_hw_brightness_cap=set_engine_hw_brightness_cap,
         )
+    return False
 
 
 def _engine_supports_spatial_output(engine: object) -> bool:
@@ -259,15 +260,15 @@ def _execute_restore_brightness(
 def _execute_restore(
     tray: IdlePowerTrayProtocol,
     *,
-    restore_from_idle_fn: Callable[[IdlePowerTrayProtocol], None],
+    restore_from_idle_fn: Callable[[IdlePowerTrayProtocol], object],
     set_engine_hw_brightness_cap: Callable[..., None],
-) -> None:
+) -> bool:
     user_forced_off = bool(_sync_idle_state_field(tray, prior_name="_user_forced_off", state_name="user_forced_off"))
     power_forced_off = bool(_sync_idle_state_field(tray, prior_name="_power_forced_off", state_name="power_forced_off"))
     if user_forced_off or power_forced_off:
-        return
+        return False
 
     idle_power_state.reset_dim_state_on_tray(tray)
     if hasattr(tray, "engine"):
         set_engine_hw_brightness_cap(tray.engine, None)
-    restore_from_idle_fn(tray)
+    return restore_from_idle_fn(tray) is not False

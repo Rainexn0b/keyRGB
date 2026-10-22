@@ -95,6 +95,8 @@ DEFAULTS: dict = {
     # /sys/class/backlight, plus DPMS screen-off detection) by either turning
     # keyboard LEDs off, or dimming them to a temporary brightness.
     "screen_dim_sync_enabled": True,
+    # Opt-in modifier/pointer wake while honoring controller sleep.
+    "wake_on_any_input": False,
     # 'off' | 'temp'
     "screen_dim_sync_mode": "off",
     # 1-50 (same brightness scale as `brightness`). Used when mode == 'temp'.
