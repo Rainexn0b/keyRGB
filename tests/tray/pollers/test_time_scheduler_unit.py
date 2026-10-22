@@ -93,7 +93,7 @@ def test_run_scheduler_iteration_applies_day_base_brightness_when_power_policy_h
 
     class _FakeDateTime:
         @staticmethod
-        def now() -> datetime:
+        def now(_tz: object = None) -> datetime:
             return datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
 
     with patch("keyrgb.tray.pollers.time_scheduler.datetime", _FakeDateTime):
@@ -137,7 +137,7 @@ def test_run_scheduler_iteration_uses_ac_brightness_as_day_primary_when_configur
 
     class _FakeDateTime:
         @staticmethod
-        def now() -> datetime:
+        def now(_tz: object = None) -> datetime:
             return datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
 
     with (
@@ -185,7 +185,7 @@ def test_run_scheduler_iteration_applies_day_base_when_only_inactive_power_sourc
 
     class _FakeDateTime:
         @staticmethod
-        def now() -> datetime:
+        def now(_tz: object = None) -> datetime:
             return datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
 
     with (
