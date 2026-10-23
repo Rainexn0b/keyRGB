@@ -5,7 +5,7 @@ import os
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from keyrgb.core.diagnostics import diagnostic_session_evidence as _evidence, runtime_capture as _runtime_capture
@@ -127,7 +127,7 @@ def run_diagnostic_session(
 
     # One captured start time drives both the session directory timestamp and the
     # journal --since boundary so the collected slice matches the run exactly.
-    session_start = datetime.now(timezone.utc)
+    session_start = datetime.now(UTC)
     session_start_local = session_start.astimezone()
     timestamp = session_start.strftime("%Y%m%dT%H%M%S.%fZ")
 

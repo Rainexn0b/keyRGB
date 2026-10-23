@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime as _datetime, timezone
+from datetime import UTC, datetime as _datetime
 from types import SimpleNamespace
 
 import pytest
@@ -181,7 +181,7 @@ def test_apply_settings_values_materializes_active_day_reactive_brightness(monke
     class FakeDateTime:
         @staticmethod
         def now() -> _datetime:
-            return _datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
+            return _datetime(2024, 1, 1, 12, 0, tzinfo=UTC)
 
     monkeypatch.setattr(settings_state, "datetime", FakeDateTime)
 
@@ -205,7 +205,7 @@ def test_apply_settings_values_materializes_active_night_reactive_brightness(mon
     class FakeDateTime:
         @staticmethod
         def now() -> _datetime:
-            return _datetime(2024, 1, 1, 22, 0, tzinfo=timezone.utc)
+            return _datetime(2024, 1, 1, 22, 0, tzinfo=UTC)
 
     monkeypatch.setattr(settings_state, "datetime", FakeDateTime)
 
@@ -226,20 +226,18 @@ def test_apply_settings_values_materializes_active_night_reactive_brightness(mon
 def test_internal_settings_apply_converts_default_utc_clock_to_local_time(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from datetime import timezone
-
     from keyrgb.gui.settings import _settings_values as settings_values
 
     cfg = SimpleNamespace(reactive_brightness=50)
 
     class FakeUtcNow:
         def astimezone(self) -> _datetime:
-            return _datetime(2024, 1, 1, 22, 0, tzinfo=timezone.utc)
+            return _datetime(2024, 1, 1, 22, 0, tzinfo=UTC)
 
     class FakeDateTime:
         @staticmethod
         def now(tz) -> FakeUtcNow:
-            assert tz is timezone.utc
+            assert tz is UTC
             return FakeUtcNow()
 
     monkeypatch.setattr(settings_values, "datetime", FakeDateTime)

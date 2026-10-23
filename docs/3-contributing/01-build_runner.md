@@ -44,7 +44,10 @@ sudo dnf install ShellCheck
 # Full pipeline
 
 Use the project venv, not distro `python`. Host numpy stubs on Python 3.14 can
-fail Type Check against the 3.10 mypy floor. See `docs/2-usage/setup.md`.
+fail Type Check against the 3.11 mypy floor. Source installs require Python >= 3.11
+and Pillow >= 13.0.0. See `docs/2-usage/setup.md` for interpreter-matched GI setup;
+release AppImages retain Ubuntu 22.04 / glibc 2.35 with bundled Python 3.11 and
+source-built PyGObject 3.50.2 / pycairo 1.25.1, not distro CPython 3.10 GI.
 
 ```bash
 .venv/bin/python -m buildpython

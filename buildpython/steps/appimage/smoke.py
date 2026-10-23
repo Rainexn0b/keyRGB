@@ -102,6 +102,7 @@ def _smoke_script() -> str:
             tcl_export,
             tk_export,
             'PY="$HERE/usr/bin/python3"',
+            "\"$PY\" -c \"import sys, PIL; assert sys.version_info >= (3, 11); assert int(PIL.__version__.split('.')[0]) >= 13; print('secure-image-runtime-ok')\"",
             "\"$PY\" -c \"import tkinter as tk; t=tk.Tcl(); t.eval('info patchlevel'); print('tcl-ok')\"",
             '"$PY" -c "import _tkinter; print(\'_tkinter-ok\')"',
             '"$PY" -c "import keyrgb.tray.ui.icon; print(\'tray-icon-import-ok\')"',
@@ -113,6 +114,7 @@ def _smoke_script() -> str:
             "apt-get install -y --no-install-recommends libgtk-3-0 libgirepository-1.0-1 xvfb xauth dbus-x11 >/dev/null",
             'export PYSTRAY_BACKEND="appindicator"',
             'export GDK_BACKEND="x11"',
+            "\"$PY\" -c \"import gi, cairo; from gi import _gi; gi.require_version('Gtk', '3.0'); from gi.repository import Gtk; print('gi-cairo-abi-ok')\"",
             (
                 'xvfb-run -a dbus-run-session -- "$PY" -c "import tkinter as tk; r=tk.Tk(); r.update(); r.destroy(); '
                 "import pystray; from PIL import Image; assert pystray.Icon.__module__ == 'pystray._appindicator'; "

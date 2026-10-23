@@ -17,9 +17,9 @@ _PYPROJECT = _REPO_ROOT / "pyproject.toml"
 
 # Declared/tested runtime support: runtime matrix and classifiers grow
 # together, while the type-check floor stays pinned.
-_TESTED_PYTHON_VERSIONS = ("3.10", "3.11", "3.12", "3.13", "3.14")
+_TESTED_PYTHON_VERSIONS = ("3.11", "3.12", "3.13", "3.14")
 _QUALITY_GATE_PYTHON = "3.12"
-_MYPY_FLOOR_PYTHON = "3.10"
+_MYPY_FLOOR_PYTHON = "3.11"
 
 
 def test_build_steps_doc_lists_every_registered_step() -> None:
@@ -75,6 +75,7 @@ def test_ci_runtime_matrix_covers_tested_python_versions() -> None:
 
     for version in _TESTED_PYTHON_VERSIONS:
         assert f'"{version}"' in ci_workflow, f"CI runtime matrix is missing Python {version}"
+    assert '"3.10"' not in ci_workflow, "Python 3.10 is no longer supported"
     assert f'python-version: "{_QUALITY_GATE_PYTHON}"' in ci_workflow, "quality gate must stay on Python 3.12"
 
 
@@ -83,8 +84,12 @@ def test_project_classifiers_track_tested_python_versions() -> None:
 
     for version in _TESTED_PYTHON_VERSIONS:
         assert f"Programming Language :: Python :: {version}" in text, f"project classifier is missing Python {version}"
-    assert 'requires-python = ">=3.10"' in text, "minimum supported Python must stay at 3.10"
-    assert f'python_version = "{_MYPY_FLOOR_PYTHON}"' in text, "mypy language floor must stay at 3.10"
+    assert "Programming Language :: Python :: 3.10" not in text
+    assert 'requires-python = ">=3.11"' in text, "minimum supported Python must stay at 3.11"
+    assert f'python_version = "{_MYPY_FLOOR_PYTHON}"' in text, "mypy language floor must stay at 3.11"
+    assert 'target-version = "py311"' in text
+    assert 'target-version = ["py311"]' in text
+    assert '"Pillow>=13.0.0"' in text
 
 
 def test_ci_doc_states_tested_matrix_and_mypy_floor() -> None:
@@ -93,14 +98,23 @@ def test_ci_doc_states_tested_matrix_and_mypy_floor() -> None:
     for version in _TESTED_PYTHON_VERSIONS:
         assert version in text, f"CI doc is missing tested Python {version}"
     assert "Quality Gate" in text and _QUALITY_GATE_PYTHON in text
-    assert "3.10" in text and "mypy" in text, "CI doc must state the 3.10 mypy floor"
+    assert f'python_version = "{_MYPY_FLOOR_PYTHON}"' in text, "CI doc must state the 3.11 mypy floor"
 
 
 def test_release_build_pins_appimage_abi_floor_and_matching_gi_python() -> None:
     workflow = _RELEASE_WORKFLOW.read_text(encoding="utf-8")
     assert "runs-on: ubuntu-22.04" in workflow
-    assert 'python-version: "3.10"' in workflow
+    assert "uses: actions/setup-python@" in workflow
+    assert 'python-version: "3.11"' in workflow
+    assert "PyGObject==3.50.2" in workflow
+    assert "pycairo==1.25.1" in workflow
+    assert "--no-binary=pycairo,PyGObject" in workflow, "both GI bindings must be source-built"
+    assert not any(line.strip().startswith("python3-gi") for line in workflow.splitlines()), (
+        "distro GI targets the wrong CPython ABI"
+    )
+    assert "libcairo2-dev" in workflow and "libgirepository1.0-dev" in workflow
     assert "binutils" in workflow
     text = _CI_DOC.read_text(encoding="utf-8")
     assert "glibc 2.35" in text
     assert "Ubuntu 22.04" in text
+    assert "3.50.2" in text and "1.25.1" in text

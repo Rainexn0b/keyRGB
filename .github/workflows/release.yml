@@ -1,6 +1,7 @@
 name: Release
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - "v*"
@@ -27,8 +28,8 @@ jobs:
         # Pin major tag v7 to immutable commit SHA.
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          # Match Jammy's python3-gi CPython ABI; the AppImage bundles Python.
-          python-version: "3.10"
+          # Pillow 13 requires 3.11; build matching GI bindings below, not Jammy's cp310 package.
+          python-version: "3.11"
           cache: pip
 
       - name: Install system deps
@@ -41,7 +42,10 @@ jobs:
             file \
             squashfs-tools \
             zsync \
-            python3-gi \
+            pkg-config \
+            libcairo2-dev \
+            libgirepository1.0-dev \
+            gobject-introspection \
             gir1.2-gtk-3.0 \
             gir1.2-ayatanaappindicator3-0.1 \
             libayatana-appindicator3-1 \
@@ -52,6 +56,9 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
+          # Jammy's GI runtime is supported by this binding release. Compile both
+          # extensions with the exact Python ABI bundled into the AppImage.
+          python -m pip install --no-binary=pycairo,PyGObject pycairo==1.25.1 PyGObject==3.50.2
           python -m pip install -e ".[dev]"
 
       - name: Dependency audit (pip-audit)
@@ -84,6 +91,7 @@ jobs:
           cat keyrgb-x86_64.AppImage.sha256
 
       - name: Upload AppImage to GitHub Release
+        if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -92,3 +100,15 @@ jobs:
             dist/keyrgb-x86_64.AppImage.zsync \
             dist/keyrgb-x86_64.AppImage.sha256 \
             --generate-notes
+
+      - name: Upload validated build-only artifacts
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: keyrgb-validated-appimage
+          path: |
+            dist/keyrgb-x86_64.AppImage
+            dist/keyrgb-x86_64.AppImage.zsync
+            dist/keyrgb-x86_64.AppImage.sha256
+          if-no-files-found: error
+          retention-days: 7

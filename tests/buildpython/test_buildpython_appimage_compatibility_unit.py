@@ -203,6 +203,12 @@ def test_gi_bundle_keeps_transitive_typelib_namespaces(tmp_path, monkeypatch) ->
     site = tmp_path / "host-site"
     (site / "gi").mkdir(parents=True)
     (site / "gi/__init__.py").touch()
+    (site / "cairo").mkdir()
+    suffix = ".cpython-311-x86_64-linux-gnu.so"
+    gi_extension = site / "gi" / f"_gi{suffix}"
+    cairo_extension = site / "cairo" / f"_cairo{suffix}"
+    gi_extension.touch()
+    cairo_extension.touch()
     typelibs = tmp_path / "typelibs"
     typelibs.mkdir()
     names = ("Gtk-3.0.typelib", "Atk-1.0.typelib", "xlib-2.0.typelib", "HarfBuzz-0.0.typelib")
@@ -211,7 +217,18 @@ def test_gi_bundle_keeps_transitive_typelib_namespaces(tmp_path, monkeypatch) ->
     monkeypatch.setattr(
         pygobject_bundle.subprocess,
         "run",
-        lambda *_args, **_kwargs: SimpleNamespace(returncode=0, stdout=json.dumps({"purelib": str(site)})),
+        lambda *_args, **_kwargs: SimpleNamespace(
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "gi": str(site / "gi"),
+                    "cairo": str(site / "cairo"),
+                    "gi_extension": str(gi_extension),
+                    "cairo_extension": str(cairo_extension),
+                    "extension_suffix": suffix,
+                }
+            ),
+        ),
     )
     monkeypatch.setattr(
         pygobject_bundle,
@@ -222,6 +239,8 @@ def test_gi_bundle_keeps_transitive_typelib_namespaces(tmp_path, monkeypatch) ->
     pygobject_bundle.bundle_pygobject(appdir=appdir, site_packages=appdir / "site-packages")
     for name in names:
         assert (appdir / "usr/lib/girepository-1.0" / name).read_bytes() == b"metadata"
+    assert (appdir / "site-packages/gi" / gi_extension.name).is_file()
+    assert (appdir / "site-packages/cairo" / cairo_extension.name).is_file()
 
 
 @pytest.mark.parametrize("override", [None, "fixture:custom"])
@@ -258,6 +277,8 @@ def test_smoke_script_checks_desktop_and_actual_launcher_without_masking_bundle(
     assert 'PYSTRAY_BACKEND="appindicator"' in script
     assert '"$HERE/AppRun" --diagnostics --no-usb' in script
     assert "GI_TYPELIB_PATH" in script
+    assert "secure-image-runtime-ok" in script
+    assert "gi-cairo-abi-ok" in script
     packages = " ".join(line for line in script.splitlines() if "apt-get install" in line)
     assert "python3-gi" not in packages
     assert "indicator" not in packages

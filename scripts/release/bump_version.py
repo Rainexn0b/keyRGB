@@ -108,7 +108,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("version", help="Version in X.Y.Z format")
     parser.add_argument(
         "--date",
-        default=dt.datetime.now(tz=dt.timezone.utc).date().isoformat(),
+        default=dt.datetime.now(tz=dt.UTC).date().isoformat(),
         help="Release date for changelog heading (default: today, YYYY-MM-DD)",
     )
     return parser.parse_args()

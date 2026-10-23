@@ -3,7 +3,7 @@ from __future__ import annotations
 import builtins
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -193,7 +193,7 @@ def test_run_diagnostic_session_uses_distinct_dirs_on_same_second(tmp_path: Path
     monkeypatch.setattr(diagnostic_session._runtime_capture, "_wait_with_signal_forwarding", lambda _process: 0)
     monkeypatch.setattr(dsev.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=0))
     monkeypatch.setattr(diagnostics_pkg, "collect_diagnostics", lambda **_kwargs: _FakeDiagnostics())
-    monkeypatch.setattr(diagnostic_session, "datetime", _FixedNow(datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc)))
+    monkeypatch.setattr(diagnostic_session, "datetime", _FixedNow(datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)))
 
     first = diagnostic_session.run_diagnostic_session(output_dir_root=session_root)
     second = diagnostic_session.run_diagnostic_session(output_dir_root=session_root)

@@ -44,6 +44,18 @@ never ignore code, test, or dependency-audit failures. Buildpython validates the
 embedded update information and the `.zsync` sidecar's length, SHA-1, filename,
 URL, and block checksum table before release upload.
 
+For packaging or runtime changes, validate the exact `main` commit before tagging
+with `gh workflow run release.yml --ref main`. This manual run uses the full release
+profile (including Ubuntu 22.04/24.04 smoke tests) and uploads the three files as
+the `keyrgb-validated-appimage` Actions artifact; it does not publish a GitHub
+Release. Watch that run and fix failures before pushing a release tag.
+
+The builder uses Python 3.11 with source-built PyGObject 3.50.2 and pycairo 1.25.1.
+Do not copy Ubuntu 22.04's Python 3.10 GI extension into that runtime. Source
+installs require Python >=3.11 and Pillow >=13.0.0; the AppImage bundles its own
+interpreter. Dependency audits remain mandatory and must not be waived to recover
+a failed release.
+
 Then run the safe release flow:
 
 ```bash
@@ -67,6 +79,12 @@ nonempty GitHub Release assets:
 Run `sha256sum -c keyrgb-x86_64.AppImage.sha256` in the download directory
 alongside the AppImage. Do not consider the release complete if any asset is
 missing or empty or the checksum fails.
+
+If a tag-triggered build fails before creating any release/assets, fix `main`
+first. Do not assume re-running the old tag will pick up those fixes. Replacing
+an unpublished tag requires explicit approval, confirmation of the old tag's
+commit, successful CI/build validation on the replacement, and a fresh check that
+no release or assets have appeared. Never silently move a published tag.
 
 The embedded update information is
 `gh-releases-zsync|Rainexn0b|keyRGB|latest|keyrgb-x86_64.AppImage.zsync`.

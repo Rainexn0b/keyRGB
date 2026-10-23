@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -42,31 +42,31 @@ class TestIsNight:
         day_start = (8, 0)
         night_start = (20, 0)
 
-        assert _is_night(datetime(2024, 1, 1, 23, 0, tzinfo=timezone.utc), day_start, night_start) is True
-        assert _is_night(datetime(2024, 1, 1, 3, 0, tzinfo=timezone.utc), day_start, night_start) is True
-        assert _is_night(datetime(2024, 1, 1, 8, 0, tzinfo=timezone.utc), day_start, night_start) is False
-        assert _is_night(datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc), day_start, night_start) is False
-        assert _is_night(datetime(2024, 1, 1, 20, 0, tzinfo=timezone.utc), day_start, night_start) is True
+        assert _is_night(datetime(2024, 1, 1, 23, 0, tzinfo=UTC), day_start, night_start) is True
+        assert _is_night(datetime(2024, 1, 1, 3, 0, tzinfo=UTC), day_start, night_start) is True
+        assert _is_night(datetime(2024, 1, 1, 8, 0, tzinfo=UTC), day_start, night_start) is False
+        assert _is_night(datetime(2024, 1, 1, 12, 0, tzinfo=UTC), day_start, night_start) is False
+        assert _is_night(datetime(2024, 1, 1, 20, 0, tzinfo=UTC), day_start, night_start) is True
 
     def test_night_contiguous_during_day(self) -> None:
         # Night: 02:00 to 14:00
         day_start = (14, 0)
         night_start = (2, 0)
 
-        assert _is_night(datetime(2024, 1, 1, 2, 0, tzinfo=timezone.utc), day_start, night_start) is True
-        assert _is_night(datetime(2024, 1, 1, 8, 0, tzinfo=timezone.utc), day_start, night_start) is True
-        assert _is_night(datetime(2024, 1, 1, 13, 59, tzinfo=timezone.utc), day_start, night_start) is True
-        assert _is_night(datetime(2024, 1, 1, 14, 0, tzinfo=timezone.utc), day_start, night_start) is False
-        assert _is_night(datetime(2024, 1, 1, 1, 0, tzinfo=timezone.utc), day_start, night_start) is False
-        assert _is_night(datetime(2024, 1, 1, 15, 0, tzinfo=timezone.utc), day_start, night_start) is False
+        assert _is_night(datetime(2024, 1, 1, 2, 0, tzinfo=UTC), day_start, night_start) is True
+        assert _is_night(datetime(2024, 1, 1, 8, 0, tzinfo=UTC), day_start, night_start) is True
+        assert _is_night(datetime(2024, 1, 1, 13, 59, tzinfo=UTC), day_start, night_start) is True
+        assert _is_night(datetime(2024, 1, 1, 14, 0, tzinfo=UTC), day_start, night_start) is False
+        assert _is_night(datetime(2024, 1, 1, 1, 0, tzinfo=UTC), day_start, night_start) is False
+        assert _is_night(datetime(2024, 1, 1, 15, 0, tzinfo=UTC), day_start, night_start) is False
 
     def test_equal_times_means_always_day(self) -> None:
         day_start = (8, 0)
         night_start = (8, 0)
 
-        assert _is_night(datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc), day_start, night_start) is False
-        assert _is_night(datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc), day_start, night_start) is False
-        assert _is_night(datetime(2024, 1, 1, 23, 59, tzinfo=timezone.utc), day_start, night_start) is False
+        assert _is_night(datetime(2024, 1, 1, 0, 0, tzinfo=UTC), day_start, night_start) is False
+        assert _is_night(datetime(2024, 1, 1, 12, 0, tzinfo=UTC), day_start, night_start) is False
+        assert _is_night(datetime(2024, 1, 1, 23, 59, tzinfo=UTC), day_start, night_start) is False
 
 
 def test_run_scheduler_iteration_applies_day_base_brightness_when_power_policy_has_no_base_override() -> None:
@@ -94,7 +94,7 @@ def test_run_scheduler_iteration_applies_day_base_brightness_when_power_policy_h
     class _FakeDateTime:
         @staticmethod
         def now(_tz: object = None) -> datetime:
-            return datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
+            return datetime(2024, 1, 1, 12, 0, tzinfo=UTC)
 
     with patch("keyrgb.tray.pollers.time_scheduler.datetime", _FakeDateTime):
         _run_scheduler_iteration(tray)
@@ -138,7 +138,7 @@ def test_run_scheduler_iteration_uses_ac_brightness_as_day_primary_when_configur
     class _FakeDateTime:
         @staticmethod
         def now(_tz: object = None) -> datetime:
-            return datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
+            return datetime(2024, 1, 1, 12, 0, tzinfo=UTC)
 
     with (
         patch("keyrgb.tray.pollers.time_scheduler.datetime", _FakeDateTime),
@@ -186,7 +186,7 @@ def test_run_scheduler_iteration_applies_day_base_when_only_inactive_power_sourc
     class _FakeDateTime:
         @staticmethod
         def now(_tz: object = None) -> datetime:
-            return datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
+            return datetime(2024, 1, 1, 12, 0, tzinfo=UTC)
 
     with (
         patch("keyrgb.tray.pollers.time_scheduler.datetime", _FakeDateTime),
@@ -220,7 +220,7 @@ def test_active_power_source_base_brightness_uses_day_policy() -> None:
 
     state = resolve_scheduler_brightness_state(
         config,
-        now=datetime(2024, 1, 1, 11, 10, tzinfo=timezone.utc),
+        now=datetime(2024, 1, 1, 11, 10, tzinfo=UTC),
         power_management_enabled=True,
     )
 
@@ -245,7 +245,7 @@ def test_active_power_source_base_brightness_uses_lower_value_at_night() -> None
 
     state = resolve_scheduler_brightness_state(
         config,
-        now=datetime(2024, 1, 1, 22, 10, tzinfo=timezone.utc),
+        now=datetime(2024, 1, 1, 22, 10, tzinfo=UTC),
         power_management_enabled=True,
     )
 
@@ -300,7 +300,7 @@ def test_scheduler_loop_advances_same_key_after_power_forced_off_deferral() -> N
         _scheduler_loop(
             tray,
             sleep_fn=sleep_fn,
-            now_fn=lambda: datetime(2024, 1, 1, 22, 0, tzinfo=timezone.utc),
+            now_fn=lambda: datetime(2024, 1, 1, 22, 0, tzinfo=UTC),
         )
 
     # The scheduler records the intent while the power owner keeps the deck

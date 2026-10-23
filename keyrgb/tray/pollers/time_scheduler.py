@@ -4,7 +4,7 @@ import logging
 import threading
 import time
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from keyrgb.core import brightness_layers as _layers
@@ -135,7 +135,7 @@ def _run_scheduler_iteration(tray: LightingTrayProtocol) -> None:
     observation_revision = capture_transition_revision(tray)
     state = resolve_scheduler_brightness_state(
         tray.config,
-        now=datetime.now(timezone.utc).astimezone(),  # Use the local clock for day/night scheduling.
+        now=datetime.now(UTC).astimezone(),  # Use the local clock for day/night scheduling.
         power_management_enabled=bool(getattr(tray.config, "power_management_enabled", True)),
     )
     if not state.enabled:

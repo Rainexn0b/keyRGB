@@ -8,7 +8,7 @@ import signal
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from types import FrameType
 from typing import Protocol, TextIO
@@ -212,7 +212,7 @@ def _write_capture_header(
 ) -> None:
     enabled_flags = " ".join(f"{key}={env[key]}" for key in _DEBUG_ENV_KEYS if key in env)
     log_file.write("KeyRGB runtime log capture\n")
-    log_file.write(f"started_utc={datetime.now(timezone.utc).isoformat()}\n")
+    log_file.write(f"started_utc={datetime.now(UTC).isoformat()}\n")
     log_file.write(f"mode={mode}\n")
     log_file.write(f"launcher={launcher}\n")
     log_file.write(f"command={shlex.join(command)}\n")

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Protocol, cast
 
 from . import _support_window_backend_probe_config as _probe_config
@@ -217,7 +217,7 @@ def run_backend_speed_probe(
         if ok is None:
             return
 
-    started_at = datetime.now(timezone.utc).isoformat()
+    started_at = datetime.now(UTC).isoformat()
     try:
         show_probe_message_dialog(
             window,
@@ -315,7 +315,7 @@ def _complete_backend_speed_probe(
     except tk_runtime_errors:
         notes = None
 
-    completed_at = datetime.now(timezone.utc).isoformat()
+    completed_at = datetime.now(UTC).isoformat()
     raw_speeds = plan.get("requested_ui_speeds")
     raw_samples = plan.get("samples")
     result = {

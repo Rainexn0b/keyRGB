@@ -1,7 +1,7 @@
 # Local setup
 
 Use the project venv for every Python command. Distro `python` can pull host
-packages (including numpy stubs) that fail Type Check against KeyRGB's 3.10
+packages (including numpy stubs) that fail Type Check against KeyRGB's 3.11
 mypy floor.
 
 ```bash
@@ -10,8 +10,14 @@ mypy floor.
 
 ## System packages
 
-PyGObject (`gi`) must come from the distro, not pip. The venv Python minor
-version must match that `_gi` extension.
+For local development, prefer distro PyGObject (`gi`). The venv Python minor
+version must match that `_gi` extension and be at least 3.11. Do not use Ubuntu
+22.04's CPython 3.10 GI extension with a newer interpreter; use the AppImage or
+build GI bindings for that interpreter instead.
+
+Release AppImages still build on Ubuntu 22.04 (glibc 2.35), using
+`actions/setup-python` Python 3.11 and source-built PyGObject 3.50.2 plus pycairo
+1.25.1 for a matching ABI. They do not use Jammy's distro CPython 3.10 GI module.
 
 **Fedora / Nobara**
 
@@ -33,7 +39,8 @@ sudo apt install python3-gi gir1.2-ayatanaappindicator3-0.1
 
 ## Venv
 
-Python >= 3.10. Expose distro site-packages so `gi` loads:
+Python >= 3.11 and Pillow >= 13.0.0 (installed by the project dependency below).
+With a matching distro Python >= 3.11, expose distro site-packages so `gi` loads:
 
 ```bash
 python3 -m venv --system-site-packages .venv

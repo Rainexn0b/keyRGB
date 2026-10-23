@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime as _datetime, timezone
+from datetime import UTC, datetime as _datetime
 from unittest.mock import MagicMock
 
 import pytest
@@ -159,7 +159,7 @@ def test_pipeline_on_ac_at_night_uses_scheduler_night_brightness(monkeypatch: py
     class FakeDateTime:
         @staticmethod
         def now(_tz: object = None) -> _datetime:
-            return _datetime(2024, 1, 1, 22, 24, tzinfo=timezone.utc)
+            return _datetime(2024, 1, 1, 22, 24, tzinfo=UTC)
 
     monkeypatch.setattr(manager_helpers, "datetime", FakeDateTime)
 
@@ -205,7 +205,7 @@ def test_pipeline_on_ac_by_day_keeps_power_source_brightness_primary(
     class FakeDateTime:
         @staticmethod
         def now(_tz: object = None) -> _datetime:
-            return _datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
+            return _datetime(2024, 1, 1, 12, 0, tzinfo=UTC)
 
     monkeypatch.setattr(manager_helpers, "datetime", FakeDateTime)
 
@@ -252,7 +252,7 @@ def test_pipeline_on_ac_by_day_uses_scheduler_brightness_when_active_power_sourc
     class FakeDateTime:
         @staticmethod
         def now(_tz: object = None) -> _datetime:
-            return _datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
+            return _datetime(2024, 1, 1, 12, 0, tzinfo=UTC)
 
     monkeypatch.setattr(manager_helpers, "datetime", FakeDateTime)
 

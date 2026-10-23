@@ -9,6 +9,7 @@ Sleep/wake ownership consolidation and optional pointer/modifier wake.
 - Tray/Power: Unify manual, idle, native-controller and power restore through one transaction with explicit applied, blocked, deferred and failed outcomes. Retain overlapping off causes, retry failed restores, reassert the scene after resume even when suspend-off is disabled, and preserve lid/user-off precedence.
 - Effects: Run restore fades outside the runtime coordinator with generation and `kb_lock` guards. Make engine close terminal and bound fade-worker shutdown; prevent stale or cancelled fades from reopening the keyboard.
 - Settings/Power: Add opt-in **Wake on any input** under **Advanced → Controller sleep and idle timing**. With controller-sleep respect enabled, modifier keys, mouse and touchpad activity can restore lighting. Keep firmware-native brightness handoff, dim limits, screen-idle guards and single-restore ordering; include the setting in diagnostics.
+- Packaging/Dependencies: Raise the source Python minimum to 3.11 and Pillow to 13.0.0; align runtime CI and tool targets with the new floor. Keep the AppImage's Ubuntu 22.04 / glibc 2.35 baseline, bundling setup-python Python 3.11 with source-built PyGObject 3.50.2 and pycairo 1.25.1 instead of Jammy's CPython 3.10 GI extension. Public command entrypoints are unchanged.
 - Tests/Docs: Add sleep/wake sequence, rollback, shutdown and input-event regressions. Automated validation does not replace live hardware acceptance for controller sleep, wake timing and physical LED behavior.
 
 ## 0.38.2 (2026-10-09)

@@ -10,7 +10,7 @@ from ...utils.subproc import python_exe
 
 
 def bundle_pygobject(*, appdir: Path, site_packages: Path) -> None:
-    """Best-effort bundle of PyGObject (gi) for tray/AppIndicator support.
+    """Bundle working, interpreter-matched GI/Cairo bindings for AppIndicator.
 
     We do not attempt to fully vendor GTK; instead we bundle the Python bindings
     plus typelibs so pystray can use AppIndicator on desktop environments.
@@ -19,10 +19,17 @@ def bundle_pygobject(*, appdir: Path, site_packages: Path) -> None:
     code = r"""
 import json
 import sysconfig
-paths = sysconfig.get_paths()
+from pathlib import Path
+import gi
+import gi._gi
+import cairo
+import cairo._cairo
 print(json.dumps({
-    "purelib": paths.get("purelib") or "",
-    "platlib": paths.get("platlib") or "",
+    "gi": str(Path(gi.__file__).parent),
+    "cairo": str(Path(cairo.__file__).parent),
+    "gi_extension": gi._gi.__file__,
+    "cairo_extension": cairo._cairo.__file__,
+    "extension_suffix": sysconfig.get_config_var("EXT_SUFFIX"),
 }))
 """
     proc = subprocess.run(
@@ -33,42 +40,36 @@ print(json.dumps({
         check=False,
     )
     if proc.returncode != 0:
-        return
+        raise SystemExit(f"AppImage requires working GI/Cairo bindings for the build interpreter: {proc.stderr}")
 
     try:
         data = json.loads(proc.stdout)
-    except json.JSONDecodeError:
-        return
+    except json.JSONDecodeError as exc:
+        raise SystemExit("Invalid AppImage GI/Cairo binding manifest") from exc
 
-    candidates: list[Path] = []
-    for k in ("purelib", "platlib"):
-        v = str(data.get(k, "") or "")
-        if v:
-            candidates.append(Path(v))
+    if not isinstance(data, dict) or not isinstance(data.get("extension_suffix"), str) or not data["extension_suffix"]:
+        raise SystemExit("Invalid AppImage GI/Cairo extension suffix")
+    # Never fall back to arbitrary system dist-packages: Jammy's cp310 _gi is
+    # not loadable by the bundled cp311 interpreter. Check both packages before
+    # replacing anything, including Cairo's own native extension.
+    sources: dict[str, Path] = {}
+    for name in ("gi", "cairo"):
+        source = Path(str(data.get(name, "")))
+        extension = Path(str(data.get(f"{name}_extension", "")))
+        if (
+            not source.is_dir()
+            or not extension.is_file()
+            or extension.parent != source
+            or not extension.name.endswith(data["extension_suffix"])
+        ):
+            raise SystemExit(f"AppImage {name} bindings do not match the build interpreter ABI")
+        sources[name] = source
 
-    # Also consider system Python dist-packages. On Ubuntu runners we install
-    # python3-gi via apt which lives here (and matches the system CPython ABI).
-    candidates.extend(
-        [
-            Path("/usr/lib/python3/dist-packages"),
-            Path("/usr/lib/python3.12/dist-packages"),
-        ]
-    )
-
-    gi_src: Path | None = None
-    for base in candidates:
-        maybe = base / "gi"
-        if maybe.exists() and maybe.is_dir():
-            gi_src = maybe
-            break
-
-    if gi_src is None:
-        return
-
-    gi_dst = site_packages / "gi"
-    if gi_dst.exists():
-        shutil.rmtree(gi_dst)
-    shutil.copytree(gi_src, gi_dst, symlinks=False)
+    for name, source in sources.items():
+        destination = site_packages / name
+        if destination.exists():
+            shutil.rmtree(destination)
+        shutil.copytree(source, destination, symlinks=False)
 
     # Bundle typelibs (girepository). Prefer the multiarch path when present.
     typelib_src_candidates = [
@@ -78,7 +79,7 @@ print(json.dumps({
     ]
     typelib_src = next((p for p in typelib_src_candidates if p.exists()), None)
     if typelib_src is None:
-        return
+        raise SystemExit("AppImage requires GI typelibs for the desktop runtime")
 
     typelib_dst = appdir / "usr" / "lib" / "girepository-1.0"
     typelib_dst.mkdir(parents=True, exist_ok=True)
@@ -87,5 +88,5 @@ print(json.dumps({
     # Gtk -> Atk, Pango -> HarfBuzz, etc.). A top-level namespace allowlist
     # leaves GI unusable on desktops without system introspection packages.
     # Copy the build environment's small metadata set, not the host GTK stack.
-    for name in typelib_src.glob("*.typelib"):
-        shutil.copy2(name, typelib_dst / name.name)
+    for typelib in typelib_src.glob("*.typelib"):
+        shutil.copy2(typelib, typelib_dst / typelib.name)

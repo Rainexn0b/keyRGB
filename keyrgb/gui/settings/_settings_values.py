@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from keyrgb.core.power.system import PowerMode
 from keyrgb.core.resources.layouts.catalog import VALID_LAYOUT_IDS
@@ -277,7 +277,7 @@ def _apply_settings_values_to_config_unbatched(
 
     # Scheduler boundaries are local wall-clock values. Start from an aware UTC
     # timestamp for lint/timezone safety, then convert to the local timezone.
-    clock = datetime.now(timezone.utc).astimezone() if now is None else now
+    clock = datetime.now(UTC).astimezone() if now is None else now
     active_reactive_brightness = settings_scheduler.active_scheduler_reactive_brightness(
         values,
         now=clock,

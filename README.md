@@ -63,6 +63,10 @@ For most users, use the AppImage installer. Only use a source checkout if you wa
 
 The installer downloads the AppImage, stores it as `~/.local/bin/keyrgb.AppImage`, installs the `~/.local/bin/keyrgb` launcher, and refreshes desktop integration. The AppImage bundles the runtime dependencies, so normal installs do not need Python/Tk GUI packages from your distro.
 
+Release AppImages retain the Ubuntu 22.04 / glibc 2.35 baseline and bundle Python
+3.11 with source-built PyGObject 3.50.2 and pycairo 1.25.1 for the matching Python
+ABI, rather than Ubuntu's CPython 3.10 GI extension.
+
 Standard install:
 
 ```bash
@@ -122,6 +126,9 @@ curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/uninstall.sh 
 <summary><b>Advanced usage and source checkout</b></summary>
 
 #### Clone and install for local development
+
+Source installs require Python 3.11 or newer and Pillow 13.0.0 or newer. See
+[local setup](docs/2-usage/setup.md) for interpreter-matched GI dependencies.
 
 ```bash
 git clone https://github.com/Rainexn0b/keyRGB.git
