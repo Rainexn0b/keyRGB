@@ -26,7 +26,7 @@ jobs:
 
       - name: Set up Python
         # Pin major tag v7 to immutable commit SHA.
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           # Pillow 13 requires 3.11; build matching GI bindings below, not Jammy's cp310 package.
           python-version: "3.11"
